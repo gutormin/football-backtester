@@ -1,0 +1,1295 @@
+{
+    "ec51b9c44ad5e34552f3ab53f7262813": {
+        "title": "Iran vs New Zealand",
+        "sport": "soccer_fifa_world_cup",
+        "commence_time": "2026-06-16T01:03:00Z",
+        "bookmakers": {
+            "Pinnacle": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.33,
+                    "current": 3.2,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 4.83,
+                    "current": 6.43,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 2.41,
+                    "current": 1.71,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                },
+                "spreads_home_spread": {
+                    "market_type": "spreads",
+                    "outcome_name": "Iran",
+                    "norm_market": "home_spread",
+                    "opening": 1.89,
+                    "current": 2.35,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                },
+                "spreads_away_spread": {
+                    "market_type": "spreads",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away_spread",
+                    "opening": 2.01,
+                    "current": 1.65,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 2.07,
+                    "current": 2.07,
+                    "last_updated": "2026-06-16T02:37:23.938702+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 1.81,
+                    "current": 1.81,
+                    "last_updated": "2026-06-16T02:37:23.938702+00:00"
+                }
+            },
+            "BetMGM": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.88,
+                    "current": 3.2,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.75,
+                    "current": 6.75,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.85,
+                    "current": 1.67,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.69,
+                    "current": 1.98,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.15,
+                    "current": 1.83,
+                    "last_updated": "2026-06-16T02:48:07.158632+00:00"
+                }
+            },
+            "Grosvenor": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.8,
+                    "current": 5.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.75,
+                    "current": 8.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.75,
+                    "current": 1.25,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.74,
+                    "current": 3.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 1.97,
+                    "current": 1.27,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "FanDuel": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.4,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.0,
+                    "current": 8.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.83,
+                    "current": 1.28,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Sky Bet": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 4.75,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.5,
+                    "current": 9.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.83,
+                    "current": 1.29,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Paddy Power": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.0,
+                    "current": 9.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.8,
+                    "current": 1.25,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Bovada": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.0,
+                    "current": 8.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.9,
+                    "current": 1.33,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "spreads_home_spread": {
+                    "market_type": "spreads",
+                    "outcome_name": "Iran",
+                    "norm_market": "home_spread",
+                    "opening": 2.1,
+                    "current": 1.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "spreads_away_spread": {
+                    "market_type": "spreads",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away_spread",
+                    "opening": 1.77,
+                    "current": 2.65,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.75,
+                    "current": 3.2,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.12,
+                    "current": 1.36,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Casumo": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.88,
+                    "current": 5.8,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.1,
+                    "current": 9.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.8,
+                    "current": 1.28,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.77,
+                    "current": 3.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.0,
+                    "current": 1.29,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Coolbet": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.9,
+                    "current": 5.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.0,
+                    "current": 10.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.95,
+                    "current": 1.3,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.7,
+                    "current": 3.25,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.15,
+                    "current": 1.35,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Coral": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.87,
+                    "current": 4.8,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.5,
+                    "current": 9.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.8,
+                    "current": 1.3,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Ladbrokes": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.87,
+                    "current": 5.25,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.5,
+                    "current": 9.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.8,
+                    "current": 1.28,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Betway": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 4.75,
+                    "current": 8.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.91,
+                    "current": 1.3,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "888sport": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.7,
+                    "current": 5.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.0,
+                    "current": 9.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.85,
+                    "current": 1.25,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Unibet (NL)": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.7,
+                    "current": 5.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.0,
+                    "current": 10.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.88,
+                    "current": 1.3,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.67,
+                    "current": 3.3,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.15,
+                    "current": 1.32,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Unibet (UK)": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.5,
+                    "current": 9.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.9,
+                    "current": 1.3,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "LiveScore Bet": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.6,
+                    "current": 4.75,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.6,
+                    "current": 9.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.82,
+                    "current": 1.27,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "LeoVegas": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.3,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.6,
+                    "current": 8.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.72,
+                    "current": 1.25,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.72,
+                    "current": 3.35,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 1.94,
+                    "current": 1.26,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "LeoVegas (SE)": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.3,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.6,
+                    "current": 8.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.71,
+                    "current": 1.23,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Virgin Bet": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.4,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.6,
+                    "current": 8.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.74,
+                    "current": 1.26,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Unibet (SE)": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.88,
+                    "current": 5.75,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.1,
+                    "current": 9.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.8,
+                    "current": 1.29,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.77,
+                    "current": 3.45,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.0,
+                    "current": 1.29,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Smarkets": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.9,
+                    "current": 5.9,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.8,
+                    "current": 9.4,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.98,
+                    "current": 1.32,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_lay_Iran": {
+                    "market_type": "h2h_lay",
+                    "outcome_name": "Iran",
+                    "norm_market": "Iran",
+                    "opening": 3.0,
+                    "current": 7.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_lay_New Zealand": {
+                    "market_type": "h2h_lay",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "New Zealand",
+                    "opening": 6.6,
+                    "current": 10.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_lay_Draw": {
+                    "market_type": "h2h_lay",
+                    "outcome_name": "Draw",
+                    "norm_market": "Draw",
+                    "opening": 2.08,
+                    "current": 1.38,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Betfair": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.94,
+                    "current": 5.7,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.0,
+                    "current": 10.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 2.0,
+                    "current": 1.36,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_lay_Iran": {
+                    "market_type": "h2h_lay",
+                    "outcome_name": "Iran",
+                    "norm_market": "Iran",
+                    "opening": 2.96,
+                    "current": 6.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_lay_New Zealand": {
+                    "market_type": "h2h_lay",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "New Zealand",
+                    "opening": 6.2,
+                    "current": 11.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_lay_Draw": {
+                    "market_type": "h2h_lay",
+                    "outcome_name": "Draw",
+                    "norm_market": "Draw",
+                    "opening": 2.04,
+                    "current": 1.37,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "PMU (FR)": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.88,
+                    "current": 5.8,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.1,
+                    "current": 9.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.8,
+                    "current": 1.28,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.71,
+                    "current": 3.4,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 1.94,
+                    "current": 1.24,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "BoyleSports": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.8,
+                    "current": 6.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.5,
+                    "current": 9.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.83,
+                    "current": 1.25,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "MyBookie.ag": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.7,
+                    "current": 4.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 4.85,
+                    "current": 6.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.9,
+                    "current": 1.4,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "spreads_home_spread": {
+                    "market_type": "spreads",
+                    "outcome_name": "Iran",
+                    "norm_market": "home_spread",
+                    "opening": 2.7,
+                    "current": 4.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "spreads_away_spread": {
+                    "market_type": "spreads",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away_spread",
+                    "opening": 1.4,
+                    "current": 1.18,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.65,
+                    "current": 2.6,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.0,
+                    "current": 1.35,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "DraftKings": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.0,
+                    "current": 9.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.87,
+                    "current": 1.31,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "BetRivers": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.88,
+                    "current": 5.4,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.1,
+                    "current": 8.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.8,
+                    "current": 1.27,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.77,
+                    "current": 3.45,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.0,
+                    "current": 1.29,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Betsson": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.68,
+                    "current": 5.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.95,
+                    "current": 9.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.9,
+                    "current": 1.28,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.65,
+                    "current": 3.4,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.12,
+                    "current": 1.27,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Nordic Bet": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.75,
+                    "current": 5.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.95,
+                    "current": 9.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.85,
+                    "current": 1.28,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.65,
+                    "current": 3.4,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.12,
+                    "current": 1.27,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Betclic (FR)": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.57,
+                    "current": 4.25,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.25,
+                    "current": 7.75,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.91,
+                    "current": 1.36,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Bet Victor": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.7,
+                    "current": 4.33,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.75,
+                    "current": 7.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.75,
+                    "current": 1.36,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Matchbook": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.98,
+                    "current": 6.4,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.0,
+                    "current": 10.5,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 2.0,
+                    "current": 1.33,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_lay_Iran": {
+                    "market_type": "h2h_lay",
+                    "outcome_name": "Iran",
+                    "norm_market": "Iran",
+                    "opening": 3.0,
+                    "current": 6.6,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_lay_New Zealand": {
+                    "market_type": "h2h_lay",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "New Zealand",
+                    "opening": 6.2,
+                    "current": 12.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_lay_Draw": {
+                    "market_type": "h2h_lay",
+                    "outcome_name": "Draw",
+                    "norm_market": "Draw",
+                    "opening": 2.04,
+                    "current": 1.34,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "spreads_home_spread": {
+                    "market_type": "spreads",
+                    "outcome_name": "Iran",
+                    "norm_market": "home_spread",
+                    "opening": 2.92,
+                    "current": 6.2,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "spreads_away_spread": {
+                    "market_type": "spreads",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away_spread",
+                    "opening": 1.51,
+                    "current": 1.18,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_over25": {
+                    "market_type": "totals",
+                    "outcome_name": "Over",
+                    "norm_market": "over25",
+                    "opening": 1.73,
+                    "current": 3.85,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "totals_under25": {
+                    "market_type": "totals",
+                    "outcome_name": "Under",
+                    "norm_market": "under25",
+                    "opening": 2.36,
+                    "current": 1.34,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Winamax (DE)": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.7,
+                    "current": 5.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 5.2,
+                    "current": 8.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.86,
+                    "current": 1.28,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Winamax (FR)": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.6,
+                    "current": 4.8,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 4.9,
+                    "current": 8.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.8,
+                    "current": 1.28,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            },
+            "Tipico": {
+                "h2h_home": {
+                    "market_type": "h2h",
+                    "outcome_name": "Iran",
+                    "norm_market": "home",
+                    "opening": 2.55,
+                    "current": 5.2,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_away": {
+                    "market_type": "h2h",
+                    "outcome_name": "New Zealand",
+                    "norm_market": "away",
+                    "opening": 6.5,
+                    "current": 9.0,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                },
+                "h2h_draw": {
+                    "market_type": "h2h",
+                    "outcome_name": "Draw",
+                    "norm_market": "draw",
+                    "opening": 1.85,
+                    "current": 1.27,
+                    "last_updated": "2026-06-16T02:57:32.945219+00:00"
+                }
+            }
+        }
+    }
+}

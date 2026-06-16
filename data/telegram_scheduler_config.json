@@ -1,0 +1,17 @@
+{
+    "enabled": true,
+    "check_interval_hours": 6,
+    "leagues": [
+        "BRA"
+    ],
+    "market": [
+        "home"
+    ],
+    "value_threshold": 1.15,
+    "min_odds": 1.5,
+    "max_odds": 50.0,
+    "staking_rule": "fixed",
+    "stake_value": 10.0,
+    "initial_bankroll": 1000.0,
+    "upcoming_source": "api"
+}

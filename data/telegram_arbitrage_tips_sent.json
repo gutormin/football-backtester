@@ -1,0 +1,42 @@
+[
+    {
+        "id": "504615e5-049a-47d7-ad19-afc94eff49fb",
+        "match": "Iran vs New Zealand",
+        "date": "16/06/2026 01:03",
+        "profit_margin": 4.36,
+        "status": "Pendente",
+        "created_at": "2026-06-15 22:25:04"
+    },
+    {
+        "id": "1d406622-ccfc-4dd8-b29f-f500d1a10cea",
+        "match": "Londrina vs Avai",
+        "date": "16/06/2026 00:00",
+        "profit_margin": 4.63,
+        "status": "Pendente",
+        "created_at": "2026-06-15 22:36:12"
+    },
+    {
+        "id": "09d9488c-14f2-45e4-93f7-a754245e179a",
+        "match": "St. Louis Cardinals vs San Diego Padres",
+        "date": "15/06/2026 23:46",
+        "profit_margin": 11.9,
+        "status": "Pendente",
+        "created_at": "2026-06-15 22:52:39"
+    },
+    {
+        "id": "744cacc2-88ac-49d6-8cae-c5a7c6942e7c",
+        "match": "Arizona Diamondbacks vs Los Angeles Angels",
+        "date": "16/06/2026 01:41",
+        "profit_margin": 2.65,
+        "status": "Pendente",
+        "created_at": "2026-06-15 22:52:41"
+    },
+    {
+        "id": "156e9828-8a4b-4d82-8929-86158d410042",
+        "match": "Chicago Cubs vs Colorado Rockies",
+        "date": "16/06/2026 00:06",
+        "profit_margin": 6.16,
+        "status": "Pendente",
+        "created_at": "2026-06-15 23:42:39"
+    }
+]

@@ -1,0 +1,5 @@
+{
+    "enabled": true,
+    "check_interval_hours": 1.0,
+    "min_profit_pct": 0.5
+}

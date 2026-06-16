@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sports Betting Backtester Pro</title>
+<!-- Google Fonts: Outfit (headings) & Inter (UI) -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Outfit:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- FontAwesome for professional icons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<!-- Chart.js for premium charting -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="manifest.json" rel="manifest"/>
+<link href="styles.css?v=5" rel="stylesheet"/>
+</head>
+<body>
+<div class="app-container">
+<!-- Sidebar Controls -->
+<aside class="sidebar">
+<div class="brand">
+<i class="fa-solid fa-chart-line logo-icon"></i>
+<h2>Predictive<span>Backtest</span></h2>
+</div>
+<form id="backtest-form" onsubmit="event.preventDefault(); runBacktest();">
+<div class="form-section">
+<h3><i class="fa-solid fa-trophy"></i> Ligas</h3>
+<div class="leagues-container-wrapper">
+<div class="league-quick-actions">
+<button onclick="selectAllLeagues(true)" type="button">Todas</button>
+<button onclick="selectAllLeagues(false)" type="button">Limpar</button>
+</div>
+<div class="leagues-list" id="leagues-checkbox-list">
+<!-- Populated dynamically -->
+<div class="loading-spinner-small">Carregando...</div>
+</div>
+</div>
+</div>
+<div class="form-section">
+<h3><i class="fa-solid fa-calendar-days"></i> Período</h3>
+<div class="form-group-row">
+<div class="form-group">
+<label for="start-date">Início</label>
+<input id="start-date" required="" type="date" value="2021-01-01"/>
+</div>
+<div class="form-group">
+<label for="end-date">Fim</label>
+<input id="end-date" required="" type="date" value="2026-06-01"/>
+</div>
+</div>
+<div class="form-group" style="margin-top: 10px;">
+<label class="multiselect-option-item" style="font-size: 12px; padding: 5px 0;">
+<input id="oos-toggle" type="checkbox"/> Validação Fora-da-Amostra (20%)
+                            <i class="fa-solid fa-circle-info" onclick="showToast(this.title, 'info')" style="font-size: 10px; color: var(--text-muted); cursor: help;" title="Separa automaticamente os últimos 20% do período como teste independente. O ROI deste período nunca é usado para ajustar parâmetros — é o único número em que você pode confiar de verdade."></i>
+</label>
+</div>
+<div class="form-group" style="margin-top: 5px;">
+<label class="multiselect-option-item" style="font-size: 12px; padding: 5px 0;">
+<input id="use-ml-toggle" type="checkbox"/> 🧠 Correção por Machine Learning (XGBoost)
+                            <i class="fa-solid fa-circle-info" onclick="showToast(this.title, 'info')" style="font-size: 10px; color: var(--text-muted); cursor: help;" title="Treina um modelo XGBoost em lote (expanding window) para aprender com as distorções passadas e ajustar as probabilidades matemáticas futuras, otimizando o Edge."></i>
+</label>
+</div>
+</div>
+<div class="form-section">
+<h3><i class="fa-solid fa-shop"></i> Mercado e Cotação</h3>
+<div class="form-group">
+<label>Mercado de Aposta</label>
+<div class="custom-multiselect" id="market-multiselect">
+<div class="multiselect-trigger" onclick="toggleMarketDropdown(event)">
+<span id="multiselect-label">Selecione os Mercados...</span>
+<i class="fa-solid fa-chevron-down"></i>
+</div>
+<div class="multiselect-dropdown" id="market-dropdown" style="display: none;">
+<div class="multiselect-quick-actions">
+<button onclick="selectAllMarkets(true, event)" type="button">Todos</button>
+<button onclick="selectAllMarkets(false, event)" type="button">Limpar</button>
+</div>
+<div class="multiselect-options" id="market-checkboxes-container">
+<div class="multiselect-optgroup">Resultado 1X2</div>
+<label class="multiselect-option-item">
+<input checked="" onchange="onMarketSelectionChange()" type="checkbox" value="home"/> Mandante (1)
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="away"/> Visitante (2)
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="draw"/> Empate (X)
+                                    </label>
+<div class="multiselect-optgroup">Dupla Chance (Lay)</div>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_home"/> Contra Mandante (X2)
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_away"/> Contra Visitante (1X)
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_draw"/> Contra Empate (12)
+                                    </label>
+<div class="multiselect-optgroup">Gols (Over/Under)</div>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="over15"/> Over 1.5 Gols
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="over25"/> Over 2.5 Gols
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="under25"/> Under 2.5 Gols
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="over35"/> Over 3.5 Gols
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="under35"/> Under 3.5 Gols
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="over45"/> Over 4.5 Gols
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="under45"/> Under 4.5 Gols
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="over55"/> Over 5.5 Gols
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="under55"/> Under 5.5 Gols
+                                    </label>
+<div class="multiselect-optgroup">Ambas Marcam</div>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="btts_yes"/> Ambas Marcam Sim
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="btts_no"/> Ambas Marcam Não
+                                    </label>
+                                    <div class="multiselect-optgroup">Handicap Asiático (Main Spread)</div>
+                                    <label class="multiselect-option-item">
+                                        <input type="checkbox" value="ah_home" onchange="onMarketSelectionChange()"> AH Casa
+                                    </label>
+                                    <label class="multiselect-option-item">
+                                        <input type="checkbox" value="ah_away" onchange="onMarketSelectionChange()"> AH Fora
+                                    </label>
+
+                                    <div class="multiselect-optgroup">Placar Exato</div>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="cs_10"/> Placar Exato 1-0
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="cs_20"/> Placar Exato 2-0
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="cs_21"/> Placar Exato 2-1
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="cs_00"/> Placar Exato 0-0
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="cs_11"/> Placar Exato 1-1
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="cs_01"/> Placar Exato 0-1
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="cs_02"/> Placar Exato 0-2
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="cs_12"/> Placar Exato 1-2
+                                    </label>
+<div class="multiselect-optgroup">Lay Placar Exato</div>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_cs_10"/> Lay Placar 1-0
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_cs_20"/> Lay Placar 2-0
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_cs_21"/> Lay Placar 2-1
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_cs_00"/> Lay Placar 0-0
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_cs_11"/> Lay Placar 1-1
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_cs_01"/> Lay Placar 0-1
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_cs_02"/> Lay Placar 0-2
+                                    </label>
+<label class="multiselect-option-item">
+<input onchange="onMarketSelectionChange()" type="checkbox" value="lay_cs_12"/> Lay Placar 1-2
+                                    </label>
+</div>
+</div>
+</div>
+</div>
+<div class="form-group-row">
+<div class="form-group">
+<label for="odds-source">Fonte Odds</label>
+<select id="odds-source">
+<option value="B365">Bet365</option>
+<option value="Avg">Média Mercado</option>
+<option value="Max">Máxima Mercado</option>
+</select>
+</div>
+<div class="form-group" id="group-ev">
+<label for="val-threshold" title="Aposta somente se a Probabilidade do Modelo * Odds da Casa for maior que este valor">Gatilho EV (+)</label>
+<input id="val-threshold" max="2.0" min="0.8" step="0.01" type="number" value="1.05"/>
+</div>
+<div class="form-group" id="group-drop" style="display: none;">
+<label for="val-drop-pct" title="Aposta somente se a Odd de Abertura tiver despencado mais que esta porcentagem % em relação ao Fechamento">Drop Mínimo Exigido (%)</label>
+<input id="val-drop-pct" max="50.0" min="1.0" step="0.5" type="number" value="5.0"/>
+</div>
+</div>
+<div class="form-group-row">
+<div class="form-group">
+<label for="min-odds">Odds Mínima</label>
+<input id="min-odds" max="50.0" min="1.0" step="0.05" type="number" value="1.00"/>
+</div>
+<div class="form-group">
+<label for="max-odds">Odds Máxima</label>
+<input id="max-odds" max="100.0" min="1.0" step="0.5" type="number" value="50.00"/>
+</div>
+</div>
+</div>
+<div class="form-section">
+<h3><i class="fa-solid fa-wallet"></i> Gestão de Banca</h3>
+<div class="form-group-row">
+<div class="form-group">
+<label for="init-bankroll">Banca Inicial ($)</label>
+<input id="init-bankroll" min="10" type="number" value="1000"/>
+</div>
+<div class="form-group">
+<label for="stake-rule">Gestão</label>
+<select id="stake-rule" onchange="toggleStakeLabel()">
+<option value="fixed">Stake Fixa ($)</option>
+<option value="proportional">Proporcional (%)</option>
+<option value="kelly">Full Kelly Criterion</option>
+<option value="kelly_half">Kelly Criterion (1/2)</option>
+<option value="kelly_quarter">Kelly Criterion (1/4)</option>
+<option value="kelly_eighth">Kelly Criterion (1/8)</option>
+</select>
+</div>
+</div>
+<div class="form-group" id="stake-val-group">
+<label for="stake-value" id="stake-val-label">Valor da Aposta ($)</label>
+<input id="stake-value" min="0.1" step="0.5" type="number" value="10"/>
+</div>
+<div class="form-group" id="exchange-commission-group" style="display: none;">
+<label for="exchange-commission">Comissão Exchange (%)
+                            <i class="fa-solid fa-circle-info" onclick="showToast(this.title, 'info')" style="font-size: 10px; color: var(--text-muted); cursor: help;" title="Taxa cobrada pela exchange (ex: Betfair cobra ~5%) sobre os lucros líquidos em apostas Lay. Deixe 0 para ignorar."></i>
+</label>
+<input id="exchange-commission" max="20" min="0" placeholder="5.0" step="0.5" type="number" value="5"/>
+</div>
+</div>
+<!-- PWA & Native Alerts Section -->
+<div class="form-section">
+<h3><i class="fa-solid fa-bell"></i> PWA &amp; Notificações Web</h3>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<button class="btn-scanner" id="btn-request-notifications" onclick="requestNotificationPermission()" style="font-size: 11px; padding: 6px; justify-content: center; width: 100%;" type="button"><i class="fa-solid fa-bell"></i> Ativar Notificações</button>
+<button class="btn-clear" id="btn-test-notifications" onclick="testNotificationAlert()" style="font-size: 11px; padding: 6px; justify-content: center; border: 1px solid var(--primary); color: var(--primary); width: 100%;" type="button"><i class="fa-solid fa-paper-plane"></i> Testar Alerta Nativo</button>
+</div>
+</div>
+<button class="btn-primary" id="btn-run-backtest" type="submit">
+<span id="btn-text"><i class="fa-solid fa-play"></i> Executar Backtest</span>
+<div class="loader-spinner" id="btn-loader"></div>
+</button>
+</form>
+</aside>
+<!-- Main Dashboard View -->
+<main class="main-dashboard">
+<!-- Header Banner -->
+<header class="dashboard-header">
+<div class="header-title-section">
+<h1>Dashboard de Backtesting Preditivo</h1>
+<p>Simulação e análise estatística de apostas baseada na Distribuição Poisson e dados históricos.</p>
+<div class="active-strategy-banner" id="active-strategy-banner" style="display: none;">
+<span class="strategy-badge-item"><i class="fa-solid fa-trophy"></i> <span id="active-leagues-text">N/A</span></span>
+<span class="strategy-separator">|</span>
+<span class="strategy-badge-item"><i class="fa-solid fa-shop"></i> <span id="active-market-text">N/A</span></span>
+<span class="strategy-separator">|</span>
+<span class="strategy-badge-item"><i class="fa-solid fa-filter"></i> Odds: <span id="active-odds-text">1.00 - 50.00</span></span>
+<span class="strategy-separator">|</span>
+<span class="strategy-badge-item"><i class="fa-solid fa-bolt"></i> Gatilho EV: <span id="active-ev-text">1.05</span></span>
+</div>
+</div>
+<!-- Database Sync Card -->
+<div class="db-sync-card">
+<div class="db-info">
+<span class="db-title"><i class="fa-solid fa-database"></i> Base de Dados Históricos</span>
+<div class="db-stats">
+<span class="badge badge-error" id="db-status-badge">Desconectado</span>
+<span id="db-update-time">Último Sync: N/A</span>
+</div>
+</div>
+<select id="db-sync-source" style="background: rgba(10, 11, 16, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 6px 8px; font-size: 11px; outline: none; cursor: pointer; height: 32px; font-family: inherit;">
+<option value="csv">Football-Data CSV</option>
+<option value="api">API DataFootball</option>
+</select>
+<button class="btn-sync" id="btn-sync-db" onclick="syncDatabase()">
+<i class="fa-solid fa-arrows-rotate"></i> Sincronizar
+                    </button>
+<button class="btn-sync" id="btn-export-backtest" onclick="exportBacktestReport()" style="display: none;" title="Exportar relatório completo do backtest para CSV (Excel)">
+<i class="fa-solid fa-file-csv"></i> Exportar CSV
+                    </button>
+<button class="btn-clear" id="btn-clear-dash" onclick="clearDashboard()" title="Limpar todos os gráficos e resultados para uma nova simulação">
+<i class="fa-solid fa-trash-can"></i> Limpar Painel
+                    </button>
+<button class="btn-scanner" id="btn-save-strategy" onclick="openSaveStrategyModal()" style="display: none; background: linear-gradient(135deg, #10b981 0%, #059669 100%); margin-left: 10px;" title="Salvar esta estratégia no histórico">
+<i class="fa-solid fa-star"></i> Salvar Estratégia
+                    </button>
+</div> <!-- End db-sync-card -->
+</header>
+
+<!-- Navigation Tabs -->
+<div class="tabs-container" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0;">
+    <button class="tab-btn active" id="tab-btn-scanner" onclick="switchTab('tab-scanner')" style="background: none; border: none; color: var(--text-primary); font-family: var(--font-heading); font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-bottom: 2px solid var(--primary); transition: all 0.3s ease;"><i class="fa-solid fa-globe"></i> Scanner Institucional</button>
+    <button class="tab-btn" id="tab-btn-laboratory" onclick="switchTab('tab-laboratory')" style="background: none; border: none; color: var(--text-muted); font-family: var(--font-heading); font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-bottom: 2px solid transparent; transition: all 0.3s ease;"><i class="fa-solid fa-microscope"></i> Laboratório Estatístico</button>
+    <button class="tab-btn" id="tab-btn-radar" onclick="switchTab('tab-radar')" style="background: none; border: none; color: var(--text-muted); font-family: var(--font-heading); font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-bottom: 2px solid transparent; transition: all 0.3s ease;"><i class="fa-solid fa-satellite-dish"></i> Radar Smart Money</button>
+    <button class="tab-btn" id="tab-btn-arbitrage" onclick="switchTab('tab-arbitrage')" style="background: none; border: none; color: var(--text-muted); font-family: var(--font-heading); font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-bottom: 2px solid transparent; transition: all 0.3s ease;"><i class="fa-solid fa-scale-balanced"></i> Arbitragem</button>
+    <button class="tab-btn" id="tab-btn-operations" onclick="switchTab('tab-operations')" style="background: none; border: none; color: var(--text-muted); font-family: var(--font-heading); font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-bottom: 2px solid transparent; transition: all 0.3s ease;"><i class="fa-solid fa-bolt"></i> Operação Diária</button>
+    <button class="tab-btn" id="tab-btn-gr" onclick="switchTab('tab-gr')" style="background: none; border: none; color: var(--text-muted); font-family: var(--font-heading); font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-bottom: 2px solid transparent; transition: all 0.3s ease;"><i class="fa-solid fa-shield-halved"></i> Gestão de Risco</button>
+    <button class="tab-btn" id="tab-btn-history" onclick="switchTab('tab-history')" style="background: none; border: none; color: var(--text-muted); font-family: var(--font-heading); font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-bottom: 2px solid transparent; transition: all 0.3s ease;"><i class="fa-solid fa-bookmark"></i> Histórico</button>
+</div>
+            <!-- Tab: Scanner -->
+            <div id="tab-scanner" class="tab-pane active" style="display: block;">
+            <!-- Strategy Scanner Section -->
+            <section class="scanner-section">
+                <div class="scanner-card">
+                    <div class="scanner-header-wrapper">
+                        <div class="scanner-title">
+                            <h3><i class="fa-solid fa-wand-magic-sparkles text-glow"></i> Scanner Institucional</h3>
+                            <p>Analise rapidamente quais mercados ou ligas tiveram o maior lucro e ROI no período selecionado.</p>
+                        </div>
+                        <div class="scanner-buttons" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                            <button type="button" class="btn-scanner" id="btn-scan-markets" onclick="runScanner('markets')">
+                                <i class="fa-solid fa-chart-pie"></i> Escanear Mercados
+                            </button>
+                            <button type="button" class="btn-scanner" id="btn-scan-leagues" onclick="runScanner('leagues')">
+                                <i class="fa-solid fa-ranking-star"></i> Escanear Ligas
+                            </button>
+                            <div style="width: 1px; background: rgba(255,255,255,0.1); margin: 0 5px;"></div>
+                            <button type="button" class="btn-scanner" id="btn-eqs-scan-markets" onclick="runEqsScanner('markets')" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: #34d399; font-size: 11px;">
+                                <i class="fa-solid fa-list-check"></i> Mercados APROVADOS
+                            </button>
+                            <button type="button" class="btn-scanner" id="btn-eqs-scan-leagues" onclick="runEqsScanner('leagues')" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: #34d399; font-size: 11px;">
+                                <i class="fa-solid fa-globe"></i> Ligas APROVADAS
+                            </button>
+                            <button type="button" class="btn-scanner" id="btn-eqs-scan-combinations" onclick="runEqsScanner('combinations')" style="background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.5); color: #34d399; font-size: 11px; font-weight: bold; border-width: 2px;">
+                                <i class="fa-solid fa-layer-group"></i> SUPER SCAN (Ligas + Mercados)
+                            </button>
+                            <div style="width: 1px; background: rgba(255,255,255,0.1); margin: 0 5px;"></div>
+                            <button type="button" class="btn-scanner" onclick="document.getElementById('global-scanner-results').innerHTML = ''; document.getElementById('scanner-results').style.display = 'none';" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #f87171; font-size: 11px; margin-left: auto;">
+                                <i class="fa-solid fa-eraser"></i> Limpar Tela
+                            </button>
+                        </div>
+                    </div>
+                    <div id="scanner-results" class="scanner-results-container" style="display: none;">
+                        <!-- Results grid gets populated dynamically -->
+                    </div>
+                    <div id="global-scanner-results" style="margin-top: 20px;"></div>
+                </div>
+            </section>
+            
+            <!-- EQS Table Container -->
+            <div id="eqs-table-container" style="margin-top: 20px;"></div>
+            </div>
+
+<!-- Tab: Radar Smart Money -->
+<div class="tab-pane" id="tab-radar" style="display: none;">
+    <div class="scanner-card" style="margin-bottom: 20px;">
+        <div class="scanner-header-wrapper">
+            <div class="scanner-title">
+                <h3><i class="fa-solid fa-satellite-dish text-glow" style="color: var(--warning);"></i> Radar Smart Money (Dropping Odds)</h3>
+                <p>Detecte movimentações violentas de dinheiro institucional e acompanhe o fluxo contra ou a favor do mercado.</p>
+            </div>
+            
+            <div class="steam-mode-toggle" style="display: flex; gap: 10px; margin-bottom: 10px; margin-top: 10px; align-items: center; width: 100%;">
+                <button id="btn-mode-lab" class="action-button active" onclick="toggleSteamMode('lab')" style="padding: 8px 15px; font-size: 13px; background: rgba(var(--primary-rgb), 0.2); color: var(--primary); border: 1px solid rgba(var(--primary-rgb), 0.4);">
+                    <i class="fa-solid fa-flask"></i> Modo Laboratório (Backtest)
+                </button>
+                <button id="btn-mode-live" class="action-button" onclick="toggleSteamMode('live')" style="padding: 8px 15px; font-size: 13px; background: transparent; color: var(--text-secondary); border: 1px solid transparent;">
+                    <i class="fa-solid fa-broadcast-tower"></i> Radar Ao Vivo
+                </button>
+            </div>
+
+            <div class="scanner-buttons" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                <button id="btn-scan-steam" class="action-button active" onclick="runSteamScan()">
+                    <i class="fa-solid fa-flask"></i> Executar Backtest
+                </button>
+                <button id="btn-clear-steam" class="action-button danger" onclick="clearSteamScan()">
+                    <i class="fa-solid fa-trash"></i> Limpar Tela
+                </button>
+            </div>
+        </div>
+        
+        <div class="info-alert" style="margin-top: 15px; display: flex; align-items: flex-start; gap: 15px; padding: 15px; background: rgba(var(--warning-rgb), 0.05); border: 1px solid rgba(var(--warning-rgb), 0.2); border-radius: 8px;">
+            <i class="fa-solid fa-triangle-exclamation" style="color: var(--warning); font-size: 20px; margin-top: 2px;"></i>
+            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+                <strong style="color: var(--warning);">Isolamento Matemático:</strong> Esta aba <strong>NÃO</strong> utiliza o modelo de Expected Goals de Poisson. O backtest simulado aqui testa exclusivamente: <em>"O que teria acontecido com a minha banca se eu apostasse apenas nos times/mercados que tiveram um Steam Move maior que o gatilho exigido?"</em>
+            </div>
+        </div>
+        
+        <div class="glassmorphism" style="margin-top: 20px; padding: 20px;">
+            <h4 style="color: var(--primary); margin-bottom: 15px; font-size: 15px;"><i class="fa-solid fa-book-open"></i> Como utilizar o Smart Money (Dropping Odds)</h4>
+            
+            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; display: flex; flex-direction: column; gap: 15px;">
+                <p>O <strong>Smart Money</strong> detecta quando grandes volumes de dinheiro institucional (sindicatos asiáticos, robôs ou apostadores profissionais) entram de forma agressiva em uma aposta, forçando as casas a "esmagarem" (derrubarem) a cotação rapidamente para se protegerem do prejuízo.</p>
+                
+                <div style="background: rgba(255,255,255,0.03); border-left: 3px solid #10b981; padding: 12px; border-radius: 4px;">
+                    <strong style="color: #10b981;">Estratégia 1: Seguir o Dinheiro (A Favor da Queda)</strong><br>
+                    Aposte na mesma seleção que sofreu a queda brusca. Tente encontrar casas de apostas "desatentas" (soft bookmakers) que ainda não perceberam o movimento global e ainda não derrubaram a odd.<br>
+                    <em>Exemplo:</em> O scanner aponta que a odd de Vitória do Flamengo despencou de <strong>@2.20</strong> para <strong>@1.60</strong> no mercado asiático. Você corre na sua casa de apostas local (que está atrasada) e consegue pegar o Flamengo ainda a <strong>@2.10</strong>. Você acaba de comprar uma aposta de extremo valor (EV+)!
+                </div>
+
+                <div style="background: rgba(255,255,255,0.03); border-left: 3px solid #ef4444; padding: 12px; border-radius: 4px;">
+                    <strong style="color: #ef4444;">Estratégia 2: Contra a Manada (Lay the Public)</strong><br>
+                    Quando uma odd cai exageradamente devido a um "hype" (overreaction), a odd do time adversário sobe proporcionalmente. Se a queda for injustificada por emoção do público, a odd adversária fica hiper-inflada.<br>
+                    <em>Exemplo:</em> O Brasil vai jogar e a massa aposta cegamente na seleção. A odd do Brasil derrete de <strong>@1.40</strong> para <strong>@1.15</strong>, enquanto a odd do adversário explode de <strong>@6.00</strong> para <strong>@11.00</strong>. Ao apostar no Handicap Positivo do adversário, você lucra no longo prazo contra o "dinheiro burro" do mercado.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="steam-loading-overlay" style="display: none; padding: 40px; text-align: center; color: var(--text-muted);">
+        <i class="fa-solid fa-satellite-dish fa-spin" style="font-size: 24px; color: var(--warning); margin-bottom: 10px;"></i>
+        <p>Rastreando o mercado asiático em busca de anomalias...</p>
+    </div>
+    
+    <div id="steam-table-container" style="margin-top: 20px;"></div>
+    <div id="steam-live-table-container" style="margin-top: 20px; display: none;">
+        <table class="data-table" id="steam-live-table">
+            <thead>
+                <tr>
+                    <th>JOGO / DATA</th>
+                    <th>CASA</th>
+                    <th>MERCADO</th>
+                    <th>ABERTURA</th>
+                    <th>ATUAL</th>
+                    <th>QUEDA</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Populated dynamically -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Tab: Arbitrage -->
+            <div id="tab-arbitrage" class="tab-pane" style="display: none;">
+                <div class="content-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h2 style="margin: 0; color: #34d399; font-weight: 600;"><i class="fa-solid fa-scale-balanced"></i> Scanner de Arbitragem (Surebets)</h2>
+                            <p style="margin: 5px 0 0 0; color: #9ca3af; font-size: 14px;">Monitoramento em tempo real de assimetrias globais (Risco Zero).</p>
+                        </div>
+                        <button type="button" class="btn-primary" id="btn-scan-arbitrage" onclick="runArbitrageScan()">
+                            <i class="fa-solid fa-radar"></i> Rastrear Oportunidades
+                        </button>
+                    </div>
+                    </div>
+
+                    <div class="glassmorphism" style="margin-bottom: 20px; padding: 15px;">
+                        <h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-filter"></i> Filtro de Casas de Apostas (Minhas Contas)</h4>
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;" id="bookie-filter-container">
+                            <label><input type="checkbox" class="bookie-cb" value="Bet365" checked> Bet365</label>
+                            <label><input type="checkbox" class="bookie-cb" value="Pinnacle" checked> Pinnacle</label>
+                            <label><input type="checkbox" class="bookie-cb" value="Betfair Exchange" checked> Betfair Exchange</label>
+                            <label><input type="checkbox" class="bookie-cb" value="Betfair" checked> Betfair</label>
+                            <label><input type="checkbox" class="bookie-cb" value="Betano" checked> Betano</label>
+                            <label><input type="checkbox" class="bookie-cb" value="1xBet" checked> 1xBet</label>
+                            <label><input type="checkbox" class="bookie-cb" value="Sportingbet" checked> Sportingbet</label>
+                            <label><input type="checkbox" class="bookie-cb" value="Betsson" checked> Betsson</label>
+                            <label><input type="checkbox" class="bookie-cb" value="Marathon Bet" checked> Marathon Bet</label>
+                            <label><input type="checkbox" class="bookie-cb" value="888sport" checked> 888sport</label>
+                            <label><input type="checkbox" class="bookie-cb" value="William Hill" checked> William Hill</label>
+                            <label><input type="checkbox" class="bookie-cb" value="Bovada" checked> Bovada</label>
+                        </div>
+                    </div>
+
+                    <div class="glassmorphism" style="margin-bottom: 20px; padding: 15px;">
+                        <h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;"><i class="fa-brands fa-telegram text-glow" style="color: #24A1DE;"></i> Robô do Telegram (Surebets)</h4>
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1; min-width: 150px; flex-direction: row; align-items: center; gap: 8px;">
+                                <label class="switch">
+                                    <input type="checkbox" id="arb-bot-enabled" onchange="saveArbitrageBotConfig()">
+                                    <span class="slider round"></span>
+                                </label>
+                                <label for="arb-bot-enabled" style="cursor: pointer; margin-bottom: 0;">Ativar Alertas</label>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="arb-bot-interval">Intervalo (Horas)</label>
+                                <input type="number" id="arb-bot-interval" value="1" step="0.5" min="0.1" onchange="saveArbitrageBotConfig()">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="arb-bot-profit">Lucro Mín. (%)</label>
+                                <input type="number" id="arb-bot-profit" value="0.5" step="0.1" min="0" onchange="saveArbitrageBotConfig()">
+                            </div>
+                            <div style="flex: 1; min-width: 150px; padding-bottom: 2px;">
+                                <button type="button" class="btn-primary" onclick="testArbitrageTelegramAlert()" style="width: 100%; background: rgba(36, 161, 222, 0.2); border-color: #24A1DE; color: #24A1DE;">
+                                    <i class="fa-solid fa-paper-plane"></i> Testar Alerta
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table" id="arbitrage-table">
+                            <thead>
+                                <tr>
+                                    <th>Jogo</th>
+                                    <th>Data / Hora</th>
+                                    <th>Mercado Encontrado</th>
+                                    <th>Lucro Líquido</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="5" style="text-align: center; color: #6b7280;">Clique em Rastrear para buscar Surebets nos jogos futuros.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Calculadora de Stake Modal (Hidden by default) -->
+                <div id="arbitrage-calculator" class="content-panel mt-4" style="display: none; border-left: 4px solid #34d399;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0; color: #fff;"><i class="fa-solid fa-calculator" style="color: #3b82f6;"></i> Calculadora de Stake Exata</h3>
+                        <button type="button" class="btn-secondary" onclick="document.getElementById('arbitrage-calculator').style.display='none'">Fechar</button>
+                    </div>
+                    
+                    <div class="dashboard-grid" style="grid-template-columns: 1fr 2fr;">
+                        <div class="stat-card" style="background: var(--bg-darker);">
+                            <div class="stat-title">Investimento Total ($)</div>
+                            <input type="number" id="arb-total-invest" value="1000" class="filter-select" style="width: 100%; font-size: 18px; font-weight: bold; margin-top: 10px;" onchange="recalcArbitrage()">
+                            
+                            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                                <div class="stat-title">Lucro Garantido</div>
+                                <div class="stat-value" id="arb-profit-value" style="color: #34d399;">$0.00</div>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <h4 style="margin: 0 0 15px 0;">Distribuição Obrigatória</h4>
+                            <div id="arb-distribution-list" style="display: flex; flex-direction: column; gap: 10px;">
+                                <!-- Injected by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+<!-- Tab: Dashboard -->
+<div class="tab-pane" id="tab-laboratory" style="display: none;">
+<!-- Metrics grid -->
+<section class="metrics-grid">
+<!-- Lucro Líquido -->
+<div class="metric-card card-profit">
+<div class="metric-info">
+<span class="metric-label">Lucro Líquido</span>
+<h2 id="metric-net-profit">$0.00</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-money-bill-trend-up"></i>
+</div>
+</div>
+<!-- Lucro em Stakes -->
+<div class="metric-card card-stakes">
+<div class="metric-info">
+<span class="metric-label">Lucro em Stakes</span>
+<h2 id="metric-profit-stakes">+0.00 st.</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-coins"></i>
+</div>
+</div>
+<!-- ROI -->
+<div class="metric-card card-roi">
+<div class="metric-info">
+<span class="metric-label">ROI (Yield)</span>
+<h2 id="metric-roi">0.0%</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-percent"></i>
+</div>
+</div>
+<!-- Taxa de Acerto -->
+<div class="metric-card card-winrate">
+<div class="metric-info">
+<span class="metric-label">Taxa de Acerto</span>
+<h2 id="metric-win-rate">0.0%</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-bullseye"></i>
+</div>
+</div>
+<!-- Total de Apostas -->
+<div class="metric-card card-bets">
+<div class="metric-info">
+<span class="metric-label">Total de Apostas</span>
+<h2 id="metric-total-bets">0</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-ticket"></i>
+</div>
+</div>
+<!-- Odd Média -->
+<div class="metric-card card-avgodds">
+<div class="metric-info">
+<span class="metric-label">Odd Média</span>
+<h2 id="metric-avg-odds">1.00</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-calculator"></i>
+</div>
+</div>
+<!-- Max Drawdown -->
+<div class="metric-card card-drawdown">
+<div class="metric-info">
+<span class="metric-label">Max Drawdown</span>
+<h2 id="metric-drawdown">0.0%</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-arrow-trend-down"></i>
+</div>
+</div>
+<!-- Banca Final -->
+<div class="metric-card card-final">
+<div class="metric-info">
+<span class="metric-label">Banca Final</span>
+<h2 id="metric-final-bankroll">$0.00</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-vault"></i>
+</div>
+</div>
+<!-- CLV Mdio -->
+<div class="metric-card card-clv">
+<div class="metric-info">
+<span class="metric-label">CLV Médio (Pinnacle)</span>
+<h2 id="metric-clv">0.0%</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-chart-line"></i>
+</div>
+</div>
+<!-- Beat Closing Line % -->
+<div class="metric-card card-bcl">
+<div class="metric-info">
+<span class="metric-label">Beat Closing Line %</span>
+<h2 id="metric-bcl">0.0%</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-check-double"></i>
+</div>
+</div>
+</section>
+<!-- Out-of-Sample Results -->
+<div class="oos-results-panel" id="oos-results-panel" style="display: none; margin-bottom: 20px;">
+<div class="oos-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+<h3 style="color: var(--warning); font-family: var(--font-heading); font-size: 16px;">
+<i class="fa-solid fa-flask-vial"></i> Resultado Fora-da-Amostra (Últimos 20%)
+                    </h3>
+<span class="oos-badge" id="oos-badge"></span>
+</div>
+<div class="metrics-grid oos-metrics-grid" id="oos-metrics-grid">
+<!-- Populated dynamically -->
+</div>
+</div>
+
+            <!-- EQS Single Strategy Analysis -->
+            <section class="risk-analysis-section" style="margin-bottom: 24px;">
+                <div class="risk-card glassmorphism">
+                    <div id="risk-empty-state" class="empty-state text-center" style="padding: 40px 20px;">
+                        <i class="fa-solid fa-shield-halved" style="font-size: 48px; opacity: 0.2; margin-bottom: 15px; display: block;"></i>
+                        <h3>Análise de Risco & Veredito</h3>
+                        <p id="ai-insight-text" style="color: var(--text-secondary);">Execute o backtest para ver o veredito da IA e a avaliação completa do Edge Quality Score.</p>
+                    </div>
+                    
+                    <div id="risk-content" style="display: none;">
+                        <div class="risk-header-grid" style="display: grid; grid-template-columns: 150px 1fr; gap: 20px; align-items: center; margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <div class="score-circle-container" style="display: flex; justify-content: center;">
+                                <div class="score-circle" style="width: 120px; height: 120px; border-radius: 50%; border: 6px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; font-family: var(--font-heading);">
+                                    <span id="eqs-score">0</span>
+                                </div>
+                            </div>
+                            <div class="risk-summary">
+                                <h3 style="font-size: 24px; margin-bottom: 5px; font-family: var(--font-heading);">
+                                    Veredito: <span id="eqs-verdict">Aguardando...</span>
+                                </h3>
+                                <p id="eqs-recommendation" style="color: var(--text-secondary); line-height: 1.5; font-size: 14px;">Recomendação...</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-validation-panel" id="stat-validation-panel" style="display: none; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 25px;">
+                            <h4 style="color: var(--primary); font-family: var(--font-heading); margin-bottom: 15px;">
+                                <i class="fa-solid fa-microscope"></i> Validação Estatística Avançada
+                            </h4>
+                            <div class="stat-validation-grid" id="stat-validation-grid">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <h4 style="margin-bottom: 15px; font-size: 14px; color: var(--text-muted);"><i class="fa-solid fa-list-check"></i> Detalhamento do Score</h4>
+                        <div id="eqs-breakdown" class="eqs-breakdown-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px;">
+                            <!-- Populated dynamically -->
+                        </div>
+
+                        <!-- Optimization Container -->
+                        <div id="eqs-optimization-container" style="margin-top: 25px;"></div>
+                    </div>
+                </div>
+            </section>
+<!-- Staking Comparison Table & Advanced Metrics Section -->
+<section class="staking-comparison-section" id="staking-comparison-panel" style="display: none; margin-bottom: 24px;">
+<div class="staking-comparison-grid-layout" style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; align-items: start;">
+<!-- Staking rules comparison table -->
+<div class="table-card glassmorphism" style="margin-bottom: 0;">
+<div class="table-header">
+<div class="table-title">
+<h3><i class="fa-solid fa-scale-balanced text-glow"></i> Comparativo por Gestão de Banca</h3>
+<p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Comparativo de como cada método de gestão financeira teria performado com a sua estratégia atual.</p>
+</div>
+</div>
+<div class="table-body">
+<table>
+<thead>
+<tr>
+<th>Método</th>
+<th>Banca Final</th>
+<th>Lucro ($)</th>
+<th>Apostas</th>
+<th>Acerto</th>
+<th>ROI</th>
+<th>Drawdown</th>
+</tr>
+</thead>
+<tbody id="staking-comparison-tbody">
+<!-- Populated dynamically -->
+</tbody>
+</table>
+</div>
+</div>
+<!-- Advanced risk metrics card -->
+<div class="calculator-card glassmorphism" style="margin-bottom: 0; padding: 20px;">
+<div class="calculator-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 12px; margin-bottom: 12px;">
+<div class="calculator-title">
+<h3><i class="fa-solid fa-circle-nodes text-glow"></i> Métricas Avançadas de Risco</h3>
+<p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Índices de volatilidade e assimetria estatística da estratégia ativa.</p>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+<div onclick="showToast(this.title, 'info')" style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.03); padding-bottom: 6px; cursor: help;" title="Mede o retorno da estratégia em relação ao risco (volatilidade) corrido. Acima de 1.0 é muito bom, 2.0 é excelente e 3.0+ é nível profissional. Exemplo: Um Sharpe de 2.00 significa que para cada R$ 1,00 de oscilação temporária que sua banca sofre, a estratégia gera R$ 2,00 de lucro médio (ótima relação de estabilidade).">
+<span style="color: var(--text-secondary);">Índice de Sharpe (Anualizado) <i class="fa-solid fa-circle-info" style="font-size: 10px; opacity: 0.6; margin-left: 4px;"></i>:</span>
+<strong id="metric-sharpe" style="color: var(--primary);">0.00</strong>
+</div>
+<div onclick="showToast(this.title, 'info')" style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.03); padding-bottom: 6px; cursor: help;" title="Variação do Sharpe que avalia o risco focando apenas na volatilidade negativa (perdas). Quanto maior o valor, menor o risco de quedas bruscas. Exemplo: Um Sortino de 3.50 significa que a estratégia ganha muito e tem poucas perdas profundas acumuladas, sendo muito mais segura do que outra com Sortino baixo de 0.80.">
+<span style="color: var(--text-secondary);">Índice de Sortino (Risco Queda) <i class="fa-solid fa-circle-info" style="font-size: 10px; opacity: 0.6; margin-left: 4px;"></i>:</span>
+<strong id="metric-sortino" style="color: var(--primary);">0.00</strong>
+</div>
+<div onclick="showToast(this.title, 'info')" style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.03); padding-bottom: 6px; cursor: help;" title="Mede a assimetria da distribuição de lucros/perdas. Exemplo: Skewness de -3.09 (negativa) é comum em lay (apostas com acerto alto, ex: 80%): você tem muitos pequenos ganhos seguidos, mas quando perde (red), perde um valor maior de uma vez, exigindo controle emocional.">
+<span style="color: var(--text-secondary);">Assimetria de Retornos (Skewness) <i class="fa-solid fa-circle-info" style="font-size: 10px; opacity: 0.6; margin-left: 4px;"></i>:</span>
+<strong id="metric-skewness" style="color: var(--text-primary);">0.00</strong>
+</div>
+<div onclick="showToast(this.title, 'info')" style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.03); padding-bottom: 6px; cursor: help;" title="A maior quantidade consecutiva de apostas ganhas (Greens) no período simulado. Exemplo: Uma sequência de 12 greens seguidos significa que a estratégia passou por uma fase altamente assertiva, acumulando lucros sem interrupções.">
+<span style="color: var(--text-secondary);">Maior Seq. de Greens (Acertos) <i class="fa-solid fa-circle-info" style="font-size: 10px; opacity: 0.6; margin-left: 4px;"></i>:</span>
+<strong id="metric-consec-wins" style="color: var(--success);">0</strong>
+</div>
+<div onclick="showToast(this.title, 'info')" style="display: flex; justify-content: space-between; cursor: help;" title="A maior quantidade consecutiva de apostas perdidas (Reds) no período simulado. Vital para dimensionar a banca mínima recomendada. Exemplo: Se sua maior sequência de reds for 8, sua banca precisa aguentar perder 8 apostas seguidas (ex: R$ 80 se a stake for R$ 10) sem quebrar.">
+<span style="color: var(--text-secondary);">Maior Seq. de Reds (Derrotas) <i class="fa-solid fa-circle-info" style="font-size: 10px; opacity: 0.6; margin-left: 4px;"></i>:</span>
+<strong id="metric-consec-losses" style="color: var(--danger);">0</strong>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Strategy Scanner Section -->
+
+<!-- AI Predictive Analytics Section -->
+<section class="ai-analytics-section" id="ai-analytics-panel" style="display: none;">
+<div class="ai-card glassmorphism">
+<div class="ai-header">
+<div class="ai-title">
+<h3><i class="fa-solid fa-brain text-glow"></i> Análise de Sustentabilidade por Inteligência Artificial</h3>
+<p>Validação quantitativa e machine learning sobre a consistência estatística da estratégia.</p>
+</div>
+<div class="ai-badge-container">
+<span class="badge" id="ai-verdict-badge">Analisando...</span>
+</div>
+</div>
+<div class="ai-grid">
+<!-- Metric 1: ML Future Prob -->
+<div class="ai-metric-widget">
+<div class="widget-header">
+<span>Previsão de Sucesso Futuro (ML)</span>
+<span class="widget-value" id="ai-ml-probability">0.0%</span>
+</div>
+<div class="progress-bar-container">
+<div class="progress-bar-fill" id="ai-ml-progress" style="width: 0%;"></div>
+</div>
+<span class="widget-desc">Probabilidade de os próximos ciclos manterem ROI positivo (Regressão Logística).</span>
+</div>
+<!-- Metric 2: Bayesian Confidence -->
+<div class="ai-metric-widget">
+<div class="widget-header">
+<span>Confiança Estatística (Bayesiana)</span>
+<span class="widget-value" id="ai-bayesian-confidence">0.0%</span>
+</div>
+<div class="progress-bar-container">
+<div class="progress-bar-fill" id="ai-bayesian-progress" style="width: 0%;"></div>
+</div>
+<span class="widget-desc">Probabilidade de a taxa de acerto real ser superior ao break-even das odds (Beta-Binomial).</span>
+</div>
+<!-- Metric 3: Drift / Performance Decay -->
+<div class="ai-metric-widget">
+<div class="widget-header">
+<span>Estabilidade Temporal (Drift)</span>
+<span class="widget-value" id="ai-drift-value">0.0%</span>
+</div>
+<div class="drift-comparison">
+<div class="half-box">
+<span class="half-label">1ª Metade ROI</span>
+<span class="half-val" id="ai-roi-first">0.0%</span>
+</div>
+<div class="drift-arrow"><i class="fa-solid fa-right-long"></i></div>
+<div class="half-box">
+<span class="half-label">2ª Metade ROI</span>
+<span class="half-val" id="ai-roi-second">0.0%</span>
+</div>
+</div>
+<span class="widget-desc" id="ai-drift-desc">Variação de rentabilidade entre as metades do histórico.</span>
+</div>
+</div>
+<!-- Monte Carlo Header -->
+<div class="ai-header" style="border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 20px; padding-top: 20px;">
+<div class="ai-title">
+<h3><i class="fa-solid fa-dice text-glow"></i> Simulação de Monte Carlo (1.000 Caminhos Aleatórios)</h3>
+<p>Análise de resiliência e probabilidade de sobrevivência da banca variando a ordem das apostas.</p>
+</div>
+</div>
+<div class="ai-grid" id="mc-grid">
+<!-- Metric 1: MC Profit Prob -->
+<div class="ai-metric-widget">
+<div class="widget-header">
+<span>Probabilidade de Lucrar</span>
+<span class="widget-value" id="mc-profit-probability">0.0%</span>
+</div>
+<div class="progress-bar-container">
+<div class="progress-bar-fill progress-bar-success" id="mc-profit-progress" style="width: 0%;"></div>
+</div>
+<span class="widget-desc">Fração das simulações que terminaram no azul.</span>
+</div>
+<!-- Metric 2: MC Ruin Risk -->
+<div class="ai-metric-widget">
+<div class="widget-header">
+<span>Risco de Ruína (Quebra)</span>
+<span class="widget-value" id="mc-ruin-probability">0.0%</span>
+</div>
+<div class="progress-bar-container">
+<div class="progress-bar-fill progress-bar-danger" id="mc-ruin-progress" style="width: 0%;"></div>
+</div>
+<span class="widget-desc">Fração das simulações que faliram (banca &lt; 10% da inicial).</span>
+</div>
+<!-- Metric 3: MC Return Expectancy -->
+<div class="ai-metric-widget">
+<div class="widget-header">
+<span>Intervalo de Confiança 90%</span>
+<span class="widget-value" id="mc-median-profit">+$0.00</span>
+</div>
+<div class="drift-comparison">
+<div class="half-box">
+<span class="half-label">Pessimista (5%)</span>
+<span class="half-val" id="mc-percentile-5" style="color: var(--text-muted); font-size: 11px;">$0.00</span>
+</div>
+<div class="drift-arrow"><i class="fa-solid fa-left-right"></i></div>
+<div class="half-box">
+<span class="half-label">Otimista (95%)</span>
+<span class="half-val" id="mc-percentile-95" style="color: var(--text-muted); font-size: 11px;">$0.00</span>
+</div>
+</div>
+<span class="widget-desc">Retorno líquido mediano esperado vs. extremos de variância.</span>
+</div>
+</div>
+<!-- Staking Recommendation Header -->
+<div class="ai-header" style="border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 20px; padding-top: 20px;">
+<div class="ai-title">
+<h3><i class="fa-solid fa-shield-halved text-glow"></i> Gestão de Banca Sugerida pela IA</h3>
+<p>Análise estatística para dimensionamento ideal de stakes e controle de volatilidade contra quebras.</p>
+</div>
+</div>
+<div class="ai-grid" id="staking-recommendation-grid">
+<!-- Recommendation Widget 1: Stake Size -->
+<div class="ai-metric-widget">
+<div class="widget-header">
+<span>Stake Proporcional Ideal</span>
+<span class="widget-value" id="rec-stake-size">0.0%</span>
+</div>
+<span class="widget-desc">Baseado no Kelly Criterion Fracionário (1/4) para crescimento seguro.</span>
+</div>
+<!-- Recommendation Widget 2: Consec Losses -->
+<div class="ai-metric-widget">
+<div class="widget-header">
+<span>Derrotas Seguidas Esperadas</span>
+<span class="widget-value" id="rec-consec-losses">0</span>
+</div>
+<span class="widget-desc">Cadeia de reds seguidos provável no período (95% de confiança).</span>
+</div>
+<!-- Recommendation Widget 3: Min Bankroll -->
+<div class="ai-metric-widget">
+<div class="widget-header">
+<span>Banca Mínima Recomendada</span>
+<span class="widget-value" id="rec-min-bankroll">$0.00</span>
+</div>
+<span class="widget-desc">Mínimo necessário para mitigar riscos de ruína sob esta volatilidade.</span>
+</div>
+</div>
+<div class="ai-report-box" id="rec-justification-box" style="margin-top: 15px; background: rgba(16, 185, 129, 0.03); border-color: rgba(16, 185, 129, 0.15); display: none;">
+<h4 style="color: #34d399;"><i class="fa-solid fa-calculator"></i> Justificativa de Banca Preditiva</h4>
+<div class="ai-report-text" id="rec-justification" style="color: #a7f3d0;">
+                            Aguardando a execução do backtest para gerar a análise de banca.
+                        </div>
+</div>
+<div class="ai-report-box" style="margin-top: 20px;">
+<h4><i class="fa-solid fa-robot"></i> Parecer Técnico do Modelo</h4>
+<div class="ai-report-text" id="ai-report-text">
+                            Aguardando a execução do backtest para gerar o parecer.
+                        </div>
+</div>
+<div class="ai-report-box" style="margin-top: 20px; border-color: rgba(96, 165, 250, 0.25);">
+<h4 style="color: #60a5fa;"><i class="fa-solid fa-list-check"></i> Checklist de Confiabilidade da Estratégia</h4>
+<div class="checklist-grid" id="ai-checklist-container">
+<div class="ai-report-text" style="color: var(--text-muted);">
+                                Aguardando a execução do backtest para gerar o checklist.
+                            </div>
+</div>
+</div>
+
+</div>
+</section>
+<!-- AI Strategy Optimization Section -->
+<section class="ai-optimization-section" id="ai-optimization-panel" style="display: none; margin-bottom: 24px;">
+<div class="ai-card glassmorphism">
+<div class="ai-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 15px; margin-bottom: 15px;">
+<div class="ai-title">
+<h3><i class="fa-solid fa-wand-magic-sparkles text-glow"></i> Sugestões de Otimização da IA</h3>
+<p>Simulações "What-If" baseadas no histórico para maximizar seu ROI e diminuir o risco.</p>
+</div>
+</div>
+<div class="optimization-body" id="ai-optimization-suggestions">
+<!-- Populated dynamically -->
+</div>
+</div>
+</section>
+<!-- Portfolio Allocator Card -->
+<section class="portfolio-allocator-section" id="portfolio-allocator-panel" style="display: none; margin-bottom: 24px;">
+<div class="calculator-card glassmorphism" style="padding: 24px;">
+<div class="calculator-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 15px; margin-bottom: 15px;">
+<div class="calculator-title">
+<h3><i class="fa-solid fa-scale-balanced text-glow"></i> Distribuição Ponderada de Portfólio (IA &amp; Markowitz)</h3>
+<p>Pesos ideais recomendados para alocação de stakes em cada mercado para otimizar o índice de Sharpe (Monte Carlo).</p>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; align-items: start;">
+<div class="allocator-chart-box" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--border-radius-lg); padding: 20px;">
+<h4 style="font-size: 14px; margin-bottom: 15px; color: var(--text-secondary); cursor: help;" title="Alocação de Stakes Recomendada: Divisão ideal do valor total da sua aposta (stake) recomendada pela IA para cada mercado de forma a equilibrar e proteger o seu capital."><i class="fa-solid fa-chart-pie"></i> Alocação de Stakes Recomendada</h4>
+<div id="allocator-bars-container" style="display: flex; flex-direction: column; gap: 15px;">
+<!-- Bar widgets populated dynamically -->
+</div>
+</div>
+<div class="allocator-info-box" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--border-radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 12px; height: 100%; justify-content: center;">
+<h4 style="font-size: 14px; color: var(--text-secondary); margin-bottom: 5px; cursor: help;" title="Estatísticas do Portfólio Otimizado: Métricas simuladas para a carteira de mercados combinados após aplicar os pesos de stake recomendados pela otimização de Markowitz."><i class="fa-solid fa-circle-info"></i> Estatísticas do Portfólio Otimizado</h4>
+<div style="display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.03); padding-bottom: 8px; cursor: help;" title="Retorno Esperado Diário: A média estimada de crescimento diário da sua banca (lucro médio ao dia) seguindo esta alocação combinada.">
+<span style="color: var(--text-secondary);">Retorno Esperado Diário:</span>
+<strong id="allocator-expected-return" style="color: var(--success);">+0.00%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.03); padding-bottom: 8px; cursor: help;" title="Volatilidade Diária: A oscilação percentual média diária esperada para o saldo da sua banca. Quanto menor, mais suave e previsível é a evolução do saldo.">
+<span style="color: var(--text-secondary);">Volatilidade Diária:</span>
+<strong id="allocator-volatility" style="color: var(--warning);">0.00%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; cursor: help;" title="Sharpe Ratio Projetado: Métrica que mede a relação retorno/risco. Uma nota que diz se o lucro gerado compensa a flutuação e o sofrimento diário das perdas. Notas maiores são melhores.">
+<span style="color: var(--text-secondary);">Sharpe Ratio Projetado:</span>
+<strong id="allocator-sharpe" style="color: var(--primary);">0.00</strong>
+</div>
+<p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top: 10px;">
+                                * A otimização usa simulação de Monte Carlo para encontrar pesos ponderados que maximizam a relação retorno/risco. Divida sua stake padrão seguindo as proporções acima para obter o portfólio ótimo.
+                            </p>
+</div>
+</div>
+</div>
+</section>
+<!-- Charts Section -->
+<section class="charts-section">
+<!-- Equity Curve Card -->
+<div class="chart-card large-chart">
+<div class="chart-header">
+<h3><i class="fa-solid fa-chart-area"></i> Curva de Crescimento da Banca (Equity Curve)</h3>
+<div class="chart-actions">
+<span class="chart-badge">Evolução no Tempo</span>
+</div>
+</div>
+<div class="chart-body">
+<canvas id="equity-chart"></canvas>
+</div>
+</div>
+<!-- League Profitability Card -->
+<div class="chart-card">
+<div class="chart-header">
+<h3><i class="fa-solid fa-chart-bar"></i> Lucro / Prejuízo por Liga</h3>
+</div>
+<div class="chart-body">
+<canvas id="league-chart"></canvas>
+</div>
+</div>
+<!-- Monthly Profitability Card -->
+<div class="chart-card large-chart">
+<div class="chart-header">
+<h3><i class="fa-solid fa-calendar-check"></i> Lucro / Prejuízo por Período Mensal</h3>
+</div>
+<div class="chart-body">
+<canvas id="monthly-chart"></canvas>
+</div>
+</div>
+<!-- Odds Range Profitability Card -->
+<div class="chart-card">
+<div class="chart-header">
+<h3><i class="fa-solid fa-percent"></i> Lucro / Prejuízo por Faixa de Odds</h3>
+</div>
+<div class="chart-body">
+<canvas id="odds-chart"></canvas>
+</div>
+</div>
+</section>
+<!-- Chronological Quartiles Performance Section -->
+<section class="quartiles-section" id="quartiles-panel" style="display: none; margin-bottom: 24px;">
+<div class="calculator-card glassmorphism">
+<div class="calculator-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 15px; margin-bottom: 15px;">
+<div class="calculator-title">
+<h3><i class="fa-solid fa-chart-pie text-glow"></i> Desempenho por Quartis (Blocos de 25% das Apostas)</h3>
+<p>Análise de consistência temporal dividindo a amostra total de apostas em 4 blocos cronológicos iguais.</p>
+</div>
+</div>
+<div class="quartiles-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+<!-- Bloco 1 -->
+<div class="quartile-card" onmouseout="this.style.transform='none'" onmouseover="this.style.transform='translateY(-2px)'" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--border-radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 10px; transition: transform var(--transition-speed); border-left: 4px solid var(--primary);">
+<h4 style="color: var(--primary); font-family: var(--font-heading); font-size: 14px; display: flex; align-items: center; gap: 8px;">
+<i class="fa-solid fa-circle-1"></i> Bloco 1 (Q1 - Primeiras)
+                            </h4>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Lucro Líquido:</span>
+<strong id="q1-profit" style="color: var(--text-glow);">$0.00</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Lucro em Stakes:</span>
+<strong id="q1-stakes">0.00 st.</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">ROI (Yield):</span>
+<strong id="q1-roi">0.0%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Taxa Acerto:</span>
+<strong id="q1-winrate">0.0%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 5px;">
+<span>Total Apostas:</span>
+<strong id="q1-bets">0</strong>
+</div>
+</div>
+<!-- Bloco 2 -->
+<div class="quartile-card" onmouseout="this.style.transform='none'" onmouseover="this.style.transform='translateY(-2px)'" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--border-radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 10px; transition: transform var(--transition-speed); border-left: 4px solid var(--primary);">
+<h4 style="color: var(--primary); font-family: var(--font-heading); font-size: 14px; display: flex; align-items: center; gap: 8px;">
+<i class="fa-solid fa-circle-2"></i> Bloco 2 (Q2)
+                            </h4>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Lucro Líquido:</span>
+<strong id="q2-profit" style="color: var(--text-glow);">$0.00</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Lucro em Stakes:</span>
+<strong id="q2-stakes">0.00 st.</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">ROI (Yield):</span>
+<strong id="q2-roi">0.0%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Taxa Acerto:</span>
+<strong id="q2-winrate">0.0%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 5px;">
+<span>Total Apostas:</span>
+<strong id="q2-bets">0</strong>
+</div>
+</div>
+<!-- Bloco 3 -->
+<div class="quartile-card" onmouseout="this.style.transform='none'" onmouseover="this.style.transform='translateY(-2px)'" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--border-radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 10px; transition: transform var(--transition-speed); border-left: 4px solid var(--primary);">
+<h4 style="color: var(--primary); font-family: var(--font-heading); font-size: 14px; display: flex; align-items: center; gap: 8px;">
+<i class="fa-solid fa-circle-3"></i> Bloco 3 (Q3)
+                            </h4>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Lucro Líquido:</span>
+<strong id="q3-profit" style="color: var(--text-glow);">$0.00</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Lucro em Stakes:</span>
+<strong id="q3-stakes">0.00 st.</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">ROI (Yield):</span>
+<strong id="q3-roi">0.0%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Taxa Acerto:</span>
+<strong id="q3-winrate">0.0%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 5px;">
+<span>Total Apostas:</span>
+<strong id="q3-bets">0</strong>
+</div>
+</div>
+<!-- Bloco 4 -->
+<div class="quartile-card" onmouseout="this.style.transform='none'" onmouseover="this.style.transform='translateY(-2px)'" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--border-radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 10px; transition: transform var(--transition-speed); border-left: 4px solid var(--primary);">
+<h4 style="color: var(--primary); font-family: var(--font-heading); font-size: 14px; display: flex; align-items: center; gap: 8px;">
+<i class="fa-solid fa-circle-4"></i> Bloco 4 (Q4 - Últimas)
+                            </h4>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Lucro Líquido:</span>
+<strong id="q4-profit" style="color: var(--text-glow);">$0.00</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Lucro em Stakes:</span>
+<strong id="q4-stakes">0.00 st.</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">ROI (Yield):</span>
+<strong id="q4-roi">0.0%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px;">
+<span style="color: var(--text-secondary);">Taxa Acerto:</span>
+<strong id="q4-winrate">0.0%</strong>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 5px;">
+<span>Total Apostas:</span>
+<strong id="q4-bets">0</strong>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Pre-Match Calculator Section -->
+<section class="calculator-section">
+<div class="calculator-card glassmorphism">
+<div class="calculator-header">
+<div class="calculator-title">
+<h3><i class="fa-solid fa-calculator text-glow"></i> Calculadora Preditiva Pré-Jogo (Dixon-Coles)</h3>
+<p>Projete gols esperados, probabilidade justa de resultados (1X2, Over/Under, Ambas Marcam) e odds baseadas nos dados históricos.</p>
+</div>
+</div>
+<div class="calculator-body-grid">
+<div class="calculator-form">
+<div class="form-group">
+<label for="calc-league">Campeonato</label>
+<select id="calc-league" onchange="onCalculatorLeagueChange()">
+<option disabled="" selected="" value="">Selecione uma liga...</option>
+<!-- Populated dynamically -->
+</select>
+</div>
+<div class="form-group-row" style="align-items: center;">
+<div class="form-group" style="flex: 1;">
+<label for="calc-home-team">Mandante</label>
+<select disabled="" id="calc-home-team">
+<option disabled="" selected="" value="">Selecione...</option>
+</select>
+</div>
+<div class="form-group-row-arrow" style="text-align: center; color: var(--text-muted); font-size: 16px; padding: 20px 5px 0 5px;"><i class="fa-solid fa-circle-chevron-right"></i></div>
+<div class="form-group" style="flex: 1;">
+<label for="calc-away-team">Visitante</label>
+<select disabled="" id="calc-away-team">
+<option disabled="" selected="" value="">Selecione...</option>
+</select>
+</div>
+</div>
+<button class="btn-scanner" id="btn-calc-predict" onclick="runRealtimePrediction()" style="width: 100%; margin-top: 10px; justify-content: center;" type="button">
+<i class="fa-solid fa-wand-magic-sparkles"></i> Calcular Odds Justas
+                            </button>
+</div>
+<!-- Results display, hidden until calculated -->
+<div class="calculator-results" id="calc-results" style="display: none;">
+<div class="calc-expectancy-grid">
+<div class="expectancy-stat">
+<span class="stat-lbl">Gols Esperados Casa (λ<sub>H</sub>)</span>
+<span class="stat-val" id="calc-res-home-lambda">0.00</span>
+<span class="stat-desc" id="calc-res-home-att">Força: 1.00</span>
+</div>
+<div class="expectancy-stat">
+<span class="stat-lbl">Gols Esperados Visitante (λ<sub>A</sub>)</span>
+<span class="stat-val" id="calc-res-away-lambda">0.00</span>
+<span class="stat-desc" id="calc-res-away-att">Força: 1.00</span>
+</div>
+</div>
+<div class="calc-odds-table-container">
+<table class="suggestion-comparison-table">
+<thead>
+<tr>
+<th>Mercado</th>
+<th>Probabilidade Justa</th>
+<th>Odds Justas</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="metric-name">Mandante (1)</td>
+<td id="calc-prob-home">0.0%</td>
+<td class="metric-opt" id="calc-odd-home">1.00</td>
+</tr>
+<tr>
+<td class="metric-name">Empate (X)</td>
+<td id="calc-prob-draw">0.0%</td>
+<td class="metric-opt" id="calc-odd-draw">1.00</td>
+</tr>
+<tr>
+<td class="metric-name">Visitante (2)</td>
+<td id="calc-prob-away">0.0%</td>
+<td class="metric-opt" id="calc-odd-away">1.00</td>
+</tr>
+<tr>
+<td class="metric-name">Over 1.5 Gols</td>
+<td id="calc-prob-over15">0.0%</td>
+<td class="metric-opt" id="calc-odd-over15">1.00</td>
+</tr>
+<tr>
+<td class="metric-name">Over 2.5 Gols</td>
+<td id="calc-prob-over25">0.0%</td>
+<td class="metric-opt" id="calc-odd-over25">1.00</td>
+</tr>
+<tr>
+<td class="metric-name">Ambas Marcam (Sim)</td>
+<td id="calc-prob-btts-yes">0.0%</td>
+<td class="metric-opt" id="calc-odd-btts-yes">1.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Odds Comparison Table in Calculator -->
+<div class="calc-bookmakers-container" id="calc-bookmakers-box" style="margin-top: 20px; width: 100%;">
+<h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;"><i class="fa-solid fa-scale-balanced text-glow"></i> Comparativo de Odds de Cotação (1X2)</h4>
+<table class="suggestion-comparison-table" style="font-size: 11px; width: 100%;">
+<thead>
+<tr>
+<th>Casa de Apostas</th>
+<th>Mandante (1)</th>
+<th>Empate (X)</th>
+<th>Visitante (2)</th>
+</tr>
+</thead>
+<tbody id="calc-bookmakers-tbody">
+<!-- Populated dynamically -->
+</tbody>
+</table>
+</div>
+</div>
+<!-- Heatmap score grid -->
+<div class="calculator-heatmap-container" id="calc-heatmap-container" style="display: none;">
+<span class="heatmap-title"><i class="fa-solid fa-th"></i> Distribuição Exata (Dixon-Coles)</span>
+<div class="heatmap-grid-wrapper">
+<div class="heatmap-axis-label vertical-label">Mandante</div>
+<div class="heatmap-grid-core">
+<div class="heatmap-axis-label horizontal-labels">
+<span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+<div style="font-size: 9px; color: var(--text-muted); text-align: center; margin-top: 4px; width: 100%;">Visitante (Gols)</div>
+</div>
+<div class="heatmap-grid" id="calc-heatmap-grid">
+<!-- Dynamically generated rows of cells -->
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Bets Table Section -->
+<section class="results-table-section">
+<div class="table-card">
+<div class="table-header">
+<h3><i class="fa-solid fa-clipboard-list"></i> Histórico de Apostas Efetuadas (Últimas 1000)</h3>
+<div class="table-actions">
+<input id="table-search" onkeyup="filterTable()" placeholder="Filtrar por time..." type="text"/>
+</div>
+</div>
+<div class="table-body">
+<table id="bets-table">
+<thead>
+<tr>
+<th>Data</th>
+<th>Liga</th>
+<th>Confronto</th>
+<th>Mercado</th>
+<th>Odd</th>
+<th>Forma Form (%)</th>
+<th>Gatilho EV</th>
+<th>Stake ($)</th>
+<th>P/L ($)</th>
+<th>Banca ($)</th>
+</tr>
+</thead>
+<tbody id="bets-table-body">
+<tr>
+<td class="text-center empty-state" colspan="10">
+<i class="fa-solid fa-info-circle"></i> Configure os filtros ao lado e execute o backtest para ver os resultados.
+                                    </td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</div> <!-- End Tab Dashboard -->
+<!-- Tab: Veredito e Risco -->
+ <!-- End Tab Risk -->
+<!-- Tab: Global Scanner -->
+ <!-- End Tab Global Scanner -->
+
+        <!-- Tab: Operations -->
+        <div id="tab-operations" class="tab-pane" style="display: none;">
+            <!-- Painel de Configurações do Robô -->
+            <section style="margin-bottom: 24px;">
+                <div class="calculator-card glassmorphism" style="max-width: 600px;">
+                    <div class="calculator-header">
+                        <div class="calculator-title">
+                            <h3><i class="fa-solid fa-bell text-glow"></i> Controle do Robô do Telegram</h3>
+                            <p>Configure e ative seu robô para enviar as dicas de apostas automaticamente.</p>
+                        </div>
+                    </div>
+                    <!-- Telegram Integration Section -->
+<div>
+
+<div class="form-group">
+<label for="tg-token">Token do Bot</label>
+<input id="tg-token" placeholder="Token do Bot" type="password"/>
+</div>
+<div class="form-group">
+<label for="tg-chat-id">Chat ID (Grupo/Canal)</label>
+<input id="tg-chat-id" placeholder="@canal ou ID" type="text"/>
+</div>
+<div class="form-group-row" style="margin-top: 5px; gap: 8px;">
+<button class="btn-scanner" id="btn-save-tg" onclick="saveTelegramConfig()" style="font-size: 11px; padding: 6px; justify-content: center; width: 100%;" type="button"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+<button class="btn-clear" id="btn-test-tg" onclick="testTelegramConnection()" style="font-size: 11px; padding: 6px; justify-content: center; border: 1px solid var(--primary); color: var(--primary); width: 100%;" type="button"><i class="fa-solid fa-paper-plane"></i> Testar</button>
+</div>
+<div class="form-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 8px;">
+<input id="tg-enabled" style="width: auto; cursor: pointer;" type="checkbox"/>
+<label for="tg-enabled" style="cursor: pointer; margin-bottom: 0;">Ativar Transmissão</label>
+</div>
+<div style="border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 12px; padding-top: 12px;">
+<h4 style="font-size: 12px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-robot" style="color: var(--success);"></i> Agendador de Tips (+EV)</h4>
+<div class="form-group" style="flex-direction: row; align-items: center; gap: 8px; margin-bottom: 8px;">
+<input id="tg-scheduler-enabled" style="width: auto; cursor: pointer;" type="checkbox"/>
+<label for="tg-scheduler-enabled" style="cursor: pointer; margin-bottom: 0;">Ativar Robô Automático</label>
+</div>
+<div class="form-group" style="margin-bottom: 10px;">
+<label for="tg-scheduler-interval">Frequência Varredura (Horas)</label>
+<input id="tg-scheduler-interval" max="24" min="1" style="padding: 6px 10px;" type="number" value="6"/>
+</div>
+<div class="form-group" style="margin-bottom: 10px;">
+<label for="tg-scheduler-source">Fonte de Jogos</label>
+<select id="tg-scheduler-source" style="background-color: rgba(10, 11, 16, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 6px 10px; font-size: 12px; outline: none; cursor: pointer; width: 100%;">
+<option value="api">API DataFootball</option>
+<option value="csv">Football-Data CSV</option>
+</select>
+</div>
+<div class="form-group-row" style="gap: 8px; margin-bottom: 0;">
+<button class="btn-scanner" id="btn-save-scheduler" onclick="saveSchedulerConfigUi()" style="font-size: 11px; padding: 6px; justify-content: center; width: 100%;" type="button"><i class="fa-solid fa-floppy-disk"></i> Salvar Robô</button>
+<button class="btn-clear" id="btn-run-scheduler-now" onclick="runSchedulerNow()" style="font-size: 11px; padding: 6px; justify-content: center; border: 1px solid var(--success); color: var(--success); width: 100%;" type="button"><i class="fa-solid fa-play"></i> Testar Robô</button>
+</div>
+</div>
+</div>
+
+                </div>
+            </section>
+            
+            <!-- Upcoming Matches Section -->
+<section class="upcoming-section" style="margin-bottom: 24px;">
+<div class="calculator-card glassmorphism">
+<div class="calculator-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 15px; margin-bottom: 15px;">
+<div class="calculator-title">
+<h3><i class="fa-solid fa-clock text-glow"></i> Próximos Jogos &amp; Grade de Tips IA</h3>
+<p>Partidas agendadas para as próximas rodadas. Dicas (+EV) são detectadas e sinalizadas em tempo real baseado no mercado ativo.</p>
+</div>
+<div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+<select id="select-upcoming-source" style="background-color: rgba(10, 11, 16, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 8px 12px; font-size: 12px; outline: none; cursor: pointer; height: 38px; flex-shrink: 0;">
+<option value="api">API DataFootball (Hoje)</option>
+<option value="csv">Football-Data CSV (Rodada)</option>
+</select>
+<button class="btn-scanner" id="btn-broadcast-tips" onclick="broadcastAllTips()" style="margin-top: 0; padding: 8px 12px; background: var(--success); border-color: var(--success-hover); height: 38px; white-space: nowrap; flex-shrink: 0;" type="button">
+<i class="fa-solid fa-bullhorn"></i> Transmitir Tips (+EV)
+                            </button>
+<button class="btn-scanner" id="btn-load-upcoming" onclick="loadUpcomingMatches()" style="margin-top: 0; padding: 8px 12px; height: 38px; white-space: nowrap; flex-shrink: 0;" type="button">
+<i class="fa-solid fa-arrows-rotate"></i> Atualizar Grade
+                            </button>
+</div>
+</div>
+<div class="upcoming-tips-grid" id="upcoming-matches-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+<div class="empty-state text-center" style="grid-column: 1 / -1; padding: 40px 0; width: 100%;">
+<i class="fa-solid fa-calendar-days" style="font-size: 28px; margin-bottom: 10px; color: var(--text-muted);"></i>
+<p>Configure a barra lateral e clique em <strong>Atualizar Grade</strong> para carregar as dicas da rodada.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Telegram Tips Log Section -->
+<section class="telegram-tips-section" style="margin-bottom: 24px;">
+<div class="table-card">
+<div class="table-header">
+<h3><i class="fa-brands fa-telegram text-glow" style="color: #24A1DE;"></i> Registro de Tips Enviadas ao Telegram</h3>
+<div class="table-actions" style="display: flex; gap: 10px; align-items: center;">
+<select id="tips-status-filter" onchange="filterTipsTable()" style="background-color: rgba(10, 11, 16, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 8px 12px; font-size: 12px; outline: none; cursor: pointer; width: auto;">
+<option value="Todos">Filtrar Status: Todos</option>
+<option value="Pendente">Pendentes</option>
+<option value="Green">Green</option>
+<option value="Red">Red</option>
+</select>
+<button class="btn-scanner" onclick="exportTipsToCsv()" style="margin-top: 0; padding: 8px 12px; background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: #34d399;" type="button">
+<i class="fa-solid fa-file-csv"></i> Exportar CSV
+                            </button>
+<button class="btn-scanner" id="btn-clear-tips" onclick="clearTipsLog()" style="margin-top: 0; padding: 8px 12px; background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #f87171;" type="button">
+<i class="fa-solid fa-trash-can"></i> Limpar Log
+                            </button>
+</div>
+</div>
+<div class="table-body">
+<table id="telegram-tips-table">
+<thead>
+<tr>
+<th>Data/Hora</th>
+<th>Liga</th>
+<th>Confronto</th>
+<th>Mercado</th>
+<th>Odds</th>
+<th>Stake (%)</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="telegram-tips-table-body">
+<tr>
+<td class="text-center empty-state" colspan="7">
+<i class="fa-solid fa-info-circle"></i> Nenhuma tip enviada ao Telegram registrada no log local.
+                                    </td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+
+        </div>
+        
+        <!-- Tab: GR -->
+        <div id="tab-gr" class="tab-pane" style="display: none;">
+            <div class="summary-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+                <div class="summary-card glassmorphism">
+                    <div class="summary-icon" style="color: var(--danger);"><i class="fa-solid fa-skull-crossbones"></i></div>
+                    <div class="summary-content">
+                        <span class="summary-label">Risco de Ruína</span>
+                        <h3 class="summary-value" id="gr-ruin-prob">--</h3>
+                    </div>
+                </div>
+                <div class="summary-card glassmorphism">
+                    <div class="summary-icon" style="color: var(--warning);"><i class="fa-solid fa-chart-line"></i></div>
+                    <div class="summary-content">
+                        <span class="summary-label">Drawdown Máximo</span>
+                        <h3 class="summary-value" id="gr-max-drawdown">--</h3>
+                    </div>
+                </div>
+                <div class="summary-card glassmorphism">
+                    <div class="summary-icon" style="color: var(--primary);"><i class="fa-solid fa-scale-balanced"></i></div>
+                    <div class="summary-content">
+                        <span class="summary-label">Sharpe Ratio</span>
+                        <h3 class="summary-value" id="gr-sharpe">--</h3>
+                    </div>
+                </div>
+                <div class="summary-card glassmorphism">
+                    <div class="summary-icon" style="color: var(--success);"><i class="fa-solid fa-coins"></i></div>
+                    <div class="summary-content">
+                        <span class="summary-label">Stake Recomendada</span>
+                        <h3 class="summary-value" id="gr-rec-stake">--</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                <!-- Monte Carlo Card -->
+                <div class="chart-card glassmorphism">
+                    <div class="chart-header">
+                        <h3><i class="fa-solid fa-filter text-glow" style="color: var(--info);"></i> Cone de Incerteza (Monte Carlo)</h3>
+                        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Simulação de 1.000 cenários de risco.</p>
+                    </div>
+                    <div class="chart-container" style="height: auto; padding: 20px;">
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px; margin-bottom: 15px;">
+                            <div><span style="color: var(--text-muted); font-size: 13px;">Probabilidade de Lucro:</span> <br> <strong id="gr-mc-prob-profit" style="font-size: 18px; color: var(--success);">--</strong></div>
+                            <div style="text-align: right;"><span style="color: var(--text-muted); font-size: 13px;">Lucro Mediano Esperado:</span> <br> <strong id="gr-mc-median-profit" style="font-size: 18px; color: var(--text-primary);">--</strong></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <div><span style="color: var(--text-muted); font-size: 13px;">Pior Cenário (5%):</span> <br> <strong id="gr-mc-p5-profit" style="font-size: 16px; color: var(--danger);">--</strong></div>
+                            <div style="text-align: right;"><span style="color: var(--text-muted); font-size: 13px;">Melhor Cenário (95%):</span> <br> <strong id="gr-mc-p95-profit" style="font-size: 16px; color: var(--success);">--</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tail Risk Card -->
+                <div class="chart-card glassmorphism">
+                    <div class="chart-header">
+                        <h3><i class="fa-solid fa-bolt text-glow" style="color: var(--warning);"></i> Estresse Estatístico Avançado</h3>
+                        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Volatilidade e Assimetria de Retornos.</p>
+                    </div>
+                    <div class="chart-container" style="height: auto; padding: 20px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tbody style="font-size: 14px;">
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 10px 0; color: var(--text-secondary);">Sortino Ratio (Risco de Queda)</td>
+                                    <td style="padding: 10px 0; text-align: right; font-weight: 600;" id="gr-sortino">--</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 10px 0; color: var(--text-secondary);">Skewness (Assimetria)</td>
+                                    <td style="padding: 10px 0; text-align: right; font-weight: 600;" id="gr-skewness">--</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 10px 0; color: var(--text-secondary);">Decaimento do Edge (Drift)</td>
+                                    <td style="padding: 10px 0; text-align: right; font-weight: 600;" id="gr-edge-decay">--</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px 0; color: var(--text-secondary);">P-Valor Binomial</td>
+                                    <td style="padding: 10px 0; text-align: right; font-weight: 600;" id="gr-pvalue">--</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Portfolio Intelligence & Bankroll -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                <!-- Parecer IA -->
+                <div class="eval-card glassmorphism" style="border-left: 4px solid var(--primary);">
+                    <div class="eval-header">
+                        <h3 style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-brain" style="color: var(--primary);"></i> Parecer de Risco Institucional (IA)</h3>
+                    </div>
+                    <div id="gr-ai-advice" style="color: var(--text-primary); line-height: 1.6; margin-top: 15px; font-size: 15px;">
+                        Rode um backtest no Laboratório para que a Inteligência Artificial formule o veredito de risco do portfólio.
+                    </div>
+                </div>
+
+                <!-- Gestão de Banca Recomendada -->
+                <div class="eval-card glassmorphism" style="border-left: 4px solid var(--success);">
+                    <div class="eval-header">
+                        <h3 style="display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-wallet" style="color: var(--success);"></i> Gestão de Banca (Bankroll)</h3>
+                    </div>
+                    <div id="gr-bankroll-advice" style="color: var(--text-primary); line-height: 1.6; margin-top: 15px; font-size: 15px;">
+                        <p style="margin-bottom: 10px; display: flex; justify-content: space-between;">
+                            <strong>Tamanho Mínimo de Banca Sugerido:</strong> 
+                            <span id="gr-min-bankroll" style="color: var(--warning); font-weight: bold; font-size: 16px;">--</span>
+                        </p>
+                        <p style="margin-bottom: 10px; display: flex; justify-content: space-between;">
+                            <strong>Tamanho de Stake Ideal:</strong> 
+                            <span id="gr-rec-stake-box" style="color: var(--success); font-weight: bold; font-size: 16px;">--</span>
+                        </p>
+                        <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-top: 15px;">
+                            <p id="gr-bankroll-justification" style="color: var(--text-muted); font-size: 13px; margin: 0;">
+                                Rode um backtest para ver as recomendações baseadas no Critério de Kelly Fracionário e Risco de Quebra.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dicionário de Métricas -->
+            <div class="chart-card glassmorphism" style="margin-bottom: 24px;">
+                <div class="chart-header">
+                    <h3><i class="fa-solid fa-book-open text-glow" style="color: var(--info);"></i> Dicionário de Métricas Estatísticas</h3>
+                </div>
+                <div class="chart-container" style="height: auto; padding: 20px;">
+                    <ul style="list-style-type: none; padding-left: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.7; margin: 0;">
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-skull-crossbones" style="color: var(--danger); width: 20px; text-align: center;"></i> Risco de Ruína:</strong> Probabilidade matemática de você perder toda a sua banca antes de dobrá-la.<br>
+                            <span style="color: var(--success);">Ideal: < 1%</span> | <span style="color: var(--warning);">Aceitável: 1% a 5%</span> | <span style="color: var(--danger);">Ruim: > 10%</span><br>
+                            <em>A cada 100 apostadores, 5 quebrarão a banca com um risco de 5%.</em>
+                        </li>
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-chart-line" style="color: var(--warning); width: 20px; text-align: center;"></i> Drawdown Máximo:</strong> A maior queda histórica contínua que a banca já sofreu do topo até o fundo.<br>
+                            <span style="color: var(--success);">Ideal: < 10%</span> | <span style="color: var(--warning);">Aceitável: 10% a 25%</span> | <span style="color: var(--danger);">Ruim: > 30%</span><br>
+                            <em>Ex: Se a banca foi a $1.000 e caiu para $800, o drawdown foi de -20%.</em>
+                        </li>
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-scale-balanced" style="color: var(--primary); width: 20px; text-align: center;"></i> Sharpe Ratio:</strong> Mede o retorno gerado por cada unidade de risco (volatilidade da curva de lucro).<br>
+                            <span style="color: var(--success);">Ideal: > 2.0 (Excelente)</span> | <span style="color: var(--warning);">Aceitável: 1.0 a 2.0</span> | <span style="color: var(--danger);">Ruim: < 1.0 (Muito volátil)</span><br>
+                            <em>Sharpe de 1.5 significa 1.5 unidades de lucro para cada 1 de susto.</em>
+                        </li>
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-coins" style="color: var(--success); width: 20px; text-align: center;"></i> Stake Recomendada:</strong> Porcentagem da banca ideal sugerida usando o Critério de Kelly Fracionário.<br>
+                            <span style="color: var(--success);">Segura: 1% a 2.5%</span> | <span style="color: var(--warning);">Agressiva: 3% a 5%</span> | <span style="color: var(--danger);">Kamikaze: > 7%</span><br>
+                            <em>2.5% em $1.000 = $25. Acima de 5% as chances de Risco de Ruína disparam.</em>
+                        </li>
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-bolt" style="color: var(--warning); width: 20px; text-align: center;"></i> Sortino Ratio:</strong> Semelhante ao Sharpe, porém <strong>só penaliza oscilações de queda</strong>. Ganhos absurdos não afetam negativamente a métrica.<br>
+                            <span style="color: var(--success);">Ideal: > 3.0</span> | <span style="color: var(--warning);">Aceitável: 1.5 a 3.0</span> | <span style="color: var(--danger);">Ruim: < 1.5</span>
+                        </li>
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-arrow-right-arrow-left" style="color: var(--info); width: 20px; text-align: center;"></i> Skewness (Assimetria):</strong> Formato dos retornos. Avalia se os tombos são maiores que os lucros ou vice-versa.<br>
+                            <span style="color: var(--success);">Positivo (> 0):</span> <em>Lucros "explosivos" e perdas pequenas. (Ótimo cenário)</em><br>
+                            <span style="color: var(--warning);">Simétrico (~ 0):</span> <em>Ganhos e perdas proporcionais.</em><br>
+                            <span style="color: var(--danger);">Negativo (< -1.0):</span> <em>Ganha de pouquinho em pouquinho, mas perde um caminhão numa única *bad run*.</em>
+                        </li>
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-arrow-trend-down" style="color: var(--danger); width: 20px; text-align: center;"></i> Decaimento do Edge (Drift):</strong> A variação do lucro recente em relação ao lucro histórico.<br>
+                            <span style="color: var(--success);">Forte: > -5%</span> | <span style="color: var(--warning);">Alerta: -10% a -20%</span> | <span style="color: var(--danger);">Crítico (O método quebrou?): < -30%</span><br>
+                            <em>Se estiver em -30%, as casas de apostas podem ter ajustado a precificação das odds para este mercado.</em>
+                        </li>
+                        <li>
+                            <strong><i class="fa-solid fa-dice" style="color: var(--success); width: 20px; text-align: center;"></i> P-Valor Binomial:</strong> A chance matemática de que seu lucro atual tenha sido mera <strong>sorte ao acaso</strong>.<br>
+                            <span style="color: var(--success);">Ideal: < 0.01 (Mínima chance de ser sorte, forte comprovação do método)</span><br>
+                            <span style="color: var(--warning);">Aceitável: 0.01 a 0.05 (Validado)</span><br>
+                            <span style="color: var(--danger);">Ruim: > 0.05 (Altamente provável que foi sorte, não confie)</span>
+                        </li>
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-chart-line" style="color: var(--success); width: 20px; text-align: center;"></i> CLV Médio (Closing Line Value):</strong> Distância entre a cotação da sua aposta e a verdadeira probabilidade final (linha de fechamento da Pinnacle). É a prova definitiva de lucro futuro.<br>
+                            <span style="color: var(--success);">Ideal: Verde / > +0.0% (O modelo bateu o mercado)</span> | <span style="color: var(--danger);">Ruim: Vermelho / < 0.0% (O lucro atual é sorte, a longo prazo perderá)</span><br>
+                            <em>Ex: Aposta feita a @2.10, mas a linha fechou a @1.90. Seu CLV é de +10.5%. Você pagou barato por uma aposta cara.</em>
+                        </li>
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-check-double" style="color: var(--primary); width: 20px; text-align: center;"></i> Beat Closing Line % (BCL %):</strong> A porcentagem das suas apostas totais em que o seu CLV foi positivo.<br>
+                            <span style="color: var(--success);">Ideal: > 50%</span> | <span style="color: var(--warning);">Marginal: ~45% a 50%</span> | <span style="color: var(--danger);">Ruim: < 45%</span><br>
+                            <em>Profissionais miram bater a linha de fechamento na maioria absoluta de suas entradas para garantir lucratividade imune à variância.</em>
+                        </li>
+                        <li style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                            <strong><i class="fa-solid fa-traffic-light" style="color: var(--info); width: 20px; text-align: center;"></i> Como usar o CLV na prática (Filtro Impeditivo):</strong><br>
+                            - <strong style="color: var(--danger);">CLV Vermelho (Negativo):</strong> Sinal de PARE. Não invista dinheiro real neste nicho, mesmo que o ROI esteja absurdamente positivo (foi apenas sorte).<br>
+                            - <strong style="color: var(--success);">CLV Verde (Positivo) + BCL > 50%:</strong> Sinal VERDE. Estratégia valiosa. Operar com a Stake sugerida sem medo da variância.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: History -->
+        <div id="tab-history" class="tab-pane" style="display: none;">
+            <div class="scanner-header-wrapper" style="margin-bottom: 20px;">
+                <div class="scanner-title">
+                    <h3><i class="fa-solid fa-bookmark text-glow" style="color: var(--warning);"></i> Estratégias Favoritas</h3>
+                    <p>Acesse e recarregue backtests que você salvou anteriormente.</p>
+                </div>
+                <div class="scanner-buttons">
+                    <button class="btn-clear" onclick="loadHistoryTab()"><i class="fa-solid fa-rotate-right"></i> Atualizar Histórico</button>
+                </div>
+            </div>
+
+            <div id="history-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+                <!-- Cards renderizados dinamicamente pelo JS -->
+            </div>
+            <div id="history-empty" style="display: none; text-align: center; padding: 40px; color: var(--text-muted);">
+                <i class="fa-solid fa-box-open" style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;"></i>
+                <p>Nenhuma estratégia salva ainda.</p>
+                <p style="font-size: 13px;">Rode um backtest e clique no botão "Salvar Estratégia" no topo para adicioná-la aqui.</p>
+            </div>
+        </div>
+
+</main>
+</div>
+<!-- Alert Modal / Toast notification -->
+<div class="toast" id="toast">
+<i class="fa-solid fa-circle-info" id="toast-icon"></i>
+<span id="toast-message">Mensagem de feedback.</span>
+</div>
+<!-- Match Details Modal -->
+<div class="modal-overlay" id="match-details-modal" style="display: none;">
+<div class="modal-container glassmorphism">
+<div class="modal-header">
+<h3><i class="fa-solid fa-circle-info text-glow"></i> Detalhes da Partida e Análise IA</h3>
+<button class="modal-close-btn" onclick="closeMatchDetailsModal()"><i class="fa-solid fa-xmark"></i></button>
+</div>
+<div class="modal-body">
+<div class="modal-match-title">
+<span class="badge badge-success" id="modal-league-badge">Liga</span>
+<h2 id="modal-match-teams">Time A vs Time B</h2>
+<span id="modal-match-date">Data: 0000-00-00</span>
+</div>
+<div class="modal-grid">
+<div class="modal-section-ratings">
+<h4><i class="fa-solid fa-chart-simple"></i> Parâmetros Dixon-Coles</h4>
+<div class="ratings-comparison-grid">
+<div class="rating-box">
+<span class="rating-team-name" id="modal-home-team-name">Mandante</span>
+<div class="rating-row"><span>Ataque (Att):</span> <strong id="modal-home-att">1.00</strong></div>
+<div class="rating-row"><span>Defesa (Def):</span> <strong id="modal-home-def">1.00</strong></div>
+<div class="rating-row"><span>Expectativa Gols (λ<sub>H</sub>):</span> <strong class="text-glow" id="modal-home-lambda">0.00</strong></div>
+</div>
+<div class="rating-separator-vs">VS</div>
+<div class="rating-box">
+<span class="rating-team-name" id="modal-away-team-name">Visitante</span>
+<div class="rating-row"><span>Ataque (Att):</span> <strong id="modal-away-att">1.00</strong></div>
+<div class="rating-row"><span>Defesa (Def):</span> <strong id="modal-away-def">1.00</strong></div>
+<div class="rating-row"><span>Expectativa Gols (λ<sub>A</sub>):</span> <strong class="text-glow" id="modal-away-lambda">0.00</strong></div>
+</div>
+</div>
+<div class="rating-league-avg">
+                            Média da Liga: <span id="modal-league-avg-home">0.00</span> (Mandante) / <span id="modal-league-avg-away">0.00</span> (Visitante)
+                        </div>
+</div>
+<div class="modal-section-probs">
+<h4><i class="fa-solid fa-calculator"></i> Probabilidades e Comparativo de Odds</h4>
+<table class="suggestion-comparison-table">
+<thead>
+<tr>
+<th>Mercado</th>
+<th>Probabilidade</th>
+<th>Odds Justas</th>
+<th>Odds Bookie</th>
+<th>EV Edge</th>
+</tr>
+</thead>
+<tbody id="modal-odds-tbody">
+<!-- Populated dynamically -->
+</tbody>
+</table>
+</div>
+</div>
+<!-- Odds Comparison Table in Details Modal -->
+<div class="modal-section-bookmakers" id="modal-bookmakers-section" style="margin-top: 20px; margin-bottom: 20px;">
+<h4><i class="fa-solid fa-scale-balanced"></i> Comparativo de Odds de Cotação (1X2)</h4>
+<table class="suggestion-comparison-table" style="font-size: 11px;">
+<thead>
+<tr>
+<th>Casa de Apostas</th>
+<th>Mandante (1)</th>
+<th>Empate (X)</th>
+<th>Visitante (2)</th>
+</tr>
+</thead>
+<tbody id="modal-bookmakers-tbody">
+<!-- Populated dynamically -->
+</tbody>
+</table>
+</div>
+<div class="modal-heatmap-section">
+<h4><i class="fa-solid fa-th"></i> Distribuição Probabilística de Placar Exato (Heatmap Dixon-Coles)</h4>
+<div class="heatmap-grid-wrapper">
+<div class="heatmap-axis-label vertical-label" style="font-size: 11px;">Mandante (Gols)</div>
+<div class="heatmap-grid-core">
+<div class="heatmap-axis-label horizontal-labels" style="font-size: 11px;">
+<span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+<div style="font-size: 9px; color: var(--text-muted); text-align: center; margin-top: 4px; width: 100%;">Visitante (Gols)</div>
+</div>
+<div class="heatmap-grid" id="modal-heatmap-grid">
+<!-- Dynamically generated rows of cells -->
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+    <!-- Save Strategy Modal -->
+    <div class="modal-overlay" id="save-strategy-modal" style="display: none;">
+        <div class="modal-container glassmorphism" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-star text-glow" style="color: var(--warning);"></i> Salvar Estratégia</h3>
+                <button class="btn-close" onclick="closeSaveStrategyModal()"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding-top: 15px;">
+                <div class="form-group">
+                    <label for="save-strategy-name">Nome da Estratégia</label>
+                    <input type="text" id="save-strategy-name" placeholder="Ex: Ambas Marcam Asiáticas seguras..." />
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn-clear" onclick="closeSaveStrategyModal()" style="flex: 1; justify-content: center;">Cancelar</button>
+                    <button class="btn-scanner" onclick="submitSaveStrategy()" style="flex: 1; justify-content: center;"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="app.js?v=19"></script>
+</body>
+</html>
