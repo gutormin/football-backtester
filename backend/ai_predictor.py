@@ -587,11 +587,17 @@ def run_monte_carlo_simulation(bets_record, initial_bankroll=1000.0, staking_rul
                 stake = stake_value
             elif staking_rule == 'proportional':
                 stake = br * (stake_value / 100.0)
-            elif staking_rule == 'kelly':
+            elif staking_rule.startswith('kelly'):
+                mult_k = stake_value
+                if staking_rule == 'kelly_half': mult_k = 0.5
+                elif staking_rule == 'kelly_quarter': mult_k = 0.25
+                elif staking_rule == 'kelly_eighth': mult_k = 0.125
+                elif staking_rule == 'kelly_sixteenth': mult_k = 0.0625
+                
                 if bookie_odds > 1.0:
                     f_star = (model_prob * bookie_odds - 1.0) / (bookie_odds - 1.0)
                     f_star = max(0.0, f_star)
-                    stake = br * f_star * stake_value
+                    stake = br * f_star * mult_k
                     stake = min(stake, br * 0.10)
                 else:
                     stake = 0.0
