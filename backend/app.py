@@ -69,6 +69,16 @@ class BacktestRequest(BaseModel):
     use_ml: bool = False
     data_source: str = "footballdata"
     futpython_api_key: str = ""
+    minOddsH: Optional[float] = None
+    maxOddsH: Optional[float] = None
+    minOddsD: Optional[float] = None
+    maxOddsD: Optional[float] = None
+    minOddsA: Optional[float] = None
+    maxOddsA: Optional[float] = None
+    minOddsOver25: Optional[float] = None
+    maxOddsOver25: Optional[float] = None
+    minOddsUnder25: Optional[float] = None
+    maxOddsUnder25: Optional[float] = None
 
 @app.get("/api/leagues")
 def list_leagues(source: str = "footballdata"):
@@ -128,7 +138,17 @@ def run_backtest(req: BacktestRequest):
             exchange_commission=req.exchange_commission,
             use_ml=req.use_ml,
             data_source=req.data_source,
-            futpython_api_key=req.futpython_api_key
+            futpython_api_key=req.futpython_api_key,
+            min_odds_h=req.minOddsH,
+            max_odds_h=req.maxOddsH,
+            min_odds_d=req.minOddsD,
+            max_odds_d=req.maxOddsD,
+            min_odds_a=req.minOddsA,
+            max_odds_a=req.maxOddsA,
+            min_odds_over25=req.minOddsOver25,
+            max_odds_over25=req.maxOddsOver25,
+            min_odds_under25=req.minOddsUnder25,
+            max_odds_under25=req.maxOddsUnder25
         )
         if "error" in results:
             raise HTTPException(status_code=400, detail=results["error"])

@@ -467,6 +467,65 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
                 
             suggestions.append(sug)
             
+    # 4. Cross-market Odds Range Optimization
+    cross_markets = [
+        ('odds_h', 'Mandante (1X2)', {
+            'Super Favoritos (<=1.50)': lambda x: x <= 1.50,
+            'Favoritos (1.50-2.00)': lambda x: 1.50 < x <= 2.00,
+            'Médios (2.00-3.00)': lambda x: 2.00 < x <= 3.00,
+            'Zebras (>3.00)': lambda x: x > 3.00
+        }),
+        ('odds_d', 'Empate (1X2)', {
+            'Baixo (<=3.00)': lambda x: x <= 3.00,
+            'Médio (3.00-3.80)': lambda x: 3.00 < x <= 3.80,
+            'Alto (>3.80)': lambda x: x > 3.80
+        }),
+        ('odds_a', 'Visitante (1X2)', {
+            'Super Favoritos (<=1.50)': lambda x: x <= 1.50,
+            'Favoritos (1.50-2.00)': lambda x: 1.50 < x <= 2.00,
+            'Médios (2.00-3.00)': lambda x: 2.00 < x <= 3.00,
+            'Zebras (>3.00)': lambda x: x > 3.00
+        }),
+        ('odds_over25', 'Over 2.5 Gols', {
+            'Favorito (<=1.70)': lambda x: x <= 1.70,
+            'Equilibrado (1.70-2.20)': lambda x: 1.70 < x <= 2.20,
+            'Zebra (>2.20)': lambda x: x > 2.20
+        }),
+        ('odds_under25', 'Under 2.5 Gols', {
+            'Favorito (<=1.70)': lambda x: x <= 1.70,
+            'Equilibrado (1.70-2.20)': lambda x: 1.70 < x <= 2.20,
+            'Zebra (>2.20)': lambda x: x > 2.20
+        })
+    ]
+
+    for field, mkt_name, ranges in cross_markets:
+        if field not in df.columns:
+            continue
+        for r_name, condition_fn in ranges.items():
+            mask = df[field].apply(lambda x: condition_fn(x) if (pd.notna(x) and x is not None) else False)
+            sub_in_range = df[mask]
+            
+            if len(sub_in_range) > 0:
+                r_profit = sub_in_range['profit'].sum()
+                if r_profit < -15.0:
+                    # Simulate excluding this range
+                    sub_exclude = df[~mask]
+                    if len(sub_exclude) >= 15:
+                        opt_res = recalculate_sub_backtest(sub_exclude, initial_bankroll, staking_rule, stake_value)
+                        if opt_res:
+                            opt_roi = opt_res['summary']['roi']
+                            opt_profit = opt_res['summary']['net_profit']
+                            if opt_roi > baseline_roi + 1.0 or opt_profit > baseline_profit + 10.0:
+                                sug = {
+                                    "type": "odds_warning",
+                                    "text": f"Evitar apostas quando o mercado de {mkt_name} estiver na faixa {r_name}. Ela gerou um prejuízo acumulado de -${abs(r_profit):.2f} no histórico, puxando o ROI geral para baixo.",
+                                    "value": f"{field}:{r_name}"
+                                }
+                                sug["original_summary"] = original_summary
+                                sug["optimized_summary"] = opt_res['summary']
+                                sug["optimized_curve"] = opt_res['equity_curve']
+                                suggestions.append(sug)
+            
     return suggestions
 
 def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value):

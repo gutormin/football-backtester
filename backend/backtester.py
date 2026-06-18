@@ -41,7 +41,7 @@ class ChronologicalBacktester:
         self.ml_history = defaultdict(lambda: {'X': [], 'y': []})
         self.matches_since_ml_fit = 0
 
-    def run(self, leagues, start_date, end_date, market, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', run_monte_carlo=True, min_odds=1.0, max_odds=50.0, exchange_commission=0.0, use_ml=False, data_source='football-data', futpython_api_key=''):
+    def run(self, leagues, start_date, end_date, market, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', run_monte_carlo=True, min_odds=1.0, max_odds=50.0, exchange_commission=0.0, use_ml=False, data_source='football-data', futpython_api_key='', min_odds_h=None, max_odds_h=None, min_odds_d=None, max_odds_d=None, min_odds_a=None, max_odds_a=None, min_odds_over25=None, max_odds_over25=None, min_odds_under25=None, max_odds_under25=None):
         """
         Runs a chronological backtest across selected leagues.
         
@@ -696,6 +696,18 @@ class ChronologicalBacktester:
                 if start_dt <= match_date <= end_dt:
                     # We can place a bet if odds are valid and we have a "+EV" (positive expected value) edge
                     if not pd.isna(bookie_odds) and bookie_odds > 1.0:
+                        # Cross-market odds filtering
+                        if min_odds_h is not None and not pd.isna(odds_h) and odds_h < min_odds_h: continue
+                        if max_odds_h is not None and not pd.isna(odds_h) and odds_h > max_odds_h: continue
+                        if min_odds_d is not None and not pd.isna(odds_d) and odds_d < min_odds_d: continue
+                        if max_odds_d is not None and not pd.isna(odds_d) and odds_d > max_odds_d: continue
+                        if min_odds_a is not None and not pd.isna(odds_a) and odds_a < min_odds_a: continue
+                        if max_odds_a is not None and not pd.isna(odds_a) and odds_a > max_odds_a: continue
+                        if min_odds_over25 is not None and not pd.isna(odds_over25) and odds_over25 < min_odds_over25: continue
+                        if max_odds_over25 is not None and not pd.isna(odds_over25) and odds_over25 > max_odds_over25: continue
+                        if min_odds_under25 is not None and not pd.isna(odds_under25) and odds_under25 < min_odds_under25: continue
+                        if max_odds_under25 is not None and not pd.isna(odds_under25) and odds_under25 > max_odds_under25: continue
+
                         # Filter by odds range
                         if bookie_odds < min_odds or bookie_odds > max_odds:
                             continue
@@ -872,7 +884,12 @@ class ChronologicalBacktester:
                                     'profit': round(profit, 2),
                                     'bankroll': round(bankroll, 2),
                                     'won': bet_won,
-                                    'clv': round(clv, 2) if clv is not None else None
+                                    'clv': round(clv, 2) if clv is not None else None,
+                                    'odds_h': round(odds_h, 2) if (odds_h and not pd.isna(odds_h)) else None,
+                                    'odds_d': round(odds_d, 2) if (odds_d and not pd.isna(odds_d)) else None,
+                                    'odds_a': round(odds_a, 2) if (odds_a and not pd.isna(odds_a)) else None,
+                                    'odds_over25': round(odds_over25, 2) if (odds_over25 and not pd.isna(odds_over25)) else None,
+                                    'odds_under25': round(odds_under25, 2) if (odds_under25 and not pd.isna(odds_under25)) else None
                                 })
                             
             # Fit Calibration Periodically

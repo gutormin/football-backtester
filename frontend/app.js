@@ -2798,38 +2798,102 @@ function applyLeagueSuggestion(excludeCodes) {
 
 
 
+window.toggleCollapsibleSection = function(id) {
+    const el = document.getElementById(id);
+    const chevron = document.getElementById(id.replace('-filters', '-chevron'));
+    if (!el) return;
+    if (el.style.display === 'none') {
+        el.style.display = 'flex';
+        if (chevron) {
+            chevron.classList.remove('fa-chevron-down');
+            chevron.classList.add('fa-chevron-up');
+        }
+    } else {
+        el.style.display = 'none';
+        if (chevron) {
+            chevron.classList.remove('fa-chevron-up');
+            chevron.classList.add('fa-chevron-down');
+        }
+    }
+};
+
 function applyOddsSuggestion(rangeName) {
+    if (rangeName.includes(':')) {
+        const parts = rangeName.split(':');
+        const field = parts[0];
+        const subRange = parts[1];
+        
+        let minFieldId = '';
+        let maxFieldId = '';
+        
+        if (field === 'odds_h') {
+            minFieldId = 'min-odds-h';
+            maxFieldId = 'max-odds-h';
+        } else if (field === 'odds_d') {
+            minFieldId = 'min-odds-d';
+            maxFieldId = 'max-odds-d';
+        } else if (field === 'odds_a') {
+            minFieldId = 'min-odds-a';
+            maxFieldId = 'max-odds-a';
+        } else if (field === 'odds_over25') {
+            minFieldId = 'min-odds-over25';
+            maxFieldId = 'max-odds-over25';
+        } else if (field === 'odds_under25') {
+            minFieldId = 'min-odds-under25';
+            maxFieldId = 'max-odds-under25';
+        }
+        
+        const minEl = document.getElementById(minFieldId);
+        const maxEl = document.getElementById(maxFieldId);
+        
+        // Expand collapsible section
+        const coll = document.getElementById('advanced-odds-filters');
+        if (coll && coll.style.display === 'none') {
+            toggleCollapsibleSection('advanced-odds-filters');
+        }
 
-    const minInput = document.getElementById('min-odds');
-
-    const maxInput = document.getElementById('max-odds');
-
-    
-
-    if (rangeName.includes('Super Favoritos') || rangeName.includes('<=1.50')) {
-
-        minInput.value = "1.50";
-
-    } else if (rangeName.includes('Zebras') || rangeName.includes('>3.00')) {
-
-        maxInput.value = "3.00";
-
-    } else if (rangeName.includes('Favoritos (1.50-2.00)')) {
-
-        minInput.value = "2.00";
-
-    } else if (rangeName.includes('Médios (2.00-3.00)')) {
-
-        maxInput.value = "2.00";
-
+        if (subRange.includes('Super Favoritos') || subRange.includes('<=1.50')) {
+            if (minEl) minEl.value = "1.50";
+        } else if (subRange.includes('Zebras') || subRange.includes('>3.00')) {
+            if (maxEl) maxEl.value = "3.00";
+        } else if (subRange.includes('Favoritos (1.50-2.00)')) {
+            if (minEl) minEl.value = "2.00";
+        } else if (subRange.includes('Médios (2.00-3.00)')) {
+            if (maxEl) maxEl.value = "2.00";
+        } else if (subRange.includes('Baixo (<=3.00)')) {
+            if (minEl) minEl.value = "3.00";
+        } else if (subRange.includes('Alto (>3.80)')) {
+            if (maxEl) maxEl.value = "3.80";
+        } else if (subRange.includes('Médio (3.00-3.80)')) {
+            if (maxEl) maxEl.value = "3.00";
+        } else if (subRange.includes('Favorito (<=1.70)')) {
+            if (minEl) minEl.value = "1.70";
+        } else if (subRange.includes('Equilibrado (1.70-2.20)')) {
+            if (minEl) minEl.value = "2.20";
+        } else if (subRange.includes('Zebra (>2.20)')) {
+            if (maxEl) maxEl.value = "2.20";
+        }
+        
+        showToast(`Filtro avançado de odds otimizado. Rodando simulação...`, "success");
+        runBacktest();
+        return;
     }
 
+    const minInput = document.getElementById('min-odds');
+    const maxInput = document.getElementById('max-odds');
     
-
+    if (rangeName.includes('Super Favoritos') || rangeName.includes('<=1.50')) {
+        minInput.value = "1.50";
+    } else if (rangeName.includes('Zebras') || rangeName.includes('>3.00')) {
+        maxInput.value = "3.00";
+    } else if (rangeName.includes('Favoritos (1.50-2.00)')) {
+        minInput.value = "2.00";
+    } else if (rangeName.includes('Médios (2.00-3.00)')) {
+        maxInput.value = "2.00";
+    }
+    
     showToast(`Filtro de Odds otimizado para excluir ${rangeName}. Rodando simulação...`, "success");
-
     runBacktest();
-
 }
 
 
@@ -8045,6 +8109,17 @@ window.runBacktest = async function() {
     const useMLToggle = document.getElementById('use-ml-toggle');
     const useMl = useMLToggle ? useMLToggle.checked : false;
 
+    const minOddsH = document.getElementById('min-odds-h') && document.getElementById('min-odds-h').value ? parseFloat(document.getElementById('min-odds-h').value) : null;
+    const maxOddsH = document.getElementById('max-odds-h') && document.getElementById('max-odds-h').value ? parseFloat(document.getElementById('max-odds-h').value) : null;
+    const minOddsD = document.getElementById('min-odds-d') && document.getElementById('min-odds-d').value ? parseFloat(document.getElementById('min-odds-d').value) : null;
+    const maxOddsD = document.getElementById('max-odds-d') && document.getElementById('max-odds-d').value ? parseFloat(document.getElementById('max-odds-d').value) : null;
+    const minOddsA = document.getElementById('min-odds-a') && document.getElementById('min-odds-a').value ? parseFloat(document.getElementById('min-odds-a').value) : null;
+    const maxOddsA = document.getElementById('max-odds-a') && document.getElementById('max-odds-a').value ? parseFloat(document.getElementById('max-odds-a').value) : null;
+    const minOddsOver25 = document.getElementById('min-odds-over25') && document.getElementById('min-odds-over25').value ? parseFloat(document.getElementById('min-odds-over25').value) : null;
+    const maxOddsOver25 = document.getElementById('max-odds-over25') && document.getElementById('max-odds-over25').value ? parseFloat(document.getElementById('max-odds-over25').value) : null;
+    const minOddsUnder25 = document.getElementById('min-odds-under25') && document.getElementById('min-odds-under25').value ? parseFloat(document.getElementById('min-odds-under25').value) : null;
+    const maxOddsUnder25 = document.getElementById('max-odds-under25') && document.getElementById('max-odds-under25').value ? parseFloat(document.getElementById('max-odds-under25').value) : null;
+
     try {
         const payload = {
             leagues: leagues,
@@ -8062,7 +8137,17 @@ window.runBacktest = async function() {
             out_of_sample: oos,
             use_ml: useMl,
             data_source: window.currentDataSource,
-            futpython_api_key: window.futpythonApiKey
+            futpython_api_key: window.futpythonApiKey,
+            minOddsH: minOddsH,
+            maxOddsH: maxOddsH,
+            minOddsD: minOddsD,
+            maxOddsD: maxOddsD,
+            minOddsA: minOddsA,
+            maxOddsA: maxOddsA,
+            minOddsOver25: minOddsOver25,
+            maxOddsOver25: maxOddsOver25,
+            minOddsUnder25: minOddsUnder25,
+            maxOddsUnder25: maxOddsUnder25
         };
         const response = await fetch('/api/backtest', {
             method: 'POST',
