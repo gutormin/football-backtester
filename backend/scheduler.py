@@ -127,6 +127,205 @@ async def run_automatic_tips_scan():
             print(f"[Scheduler Autopilot Error] {e}")
             return {"status": "error", "message": str(e)}
             
+    elif mode == "saved_strategies":
+        try:
+            from .history_manager import load_history
+            saved_strategies = load_history()
+            if not saved_strategies:
+                print("[Scheduler Saved Strategies] Nenhuma estratégia salva encontrada para monitoramento.")
+                return {"status": "skipped", "message": "Nenhuma estratégia salva no histórico."}
+                
+            poisson = PoissonModel()
+            all_leagues = get_all_available_leagues()
+            code_to_name = {l['code']: l['name'] for l in all_leagues}
+            league_codes = [l['code'] for l in all_leagues]
+            
+            league_cache = {}
+            
+            for row in df_fixtures.to_dict('records'):
+                league_code = row.get('Div')
+                if not league_code or league_code not in league_codes:
+                    continue
+                    
+                home_team = row.get('HomeTeam')
+                away_team = row.get('AwayTeam')
+                if pd.isna(home_team) or pd.isna(away_team):
+                    continue
+                    
+                # Load league data to get ratings
+                if league_code not in league_cache:
+                    try:
+                        hist_df = await loop.run_in_executor(None, lambda: load_league_data(league_code, start_date='2020-08-01'))
+                        league_cache[league_code] = hist_df
+                    except Exception:
+                        continue
+                        
+                hist_df = league_cache[league_code]
+                if hist_df.empty:
+                    continue
+                    
+                try:
+                    match_date = pd.to_datetime(row.get('Date'), dayfirst=True)
+                    date_str = match_date.strftime('%Y-%m-%d')
+                except Exception:
+                    date_str = str(row.get('Date'))
+                    match_date = datetime.now()
+                    
+                # Predict outcome probabilities
+                pred = poisson.predict_match(home_team, away_team, hist_df, match_date)
+                
+                # Map odds
+                odds_h = float(row.get('B365H', np.nan))
+                odds_d = float(row.get('B365D', np.nan))
+                odds_a = float(row.get('B365A', np.nan))
+                odds_over25 = float(row.get('B365>2.5', np.nan))
+                odds_under25 = float(row.get('B365<2.5', np.nan))
+                
+                est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, pred['lambda_home'], pred['lambda_away'])
+                
+                for strategy in saved_strategies:
+                    strategy_name = strategy.get('name', 'Estratégia Salva')
+                    params = strategy.get('params', {})
+                    
+                    target_leagues = params.get('leagues', [])
+                    if league_code not in target_leagues:
+                        continue
+                        
+                    s_markets_raw = params.get('markets') or params.get('market', 'home')
+                    if isinstance(s_markets_raw, str):
+                        s_markets = [m.strip() for m in s_markets_raw.split(',')]
+                    elif isinstance(s_markets_raw, list):
+                        s_markets = [str(m).strip() for m in s_markets_raw]
+                    else:
+                        s_markets = ['home']
+                        
+                    value_threshold = float(params.get('valueThreshold') or params.get('valThreshold', 1.05))
+                    min_odds = float(params.get('minOdds', 1.0))
+                    max_odds = float(params.get('maxOdds', 50.0))
+                    staking_rule = params.get('stakingRule', 'fixed')
+                    stake_value = float(params.get('stakeValue', 10.0))
+                    initial_bankroll = float(params.get('initialBankroll', 1000.0))
+                    
+                    for market in s_markets:
+                        market_prob = 0.0
+                        bookie_odds = np.nan
+                        market_label = ""
+                        
+                        if market == 'home':
+                            market_prob = pred['prob_home']
+                            bookie_odds = odds_h
+                            market_label = "1 (Mandante)"
+                        elif market == 'away':
+                            market_prob = pred['prob_away']
+                            bookie_odds = odds_a
+                            market_label = "2 (Visitante)"
+                        elif market == 'draw':
+                            market_prob = pred['prob_draw']
+                            bookie_odds = odds_d
+                            market_label = "X (Empate)"
+                        elif market == 'over15':
+                            market_prob = pred['prob_over_15']
+                            bookie_odds = est_odds.get('bookie_over_15', np.nan)
+                            market_label = "Over 1.5"
+                        elif market == 'over25':
+                            market_prob = pred['prob_over_25']
+                            bookie_odds = odds_over25
+                            market_label = "Over 2.5"
+                        elif market == 'under25':
+                            market_prob = pred['prob_under_25']
+                            bookie_odds = odds_under25
+                            market_label = "Under 2.5"
+                        elif market == 'over35':
+                            market_prob = pred['prob_over_35']
+                            bookie_odds = est_odds.get('bookie_over_35', np.nan)
+                            market_label = "Over 3.5"
+                        elif market == 'under35':
+                            market_prob = pred['prob_under_35']
+                            bookie_odds = est_odds.get('bookie_under_35', np.nan)
+                            market_label = "Under 3.5"
+                        elif market == 'over45':
+                            market_prob = pred['prob_over_45']
+                            bookie_odds = est_odds.get('bookie_over_45', np.nan)
+                            market_label = "Over 4.5"
+                        elif market == 'under45':
+                            market_prob = pred['prob_under_45']
+                            bookie_odds = est_odds.get('bookie_under_45', np.nan)
+                            market_label = "Under 4.5"
+                        elif market == 'over55':
+                            market_prob = pred['prob_over_55']
+                            bookie_odds = est_odds.get('bookie_over_55', np.nan)
+                            market_label = "Over 5.5"
+                        elif market == 'under55':
+                            market_prob = pred['prob_under_55']
+                            bookie_odds = est_odds.get('bookie_under_55', np.nan)
+                            market_label = "Under 5.5"
+                        elif market == 'btts_yes':
+                            market_prob = pred['prob_btts_yes']
+                            bookie_odds = est_odds.get('bookie_btts_yes', np.nan)
+                            market_label = "BTTS Sim"
+                        elif market == 'btts_no':
+                            market_prob = pred['prob_btts_no']
+                            bookie_odds = est_odds.get('bookie_btts_no', np.nan)
+                            market_label = "BTTS Não"
+                        elif market.startswith('cs_'):
+                            market_prob = pred.get(f"prob_{market}", 0.0)
+                            bookie_odds = est_odds.get(f"bookie_{market}", np.nan)
+                            market_label = f"Placar Exato {market[3]}-{market[4]}"
+                        elif market == 'lay_home':
+                            market_prob = pred['prob_draw'] + pred['prob_away']
+                            bookie_odds = 1.0 / (1.0/odds_d + 1.0/odds_a) if (odds_d > 1.0 and odds_a > 1.0) else np.nan
+                            market_label = "Contra Mandante (X2)"
+                        elif market == 'lay_away':
+                            market_prob = pred['prob_home'] + pred['prob_draw']
+                            bookie_odds = 1.0 / (1.0/odds_h + 1.0/odds_d) if (odds_h > 1.0 and odds_d > 1.0) else np.nan
+                            market_label = "Contra Visitante (1X)"
+                        elif market == 'lay_draw':
+                            market_prob = pred['prob_home'] + pred['prob_away']
+                            bookie_odds = 1.0 / (1.0/odds_h + 1.0/odds_a) if (odds_h > 1.0 and odds_a > 1.0) else np.nan
+                            market_label = "Contra Empate (12)"
+                            
+                        if pd.isna(bookie_odds) or bookie_odds <= 1.0:
+                            continue
+                            
+                        ev = market_prob * bookie_odds
+                        is_tip = (ev >= value_threshold) and (min_odds <= bookie_odds <= max_odds)
+                        if not is_tip:
+                            continue
+                            
+                        dup_key = (home_team, away_team, market_label, date_str)
+                        if dup_key in sent_lookup:
+                            continue
+                            
+                        stake_pct = 0.0
+                        if staking_rule == 'kelly':
+                            f_star = (market_prob * bookie_odds - 1.0) / (bookie_odds - 1.0)
+                            stake_pct = max(0.0, f_star) * stake_value * 100.0
+                            stake_pct = min(stake_pct, 10.0)
+                        elif staking_rule == 'proportional':
+                            stake_pct = stake_value
+                        else:
+                            stake_pct = (stake_value / initial_bankroll) * 100.0
+                            
+                        league_name = code_to_name.get(league_code, league_code)
+                        time_str = str(row.get('Time')) if not pd.isna(row.get('Time')) else '00:00'
+                        
+                        tips_to_send.append({
+                            'league_name': league_name,
+                            'date_str': date_str,
+                            'time_str': time_str,
+                            'home_team': home_team,
+                            'away_team': away_team,
+                            'market_label': f"{market_label} (Estratégia: {strategy_name})",
+                            'prob': market_prob * 100.0,
+                            'fair_odds': 1.0 / market_prob if market_prob > 0 else 99.0,
+                            'bookie_odds': bookie_odds,
+                            'ev': ev,
+                            'stake_pct': stake_pct
+                        })
+        except Exception as e:
+            print(f"[Scheduler Saved Strategies Error] {e}")
+            return {"status": "error", "message": str(e)}
+            
     else:
             poisson = PoissonModel()
             all_leagues = get_all_available_leagues()
