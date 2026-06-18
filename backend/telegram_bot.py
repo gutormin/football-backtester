@@ -221,14 +221,19 @@ def add_telegram_arbitrage_tip(match_name, match_date, profit_margin):
     return new_tip
 
 
-def format_telegram_smart_money_tip(match_name, match_date, bookmaker, market, opening_odd, current_odd, drop_pct):
+def format_telegram_smart_money_tip(match_name, match_date, bookmaker, market, opening_odd, current_odd, drop_pct, confidence_score=None, confidence_level=None, liquidity_tier=None):
     # Formats a beautiful alert for smart money drops
+    confidence_str = ""
+    if confidence_level and confidence_score is not None:
+        emoji = "🟢" if confidence_level == "Alta" else ("🟡" if confidence_level == "Média" else "🔴")
+        confidence_str = f"ℹ️ <b>Índice de Confiança:</b> {emoji} <b>{confidence_level}</b> ({confidence_score:.0f}%)\n💧 <b>Liquidez da Liga:</b> {liquidity_tier}\n\n"
     message = (
         f"<b>🚨 ALERTA DE SMART MONEY DETECTADO</b>\n\n"
         f"⚽ <b>Jogo:</b> {match_name}\n"
         f"📅 <b>Data:</b> {match_date}\n"
         f"🎯 <b>Mercado Afetado:</b> {market}\n"
         f"🏦 <b>Casa Afetada:</b> {bookmaker}\n\n"
+        f"{confidence_str}"
         f"📉 <b>Esmagamento da Odd:</b>\n"
         f"Abertura: @{opening_odd:.2f} ➡️ Atual: <b>@{current_odd:.2f}</b>\n"
         f"💥 <b>Queda Total: -{drop_pct:.1f}%</b>\n\n"

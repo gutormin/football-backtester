@@ -1300,6 +1300,9 @@ def get_live_steam_moves(req: LiveSteamRequest):
                     if opening > 1.0 and current > 0.0 and current < opening:
                         drop_pct = ((opening / current) - 1.0) * 100
                         if drop_pct >= req.minDropPct:
+                            from .smart_money import calculate_confidence_score
+                            sport_key = match_info.get('sport', '')
+                            score, confidence_level, tier_name = calculate_confidence_score(drop_pct, sport_key)
                             results.append({
                                 'match': title,
                                 'date': date_str,
@@ -1307,7 +1310,10 @@ def get_live_steam_moves(req: LiveSteamRequest):
                                 'market': norm_market.upper(),
                                 'opening_odd': opening,
                                 'current_odd': current,
-                                'drop_pct': round(drop_pct, 1)
+                                'drop_pct': round(drop_pct, 1),
+                                'liquidity_tier': tier_name,
+                                'confidence_score': score,
+                                'confidence_level': confidence_level
                             })
                             
         # Sort by biggest drop

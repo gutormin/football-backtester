@@ -142,6 +142,10 @@ def fetch_and_update_live_odds():
                                     if drop_pct >= 5.0 and not bookie_entry[comp_key].get('telegram_sent', False):
                                         try:
                                             from backend.telegram_bot import send_telegram_message, format_telegram_smart_money_tip
+                                            from backend.smart_money import calculate_confidence_score
+                                            
+                                            sport_key = match_entry.get('sport', '')
+                                            score, confidence_level, tier_name = calculate_confidence_score(drop_pct, sport_key)
                                             
                                             commence_time = match_entry.get('commence_time', '')
                                             try:
@@ -159,7 +163,10 @@ def fetch_and_update_live_odds():
                                                 norm_market.upper(),
                                                 opening,
                                                 price,
-                                                drop_pct
+                                                drop_pct,
+                                                confidence_score=score,
+                                                confidence_level=confidence_level,
+                                                liquidity_tier=tier_name
                                             )
                                             send_telegram_message(msg)
                                             bookie_entry[comp_key]['telegram_sent'] = True

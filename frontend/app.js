@@ -7516,6 +7516,7 @@ function renderSteamTable(results) {
                     <th style="padding: 12px 15px; text-align: left; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Nicho</th>
                     <th style="padding: 12px 15px; text-align: center; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Apostas Feitas</th>
                     <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Drop Médio (%)</th>
+                    <th style="padding: 12px 15px; text-align: center; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Confiança</th>
                     <th style="padding: 12px 15px; text-align: center; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Taxa de Acerto</th>
                     <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">ROI</th>
                     <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Lucro Líquido</th>
@@ -7530,6 +7531,35 @@ function renderSteamTable(results) {
         const leagueName = (window.AVAILABLE_LEAGUES && window.AVAILABLE_LEAGUES.find(l => l.code === codeParts[0])) ? 
             window.AVAILABLE_LEAGUES.find(l => l.code === codeParts[0]).name : codeParts[0];
             
+        let badgeColor = 'var(--text-muted)';
+        let badgeBg = 'rgba(255,255,255,0.05)';
+        let badgeBorder = '1px solid rgba(255,255,255,0.1)';
+        
+        if (r.confidence_level === 'Alta') {
+            badgeColor = '#10b981';
+            badgeBg = 'rgba(16, 185, 129, 0.15)';
+            badgeBorder = '1px solid rgba(16, 185, 129, 0.3)';
+        } else if (r.confidence_level === 'Média') {
+            badgeColor = '#f59e0b';
+            badgeBg = 'rgba(245, 158, 11, 0.15)';
+            badgeBorder = '1px solid rgba(245, 158, 11, 0.3)';
+        } else if (r.confidence_level === 'Baixa') {
+            badgeColor = '#ef4444';
+            badgeBg = 'rgba(239, 68, 68, 0.15)';
+            badgeBorder = '1px solid rgba(239, 68, 68, 0.3)';
+        }
+        
+        const confidenceHTML = `
+            <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; vertical-align: middle;">
+                <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; color: ${badgeColor}; background: ${badgeBg}; border: ${badgeBorder}; text-transform: uppercase;">
+                    ${r.confidence_level || 'Baixa'}
+                </span>
+                <span style="font-size: 9px; color: var(--text-muted); margin-top: 2px; font-weight: 500;">
+                    Score: ${(r.confidence_score || 0).toFixed(0)}% (Liq: ${r.liquidity_tier || 'Baixa'})
+                </span>
+            </div>
+        `;
+            
         html += `
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background-color 0.2s;">
                 <td style="padding: 12px 15px; font-weight: 500; font-size: 13px;">
@@ -7542,6 +7572,9 @@ function renderSteamTable(results) {
                 </td>
                 <td style="padding: 12px 15px; text-align: right; color: var(--info); font-family: var(--font-mono); font-weight: bold;">
                     -${r.avg_drop.toFixed(1)}% <i class="fa-solid fa-arrow-trend-down" style="font-size: 10px; margin-left: 2px;"></i>
+                </td>
+                <td style="padding: 12px 15px; text-align: center;">
+                    ${confidenceHTML}
                 </td>
                 <td style="padding: 12px 15px; text-align: center; color: var(--text-secondary);">
                     ${r.win_rate.toFixed(1)}%
@@ -7814,6 +7847,36 @@ window.runLiveSteamScan = async function() {
         
         data.scan_results.forEach(item => {
             const tr = document.createElement('tr');
+            
+            let badgeColor = 'var(--text-muted)';
+            let badgeBg = 'rgba(255,255,255,0.05)';
+            let badgeBorder = '1px solid rgba(255,255,255,0.1)';
+            
+            if (item.confidence_level === 'Alta') {
+                badgeColor = '#10b981';
+                badgeBg = 'rgba(16, 185, 129, 0.15)';
+                badgeBorder = '1px solid rgba(16, 185, 129, 0.3)';
+            } else if (item.confidence_level === 'Média') {
+                badgeColor = '#f59e0b';
+                badgeBg = 'rgba(245, 158, 11, 0.15)';
+                badgeBorder = '1px solid rgba(245, 158, 11, 0.3)';
+            } else if (item.confidence_level === 'Baixa') {
+                badgeColor = '#ef4444';
+                badgeBg = 'rgba(239, 68, 68, 0.15)';
+                badgeBorder = '1px solid rgba(239, 68, 68, 0.3)';
+            }
+
+            const confidenceHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                    <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; color: ${badgeColor}; background: ${badgeBg}; border: ${badgeBorder}; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        ${item.confidence_level || 'Baixa'}
+                    </span>
+                    <span style="font-size: 10px; color: var(--text-muted); margin-top: 5px; font-weight: 500;">
+                        Score: ${(item.confidence_score || 0).toFixed(0)}% (${item.liquidity_tier || 'Baixa'})
+                    </span>
+                </div>
+            `;
+
             tr.innerHTML = `
                 <td>
                     <div style="font-weight: bold; color: var(--text-primary);">${item.match}</div>
@@ -7827,6 +7890,9 @@ window.runLiveSteamScan = async function() {
                     <div style="display: inline-block; padding: 4px 8px; background: rgba(var(--warning-rgb), 0.1); color: var(--warning); border-radius: 4px; font-weight: bold; font-size: 12px;">
                         <i class="fa-solid fa-arrow-trend-down"></i> -${item.drop_pct}%
                     </div>
+                </td>
+                <td>
+                    ${confidenceHTML}
                 </td>
             `;
             tbody.appendChild(tr);

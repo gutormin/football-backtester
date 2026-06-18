@@ -1,6 +1,63 @@
 import pandas as pd
 import numpy as np
 
+def estimate_liquidity_tier(league_identifier: str):
+    """
+    Estima a liquidez da liga baseado em sua sigla/nome.
+    Retorna (tier_name, weight) onde:
+    - tier_name: 'Alta', 'Média', 'Baixa'
+    - weight: 1.0, 0.7, 0.4
+    """
+    if not league_identifier:
+        return 'Baixa', 0.4
+    lid = league_identifier.lower().strip()
+    
+    # Tier 1 - Alta Liquidez (Peso 1.0)
+    t1_keys = [
+        'e0', 'sp1', 'i1', 'd1', 'f1', 'bra', 
+        'premier_league', 'la_liga', 'serie_a', 'bundesliga', 'ligue1', 'campeonato_brasileiro', 'brazil_serie_a'
+    ]
+    is_t1 = any(k in lid for k in t1_keys)
+    if is_t1:
+        if 'bundesliga2' in lid or 'bundesliga_2' in lid or 'serie_b' in lid or 'segunda' in lid:
+            pass
+        else:
+            return 'Alta', 1.0
+            
+    # Tier 2 - Média Liquidez (Peso 0.7)
+    t2_keys = [
+        'e1', 'sp2', 'i2', 'd2', 'f2', 'n1', 'b1', 'p1', 't1', 'usa', 'jpn',
+        'championship', 'segunda', 'serie_b', 'bundesliga2', 'bundesliga_2', 'ligue2', 'eredivisie', 
+        'primeira_liga', 'belgium_first_division', 'super_league', 'mls', 'j_league', 'japan_j_league',
+        'netherlands_eredivisie', 'portugal_primeira_liga', 'turkey_super_league'
+    ]
+    if any(k in lid for k in t2_keys):
+        return 'Média', 0.7
+        
+    # Tier 3 - Baixa Liquidez (Peso 0.4)
+    return 'Baixa', 0.4
+
+def calculate_confidence_score(drop_pct: float, league_identifier: str):
+    """
+    Calcula um score de confiança de 0 a 100 com base no drop de odds e na liquidez da liga.
+    Formula: Confidence Score = min(100.0, drop_pct * 10.0 * liquidity_weight)
+    Retorna (score, confidence_level, liquidity_tier)
+    """
+    tier_name, weight = estimate_liquidity_tier(league_identifier)
+    if drop_pct <= 0:
+        return 0.0, 'Baixa', tier_name
+        
+    score = min(100.0, drop_pct * 10.0 * weight)
+    
+    if score >= 75.0:
+        confidence_level = 'Alta'
+    elif score >= 45.0:
+        confidence_level = 'Média'
+    else:
+        confidence_level = 'Baixa'
+        
+    return round(score, 1), confidence_level, tier_name
+
 class SmartMoneyBacktester:
     def __init__(self, data_loader_fn):
         self.data_loader_fn = data_loader_fn
@@ -92,6 +149,7 @@ class SmartMoneyBacktester:
                     })
                     
             if not bets:
+                score, confidence_level, tier_name = calculate_confidence_score(0.0, league_code)
                 results.append({
                     'code': f"{league_code}|{market}",
                     'market_name': market.capitalize(),
@@ -99,7 +157,10 @@ class SmartMoneyBacktester:
                     'net_profit': 0.0,
                     'roi': 0.0,
                     'avg_drop': 0.0,
-                    'win_rate': 0.0
+                    'win_rate': 0.0,
+                    'liquidity_tier': tier_name,
+                    'confidence_score': score,
+                    'confidence_level': confidence_level
                 })
                 continue
                 
@@ -111,6 +172,8 @@ class SmartMoneyBacktester:
             wins = sum(1 for b in bets if b['won'])
             win_rate = (wins / total_bets * 100) if total_bets > 0 else 0
             
+            score, confidence_level, tier_name = calculate_confidence_score(avg_drop, league_code)
+            
             results.append({
                 'code': f"{league_code}|{market}",
                 'market_name': market.capitalize(),
@@ -118,7 +181,10 @@ class SmartMoneyBacktester:
                 'net_profit': round(net_profit, 2),
                 'roi': round(roi, 2),
                 'avg_drop': round(avg_drop, 2),
-                'win_rate': round(win_rate, 1)
+                'win_rate': round(win_rate, 1),
+                'liquidity_tier': tier_name,
+                'confidence_score': score,
+                'confidence_level': confidence_level
             })
             
         return results
