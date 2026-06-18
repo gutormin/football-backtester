@@ -382,95 +382,78 @@
 <div class="tab-pane" id="tab-radar" style="display: none;">
     <!-- Radar Smart Money - Premium UI Styles -->
     <style>
-    .radar-header-banner {
-        text-align: center;
-        margin-bottom: 25px;
-        padding: 30px 20px;
-        background: radial-gradient(circle at center, rgba(16, 185, 129, 0.08) 0%, transparent 70%);
-        border-radius: 12px;
+    .radar-sonar-container {
+        position: relative;
+        width: 45px;
+        height: 45px;
     }
-    .radar-logo-wrapper {
+    .radar-sonar-wave {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border: 2px solid #10b981;
+        border-radius: 50%;
+        opacity: 0.8;
+        animation: radar-wave-ping 2s infinite ease-out;
+        box-sizing: border-box;
+    }
+    .radar-sonar-center {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        width: 21px;
+        height: 21px;
+        background: #10b981;
+        border-radius: 50%;
+        box-shadow: 0 0 15px #10b981;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 12px;
-        margin-bottom: 12px;
     }
-    .radar-logo-icon {
-        font-size: 32px;
-        color: #10b981;
-        animation: radar-pulse-anim 2.5s infinite ease-in-out;
-        filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.4));
-    }
-    @keyframes radar-pulse-anim {
-        0% { transform: rotate(0deg) scale(1); opacity: 0.8; }
-        50% { transform: rotate(180deg) scale(1.1); opacity: 1; filter: drop-shadow(0 0 15px rgba(16, 185, 129, 0.6)); }
-        100% { transform: rotate(360deg) scale(1); opacity: 0.8; }
-    }
-    .radar-logo-text {
-        font-family: 'Outfit', sans-serif;
-        font-size: 26px;
-        font-weight: 800;
-        letter-spacing: 0.5px;
-        color: #ffffff;
-        text-transform: uppercase;
-    }
-    .radar-logo-text span {
-        color: #10b981;
-        margin-left: 8px;
-    }
-    .radar-beta-tag {
-        background: #06b6d4;
-        color: #ffffff;
-        font-size: 10px;
-        font-weight: 700;
-        padding: 2px 6px;
-        border-radius: 4px;
-        text-transform: uppercase;
-        vertical-align: middle;
-        margin-left: 10px;
-        letter-spacing: 0.5px;
-    }
-    .radar-sub-banner {
-        font-family: 'Outfit', sans-serif;
-        font-size: 36px;
-        font-weight: 800;
-        color: #ffffff;
-        margin-bottom: 8px;
-        letter-spacing: -0.5px;
-        text-transform: uppercase;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    }
-    .radar-desc-banner {
-        font-size: 15px;
-        color: #9ca3af;
-        font-weight: 500;
+    @keyframes radar-wave-ping {
+        0% { transform: scale(0.6); opacity: 1; }
+        100% { transform: scale(1.6); opacity: 0; }
     }
     .radar-panel-card {
         background: #0b0e14 !important;
-        border: 1px solid rgba(16, 185, 129, 0.25) !important;
-        box-shadow: 0 0 25px rgba(16, 185, 129, 0.04) !important;
+        border: 1px solid rgba(16, 185, 129, 0.3) !important;
+        box-shadow: 0 0 30px rgba(16, 185, 129, 0.05) !important;
         border-radius: 16px !important;
-        padding: 24px !important;
+        padding: 0 !important;
         margin-bottom: 20px;
+        overflow: hidden;
     }
-    .radar-inner-title-row {
+    .radar-navbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 20px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        padding-bottom: 15px;
+        background: #11151d;
+        border-bottom: 1px solid rgba(16, 185, 129, 0.15);
+        padding: 12px 20px;
     }
-    .radar-inner-title {
-        font-family: 'Outfit', sans-serif;
-        font-size: 16px;
-        font-weight: 700;
-        color: #ffffff;
-        text-transform: uppercase;
+    .radar-nav-btn {
+        background: transparent;
+        border: none;
+        color: #9ca3af;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
+        transition: all 0.2s ease;
+    }
+    .radar-nav-btn:hover {
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .radar-nav-btn.active {
+        background: rgba(16, 185, 129, 0.12) !important;
+        border: 1px solid rgba(16, 185, 129, 0.25) !important;
+        color: #34d399 !important;
+        font-weight: 700;
     }
     .radar-smart-table {
         width: 100%;
@@ -557,15 +540,16 @@
         border: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
     .radar-odd-badge-current {
-        background: rgba(99, 102, 241, 0.12) !important;
-        color: #a5b4fc !important;
-        border: 1px solid rgba(99, 102, 241, 0.35) !important;
-        padding: 6px 14px;
+        background: #0d1e3d !important;
+        color: #38bdf8 !important;
+        border: 1px solid rgba(56, 189, 248, 0.35) !important;
+        padding: 8px 16px;
         border-radius: 8px;
         font-family: var(--font-mono);
-        font-weight: bold;
+        font-weight: 800;
         font-size: 13px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        display: inline-block;
     }
     .radar-drop-pct-red {
         color: #f87171 !important;
@@ -580,32 +564,87 @@
     </style>
 
     <!-- Radar Banner Superior -->
-    <div class="radar-header-banner">
-        <div class="radar-logo-wrapper">
-            <i class="fa-solid fa-circle-notch radar-logo-icon"></i>
-            <span class="radar-logo-text">Radar<span>Smart Money</span></span>
-            <span class="radar-beta-tag">Beta</span>
+    <div style="text-align: center; margin-bottom: 25px; padding: 20px 20px 10px 20px; background: radial-gradient(circle at center, rgba(16, 185, 129, 0.06) 0%, transparent 70%);">
+        <div class="radar-logo-wrapper" style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 15px;">
+            <!-- Sonar com animação de ondas circulares -->
+            <div class="radar-sonar-container">
+                <div class="radar-sonar-wave" style="animation-delay: 0s;"></div>
+                <div class="radar-sonar-wave" style="animation-delay: 0.6s;"></div>
+                <div class="radar-sonar-center">
+                    <i class="fa-solid fa-satellite-dish" style="color: #0b0e14; font-size: 11px;"></i>
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 900; letter-spacing: 1px; color: #ffffff; text-transform: uppercase;">RADAR</span>
+                    <span style="background: #00f0ff; color: #0b0e14; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">BETA</span>
+                </div>
+                <span style="font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 800; letter-spacing: 2px; color: #10b981; text-transform: uppercase; margin-top: 2px;">SMART MONEY</span>
+            </div>
         </div>
-        <h1 class="radar-sub-banner">Odds Drops Live Monitoring</h1>
-        <p class="radar-desc-banner">Recent sharp odds movements detected across global football markets</p>
+        <h1 style="font-family: 'Outfit', sans-serif; font-size: 34px; font-weight: 800; color: #ffffff; margin-bottom: 8px; letter-spacing: 0.5px; text-transform: uppercase; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">ODDS DROPS LIVE MONITORING</h1>
+        <p style="font-size: 14px; color: #9ca3af; font-weight: 500; margin-bottom: 20px;">Recent sharp odds movements detected across global football markets</p>
     </div>
 
     <div class="radar-panel-card">
-        <div class="scanner-header-wrapper">
-            <div class="scanner-title">
-                <h3 class="radar-inner-title"><i class="fa-solid fa-satellite-dish" style="color: #10b981;"></i> Painel de Controle e Histórico</h3>
+        <!-- Barra de Navegação Superior (Mockup) -->
+        <div class="radar-navbar">
+            <div style="display: flex; gap: 8px;">
+                <button class="radar-nav-btn" onclick="alert('Funcionalidade decorativa do mockup. Use os botões abaixo para operar o Radar!')">
+                    <i class="fa-solid fa-chart-simple"></i> Dashboard
+                </button>
+                <button class="radar-nav-btn active">
+                    <i class="fa-solid fa-droplet"></i> Odds Drops
+                </button>
+                <button class="radar-nav-btn" onclick="alert('Funcionalidade decorativa do mockup. Use os botões abaixo para operar o Radar!')">
+                    <i class="fa-solid fa-bolt"></i> Live Data
+                </button>
+                <button class="radar-nav-btn" onclick="alert('Funcionalidade decorativa do mockup. Use os botões abaixo para operar o Radar!')">
+                    <i class="fa-solid fa-chart-line"></i> Insights
+                </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="position: relative;">
+                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 9px; color: #6b7280; font-size: 11px;"></i>
+                    <input type="text" placeholder="Search" style="background: #0b0e14; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 6px 12px 6px 30px; color: #ffffff; font-size: 12px; width: 140px; outline: none; transition: border 0.2s;" onfocus="this.style.borderColor='rgba(16, 185, 129, 0.4)'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'">
+                </div>
+                <button style="background: transparent; border: none; color: #9ca3af; cursor: pointer; font-size: 14px;" title="Configurações" onclick="alert('Configurações do Radar: use os controles no painel principal.')">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+            </div>
+        </div>
+
+        <div style="padding: 24px;">
+            <!-- Título e Subtítulo da Atividade -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="color: #6b7280; font-size: 12px; cursor: pointer; font-weight: 600;" onclick="alert('Voltando para a atividade principal...')"><i class="fa-solid fa-chevron-left" style="font-size: 10px; margin-right: 4px;"></i> Activity</span>
+                </div>
+                <div style="position: relative;">
+                    <select style="background: #11151d; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 12px; color: #ffffff; font-size: 12px; outline: none; cursor: pointer;" onchange="alert('Filtrando período: ' + this.value)">
+                        <option>Last 30 Min</option>
+                        <option>Last 1 Hour</option>
+                        <option>Last 24 Hours</option>
+                    </select>
+                </div>
             </div>
             
-            <div class="steam-mode-toggle" style="display: flex; gap: 10px; margin-bottom: 10px; margin-top: 10px; align-items: center; width: 100%;">
-                <button id="btn-mode-lab" class="action-button active" onclick="toggleSteamMode('lab')" style="padding: 8px 15px; font-size: 13px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
-                    <i class="fa-solid fa-flask"></i> Modo Laboratório (Backtest)
-                </button>
-                <button id="btn-mode-live" class="action-button" onclick="toggleSteamMode('live')" style="padding: 8px 15px; font-size: 13px; background: transparent; color: var(--text-secondary); border: 1px solid transparent;">
-                    <i class="fa-solid fa-broadcast-tower"></i> Radar Ao Vivo
-                </button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px; text-transform: uppercase; margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-satellite-dish" style="color: #10b981;"></i> Recent Odds Drops
+                </h2>
+                
+                <div class="steam-mode-toggle" style="display: flex; gap: 10px; align-items: center; margin: 0;">
+                    <button id="btn-mode-lab" class="action-button active" onclick="toggleSteamMode('lab')" style="padding: 8px 15px; font-size: 13px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                        <i class="fa-solid fa-flask"></i> Modo Laboratório (Backtest)
+                    </button>
+                    <button id="btn-mode-live" class="action-button" onclick="toggleSteamMode('live')" style="padding: 8px 15px; font-size: 13px; background: transparent; color: var(--text-secondary); border: 1px solid transparent;">
+                        <i class="fa-solid fa-broadcast-tower"></i> Radar Ao Vivo
+                    </button>
+                </div>
             </div>
 
-            <div class="scanner-buttons" style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <div class="scanner-buttons" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
                 <button id="btn-scan-steam" class="action-button active" onclick="runSteamScan()">
                     <i class="fa-solid fa-flask"></i> Executar Backtest
                 </button>
@@ -613,7 +652,6 @@
                     <i class="fa-solid fa-trash"></i> Limpar Tela
                 </button>
             </div>
-        </div>
         
         <div class="info-alert" style="margin-top: 15px; display: flex; align-items: flex-start; gap: 15px; padding: 15px; background: rgba(var(--warning-rgb), 0.05); border: 1px solid rgba(var(--warning-rgb), 0.2); border-radius: 8px;">
             <i class="fa-solid fa-triangle-exclamation" style="color: var(--warning); font-size: 20px; margin-top: 2px;"></i>
@@ -672,6 +710,7 @@
                 <!-- Populated dynamically -->
             </tbody>
         </table>
+    </div>
     </div>
 </div>
 

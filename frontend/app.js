@@ -7536,36 +7536,37 @@ function renderSteamTable(results) {
         else if (r.confidence_level === 'Média') rowGlowClass = 'radar-row-glow-media';
         else rowGlowClass = 'radar-row-glow-baixa';
             
-        let badgeColor = 'var(--text-muted)';
-        let badgeBg = 'rgba(255,255,255,0.05)';
-        let badgeBorder = '1px solid rgba(255,255,255,0.1)';
-        let icon = 'fa-circle-question';
+        let confBorderColor = 'rgba(255, 255, 255, 0.1)';
+        let confGlowColor = 'rgba(255, 255, 255, 0.02)';
+        let confTextColor = '#9ca3af';
+        let confIcon = 'fa-circle-question';
         
         if (r.confidence_level === 'Alta') {
-            badgeColor = '#10b981';
-            badgeBg = 'rgba(16, 185, 129, 0.12)';
-            badgeBorder = '1px solid rgba(16, 185, 129, 0.3)';
-            icon = 'fa-circle-check';
+            confBorderColor = '#10b981';
+            confGlowColor = 'rgba(16, 185, 129, 0.05)';
+            confTextColor = '#10b981';
+            confIcon = 'fa-circle-check';
         } else if (r.confidence_level === 'Média') {
-            badgeColor = '#f59e0b';
-            badgeBg = 'rgba(245, 158, 11, 0.12)';
-            badgeBorder = '1px solid rgba(245, 158, 11, 0.3)';
-            icon = 'fa-circle-exclamation';
+            confBorderColor = '#f59e0b';
+            confGlowColor = 'rgba(245, 158, 11, 0.05)';
+            confTextColor = '#f59e0b';
+            confIcon = 'fa-circle-exclamation';
         } else if (r.confidence_level === 'Baixa') {
-            badgeColor = '#ef4444';
-            badgeBg = 'rgba(239, 68, 68, 0.12)';
-            badgeBorder = '1px solid rgba(239, 68, 68, 0.3)';
-            icon = 'fa-triangle-exclamation';
+            confBorderColor = '#ef4444';
+            confGlowColor = 'rgba(239, 68, 68, 0.05)';
+            confTextColor = '#ef4444';
+            confIcon = 'fa-triangle-exclamation';
         }
         
         const confidenceHTML = `
-            <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; vertical-align: middle; gap: 4px;">
-                <span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; color: ${badgeColor}; background: ${badgeBg}; border: ${badgeBorder}; text-transform: uppercase;">
-                    <i class="fa-solid ${icon}" style="font-size: 10px;"></i> ${r.confidence_level || 'Baixa'}
-                </span>
-                <span style="font-size: 9px; color: var(--text-muted); font-weight: bold;">
-                    Score: ${(r.confidence_score || 0).toFixed(0)}% (Liq: ${r.liquidity_tier || 'Baixa'})
-                </span>
+            <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 12px; border: 1px solid ${confBorderColor}; background: ${confGlowColor}; box-shadow: 0 0 10px ${confGlowColor}; min-width: 140px; box-sizing: border-box;">
+                <div style="display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 11px; color: ${confTextColor}; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <i class="fa-solid ${confIcon}"></i>
+                    <span>${r.confidence_level || 'BAIXA'}</span>
+                </div>
+                <div style="font-size: 9px; color: var(--text-muted); font-weight: bold; margin-top: 3px;">
+                    Score: ${(r.confidence_score || 0).toFixed(0)}% (${r.confidence_level || 'Baixa'})
+                </div>
             </div>
         `;
             
@@ -7579,8 +7580,8 @@ function renderSteamTable(results) {
                 <td style="font-family: var(--font-mono); color: var(--text-primary);">
                     ${r.total_bets}
                 </td>
-                <td style="color: var(--info); font-family: var(--font-mono); font-weight: bold;">
-                    -${r.avg_drop.toFixed(1)}% <i class="fa-solid fa-arrow-trend-down" style="font-size: 10px; margin-left: 2px;"></i>
+                <td style="color: #f87171; font-family: var(--font-mono); font-weight: bold;">
+                    -${r.avg_drop.toFixed(1)}% <span style="font-size: 14px; margin-left: 2px;">&darr;</span>
                 </td>
                 <td>
                     ${confidenceHTML}
@@ -7865,36 +7866,37 @@ window.runLiveSteamScan = async function() {
                 tr.className = 'radar-row-glow-baixa';
             }
             
-            let badgeColor = 'var(--text-muted)';
-            let badgeBg = 'rgba(255,255,255,0.05)';
-            let badgeBorder = '1px solid rgba(255,255,255,0.1)';
-            let icon = 'fa-circle-question';
+            let confBorderColor = 'rgba(255, 255, 255, 0.1)';
+            let confGlowColor = 'rgba(255, 255, 255, 0.02)';
+            let confTextColor = '#9ca3af';
+            let confIcon = 'fa-circle-question';
             
             if (item.confidence_level === 'Alta') {
-                badgeColor = '#10b981';
-                badgeBg = 'rgba(16, 185, 129, 0.12)';
-                badgeBorder = '1px solid rgba(16, 185, 129, 0.3)';
-                icon = 'fa-circle-check';
+                confBorderColor = '#10b981';
+                confGlowColor = 'rgba(16, 185, 129, 0.05)';
+                confTextColor = '#10b981';
+                confIcon = 'fa-circle-check';
             } else if (item.confidence_level === 'Média') {
-                badgeColor = '#f59e0b';
-                badgeBg = 'rgba(245, 158, 11, 0.12)';
-                badgeBorder = '1px solid rgba(245, 158, 11, 0.3)';
-                icon = 'fa-circle-exclamation';
+                confBorderColor = '#f59e0b';
+                confGlowColor = 'rgba(245, 158, 11, 0.05)';
+                confTextColor = '#f59e0b';
+                confIcon = 'fa-circle-exclamation';
             } else if (item.confidence_level === 'Baixa') {
-                badgeColor = '#ef4444';
-                badgeBg = 'rgba(239, 68, 68, 0.12)';
-                badgeBorder = '1px solid rgba(239, 68, 68, 0.3)';
-                icon = 'fa-triangle-exclamation';
+                confBorderColor = '#ef4444';
+                confGlowColor = 'rgba(239, 68, 68, 0.05)';
+                confTextColor = '#ef4444';
+                confIcon = 'fa-triangle-exclamation';
             }
 
             const confidenceHTML = `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 4px;">
-                    <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; color: ${badgeColor}; background: ${badgeBg}; border: ${badgeBorder}; text-transform: uppercase; letter-spacing: 0.5px;">
-                        <i class="fa-solid ${icon}" style="font-size: 11px;"></i> ${item.confidence_level || 'Baixa'}
-                    </span>
-                    <span style="font-size: 9px; color: var(--text-muted); font-weight: bold;">
-                        Score: ${(item.confidence_score || 0).toFixed(0)}% (Liq: ${item.liquidity_tier || 'Baixa'})
-                    </span>
+                <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 12px; border: 1px solid ${confBorderColor}; background: ${confGlowColor}; box-shadow: 0 0 10px ${confGlowColor}; min-width: 140px; box-sizing: border-box;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 11px; color: ${confTextColor}; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <i class="fa-solid ${confIcon}"></i>
+                        <span>${item.confidence_level || 'BAIXA'}</span>
+                    </div>
+                    <div style="font-size: 9px; color: var(--text-muted); font-weight: bold; margin-top: 3px;">
+                        Score: ${(item.confidence_score || 0).toFixed(0)}% (${item.confidence_level || 'Baixa'})
+                    </div>
                 </div>
             `;
 
@@ -7922,19 +7924,24 @@ window.runLiveSteamScan = async function() {
                 </div>
             `;
 
-            let bookieClass = 'radar-bookie-neutral';
+            let bookieHTML = '';
             const bName = item.bookmaker.toLowerCase();
-            if (bName.includes('365')) bookieClass = 'radar-bookie-bet365';
-            else if (bName.includes('pinnacle')) bookieClass = 'radar-bookie-pinnacle';
-            else if (bName.includes('betfair')) bookieClass = 'radar-bookie-betfair';
+            if (bName.includes('365')) {
+                bookieHTML = `<span class="radar-bookmaker-badge radar-bookie-bet365" style="font-family: 'Outfit', sans-serif; font-style: italic; font-weight: 900; letter-spacing: -0.5px;"><span style="color: #ffffff;">bet</span><span style="color: #ffdf1b;">365</span></span>`;
+            } else if (bName.includes('pinnacle')) {
+                bookieHTML = `<span class="radar-bookmaker-badge radar-bookie-pinnacle" style="font-family: 'Outfit', sans-serif; font-weight: 900; letter-spacing: 0.5px;"><span style="color: #ff7020;">PIN</span><span style="color: #ffffff;">NACLE</span></span>`;
+            } else if (bName.includes('betfair')) {
+                bookieHTML = `<span class="radar-bookmaker-badge radar-bookie-betfair" style="font-family: 'Outfit', sans-serif; font-weight: 900; letter-spacing: -0.5px;"><span style="color: #ffbe00;">bet</span><span style="color: #ffffff;">fair</span></span>`;
+            } else {
+                bookieHTML = `<span class="radar-bookmaker-badge radar-bookie-neutral">${item.bookmaker}</span>`;
+            }
             
-            const bookieHTML = `<span class="radar-bookmaker-badge ${bookieClass}">${item.bookmaker}</span>`;
             const marketHTML = `<span style="color: #67e8f9; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">${item.market}</span>`;
             const openingHTML = `<span style="color: var(--text-secondary); font-family: var(--font-mono); font-size: 13px;">@${item.opening_odd.toFixed(2)}</span>`;
             const currentHTML = `<span class="radar-odd-badge-current">@${item.current_odd.toFixed(2)}</span>`;
             const dropHTML = `
                 <span class="radar-drop-pct-red">
-                    ${item.drop_pct.toFixed(0)}% <i class="fa-solid fa-arrow-down-long" style="font-size: 11px;"></i>
+                    ${item.drop_pct.toFixed(0)}% <span style="font-size: 16px; margin-left: 2px;">&darr;</span>
                 </span>
             `;
 
