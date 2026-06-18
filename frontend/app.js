@@ -7780,35 +7780,66 @@ window.toggleSteamMode = function(mode) {
     const labTable = document.getElementById('steam-table-container');
     const liveTable = document.getElementById('steam-live-table-container');
     
+    // Elementos da barra de navegação decorativa do mockup
+    const tabDashboard = document.getElementById('radar-tab-nav-dashboard');
+    const tabDrops = document.getElementById('radar-tab-nav-drops');
+    
     if (mode === 'lab') {
-        btnLab.classList.add('active');
-        btnLab.style.background = 'rgba(var(--primary-rgb), 0.2)';
-        btnLab.style.color = 'var(--primary)';
-        btnLab.style.border = '1px solid rgba(var(--primary-rgb), 0.4)';
+        if (btnLab) {
+            btnLab.classList.add('active');
+            btnLab.style.background = 'rgba(16, 185, 129, 0.15)';
+            btnLab.style.color = '#34d399';
+            btnLab.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        }
+        if (btnLive) {
+            btnLive.classList.remove('active');
+            btnLive.style.background = 'transparent';
+            btnLive.style.color = 'var(--text-secondary)';
+            btnLive.style.border = '1px solid transparent';
+        }
         
-        btnLive.classList.remove('active');
-        btnLive.style.background = 'transparent';
-        btnLive.style.color = 'var(--text-secondary)';
-        btnLive.style.border = '1px solid transparent';
+        if (tabDashboard) tabDashboard.classList.add('active');
+        if (tabDrops) tabDrops.classList.remove('active');
         
-        labTable.style.display = 'block';
-        liveTable.style.display = 'none';
-        document.getElementById('btn-scan-steam').innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest';
+        if (labTable) labTable.style.display = 'block';
+        if (liveTable) liveTable.style.display = 'none';
+        
+        const btnScan = document.getElementById('btn-scan-steam');
+        if (btnScan) btnScan.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest';
     } else {
-        btnLive.classList.add('active');
-        btnLive.style.background = 'rgba(var(--warning-rgb), 0.2)';
-        btnLive.style.color = 'var(--warning)';
-        btnLive.style.border = '1px solid rgba(var(--warning-rgb), 0.4)';
+        if (btnLive) {
+            btnLive.classList.add('active');
+            btnLive.style.background = 'rgba(16, 185, 129, 0.15)';
+            btnLive.style.color = '#34d399';
+            btnLive.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        }
+        if (btnLab) {
+            btnLab.classList.remove('active');
+            btnLab.style.background = 'transparent';
+            btnLab.style.color = 'var(--text-secondary)';
+            btnLab.style.border = '1px solid transparent';
+        }
         
-        btnLab.classList.remove('active');
-        btnLab.style.background = 'transparent';
-        btnLab.style.color = 'var(--text-secondary)';
-        btnLab.style.border = '1px solid transparent';
+        if (tabDrops) tabDrops.classList.add('active');
+        if (tabDashboard) tabDashboard.classList.remove('active');
         
-        labTable.style.display = 'none';
-        liveTable.style.display = 'block';
-        document.getElementById('btn-scan-steam').innerHTML = '<i class="fa-solid fa-radar"></i> Rastrear Quedas Ao Vivo';
+        if (labTable) labTable.style.display = 'none';
+        if (liveTable) liveTable.style.display = 'block';
+        
+        const btnScan = document.getElementById('btn-scan-steam');
+        if (btnScan) btnScan.innerHTML = '<i class="fa-solid fa-radar"></i> Rastrear Quedas Ao Vivo';
     }
+};
+
+window.switchRadarTab = function(mode) {
+    window.toggleSteamMode(mode);
+};
+
+window.showRadarInsights = function() {
+    alert("💡 INSIGHTS ESTRATÉGICOS DO RADAR SMART MONEY:\n\n" +
+          "1. Ligas de Tier Alta (ex: Premier League, La Liga, Brasileirão Série A) possuem volumes de negociação gigantescos. Drops nessas ligas representam a entrada de sindicatos asiáticos e possuem ALTÍSSIMA CONFIANÇA.\n\n" +
+          "2. Evite seguir drops de odds em ligas de baixa liquidez (Tier Baixa) quando o score de confiança for menor que 45%, pois estes mercados sofrem manipulações de pequenos apostadores locais (ruído).\n\n" +
+          "3. O mercado de 'Match Odds' (1X2) e 'Goals (O2.5/U2.5)' são os preferidos dos robôs institucionais. Fique atento a quedas simultâneas nestas linhas.");
 };
 
 window.runLiveSteamScan = async function() {

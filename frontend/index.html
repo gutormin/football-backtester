@@ -590,25 +590,25 @@
         <!-- Barra de Navegação Superior (Mockup) -->
         <div class="radar-navbar">
             <div style="display: flex; gap: 8px;">
-                <button class="radar-nav-btn" onclick="alert('Funcionalidade decorativa do mockup. Use os botões abaixo para operar o Radar!')">
+                <button id="radar-tab-nav-dashboard" class="radar-nav-btn" onclick="window.switchRadarTab('lab')">
                     <i class="fa-solid fa-chart-simple"></i> Dashboard
                 </button>
-                <button class="radar-nav-btn active">
+                <button id="radar-tab-nav-drops" class="radar-nav-btn active" onclick="window.switchRadarTab('live')">
                     <i class="fa-solid fa-droplet"></i> Odds Drops
                 </button>
-                <button class="radar-nav-btn" onclick="alert('Funcionalidade decorativa do mockup. Use os botões abaixo para operar o Radar!')">
+                <button class="radar-nav-btn" onclick="window.runLiveSteamScan(); window.switchRadarTab('live');">
                     <i class="fa-solid fa-bolt"></i> Live Data
                 </button>
-                <button class="radar-nav-btn" onclick="alert('Funcionalidade decorativa do mockup. Use os botões abaixo para operar o Radar!')">
+                <button class="radar-nav-btn" onclick="window.showRadarInsights()">
                     <i class="fa-solid fa-chart-line"></i> Insights
                 </button>
             </div>
             <div style="display: flex; align-items: center; gap: 15px;">
                 <div style="position: relative;">
                     <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 9px; color: #6b7280; font-size: 11px;"></i>
-                    <input type="text" placeholder="Search" style="background: #0b0e14; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 6px 12px 6px 30px; color: #ffffff; font-size: 12px; width: 140px; outline: none; transition: border 0.2s;" onfocus="this.style.borderColor='rgba(16, 185, 129, 0.4)'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'">
+                    <input type="text" placeholder="Search" style="background: #0b0e14; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 6px 12px 6px 30px; color: #ffffff; font-size: 12px; width: 140px; outline: none; transition: border 0.2s;" onfocus="this.style.borderColor='rgba(16, 185, 129, 0.4)'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'" oninput="alert('Filtragem em tempo real: use a caixa de busca do navegador ou os filtros do painel esquerdo!')">
                 </div>
-                <button style="background: transparent; border: none; color: #9ca3af; cursor: pointer; font-size: 14px;" title="Configurações" onclick="alert('Configurações do Radar: use os controles no painel principal.')">
+                <button style="background: transparent; border: none; color: #9ca3af; cursor: pointer; font-size: 14px;" title="Configurações" onclick="alert('Configurações: use os filtros e parâmetros de mercado localizados no painel esquerdo da tela.')">
                     <i class="fa-solid fa-gear"></i>
                 </button>
             </div>
