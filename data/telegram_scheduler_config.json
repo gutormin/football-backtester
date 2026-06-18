@@ -1,16 +1,17 @@
 {
     "enabled": true,
+    "mode": "manual",
     "check_interval_hours": 6,
     "leagues": [
-        "BRA"
+        "E2"
     ],
     "market": [
-        "home"
+        "btts_yes"
     ],
     "value_threshold": 1.15,
-    "min_odds": 1.5,
+    "min_odds": 1.0,
     "max_odds": 50.0,
-    "staking_rule": "fixed",
+    "staking_rule": "kelly_quarter",
     "stake_value": 10.0,
     "initial_bankroll": 1000.0,
     "upcoming_source": "api"

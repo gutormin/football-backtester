@@ -338,8 +338,11 @@ def sync_data_from_api(force=False):
         except Exception as e:
             print(f"Error syncing league {l['code']}: {e}")
 
-def load_league_data(league_code, start_date='2021-01-01'):
+def load_league_data(league_code, start_date='2021-01-01', data_source="footballdata", api_key=""):
     """Loads and standardizes data for a given league starting from a specific date."""
+    if data_source == "futpython":
+        return fetch_futpython_data(league_code, start_date, api_key)
+        
     global _LEAGUE_DATA_CACHE
     
     if league_code not in _LEAGUE_DATA_CACHE:
@@ -560,8 +563,11 @@ def get_api_leagues():
         
     return []
 
-def get_all_available_leagues():
+def get_all_available_leagues(source="footballdata"):
     """Returns a list of all leagues supported by the system."""
+    if source == "futpython":
+        return get_futpython_leagues()
+        
     all_leagues = []
     seen_codes = set()
     
@@ -683,3 +689,109 @@ def load_upcoming_from_api(token):
     except Exception as e:
         print(f"Error loading upcoming matches from DataFootball API: {e}")
         return pd.DataFrame()
+
+def get_futpython_leagues():
+    """Loads custom leagues for FutPythonTrader from local json."""
+    import json
+    config_path = os.path.join(DATA_DIR, 'futpython_leagues.json')
+    if not os.path.exists(config_path):
+        return []
+    
+    leagues_list = []
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            mapping = json.load(f)
+            for pais, ligas in mapping.items():
+                for liga in ligas:
+                    code = f"{pais}/{liga}"
+                    leagues_list.append({
+                        'code': code,
+                        'name': f"{pais.capitalize()} - {liga.capitalize().replace('-', ' ')}",
+                        'type': 'futpython',
+                        'api_name': code
+                    })
+    except Exception as e:
+        print(f"Error loading futpython leagues: {e}")
+    return leagues_list
+
+def fetch_futpython_data(league_code, start_date, api_key):
+    """Fetches CSV data from FutPythonTrader and converts it to pandas DataFrame."""
+    import requests
+    import io
+    import pandas as pd
+    
+    # Check if league code has pais/liga format
+    if "/" not in league_code:
+        return pd.DataFrame()
+        
+    parts = league_code.split("/")
+    pais = parts[0]
+    liga = "/".join(parts[1:])
+    
+    temporadas = [
+        "2022", "2023", "2024", "2025", "2026",
+        "2021-2022", "2022-2023", "2023-2024", "2024-2025", "2025-2026"
+    ]
+    base_url = "https://futpythontrader.com.br/api/download"
+    dataframes = []
+    
+    for temp in temporadas:
+        url = f"{base_url}/{pais}/{liga}/{temp}?api_key={api_key}"
+        try:
+            res = requests.get(url, timeout=15)
+            if res.status_code == 200:
+                if res.text.strip().startswith("{"):
+                    continue # JSON error like Dataset não encontrado
+                df = pd.read_csv(io.StringIO(res.text))
+                # Rename columns to match standard backtester format
+                df = df.rename(columns={
+                    'Home': 'HomeTeam',
+                    'Away': 'AwayTeam',
+                    'Home_Score': 'FTHG',
+                    'Away_Score': 'FTAG',
+                    'Odd_1_FT': 'B365H',
+                    'Odd_X_FT': 'B365D',
+                    'Odd_2_FT': 'B365A',
+                    'Over_FT_2_5': 'B365>2.5',
+                    'Under_FT_2_5': 'B365<2.5'
+                })
+                
+                # Fix comma-separated decimals for all numeric columns in FutPythonTrader
+                for col in df.columns:
+                    if col not in ['HomeTeam', 'AwayTeam', 'League', 'Date', 'Time']:
+                        if df[col].dtype == 'object':
+                            df[col] = df[col].astype(str).str.replace(',', '.')
+                            df[col] = pd.to_numeric(df[col], errors='ignore')
+                            
+                dataframes.append(df)
+            elif res.status_code == 401:
+                print("FutPythonTrader API Key inválida.")
+                break
+        except Exception as e:
+            print(f"Error fetching FutPythonTrader temp {temp}: {e}")
+            
+    if not dataframes:
+        return pd.DataFrame()
+        
+    df_total = pd.concat(dataframes, ignore_index=True)
+    
+    if 'Date' in df_total.columns:
+        df_total['Date'] = pd.to_datetime(df_total['Date'], dayfirst=True, errors='coerce')
+    
+    df_total = df_total[df_total['Date'] >= pd.to_datetime(start_date)]
+    df_total.sort_values(by=['Date', 'Time'], inplace=True, na_position='first')
+    
+    df_total = df_total.copy()
+    df_total['LeagueCode'] = league_code
+    
+    # Calculate FTR (Full Time Result)
+    import numpy as np
+    conditions = [
+        (df_total['FTHG'] > df_total['FTAG']),
+        (df_total['FTHG'] < df_total['FTAG']),
+        (df_total['FTHG'] == df_total['FTAG'])
+    ]
+    choices = ['H', 'A', 'D']
+    df_total['FTR'] = np.select(conditions, choices, default='')
+    
+    return df_total

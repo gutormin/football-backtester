@@ -1,5 +1,1851 @@
 [
     {
+        "id": "9e08bc39-8c42-44ee-a4cd-81b9333658dd",
+        "created_at": "2026-06-17T11:07:18.445455",
+        "name": "China Chinese Super League - BTTS - Otimizada (EV: 1.05 | Odds: 1.00-50.00) - PADRÃO",
+        "params": {
+            "leagues": [
+                "CHINA_CHINESE_SUPER_LEAGUE"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "btts_yes"
+            ],
+            "valueThreshold": 1.05,
+            "initialBankroll": 1000,
+            "stakingRule": "kelly_quarter",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 1,
+            "maxOdds": 50,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "footballdata",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
+        },
+        "summary": {
+            "initial_bankroll": 1000,
+            "final_bankroll": 3335.67,
+            "net_profit": 2335.67,
+            "profit_in_stakes": 53.14,
+            "total_bets": 250,
+            "wins": 141,
+            "losses": 109,
+            "win_rate": 56.4,
+            "roi": 19.84,
+            "max_drawdown": 23.77,
+            "total_staked": 11770.79,
+            "avg_odds": 2.2,
+            "sharpe_ratio": 2.82,
+            "sortino_ratio": 5.73,
+            "skewness": 0.03,
+            "max_consec_wins": 10,
+            "max_consec_losses": 6,
+            "avg_clv": null,
+            "bcl_percent": null,
+            "p_value": 0.000255,
+            "brier_score": 0.2454,
+            "brier_score_market": 0.253,
+            "brier_improvement": 3,
+            "bootstrap_roi_ci_lower": 4.39,
+            "bootstrap_roi_ci_upper": 36.22,
+            "bootstrap_roi_median": 19.66,
+            "prob_positive_roi": 0.9932,
+            "min_sample_size": 439,
+            "sample_sufficient": false,
+            "power_ratio": 0.57,
+            "rolling_roi": [
+                {
+                    "bet_index": 99,
+                    "roi": 11.88
+                },
+                {
+                    "bet_index": 100,
+                    "roi": 13.57
+                },
+                {
+                    "bet_index": 101,
+                    "roi": 14.77
+                },
+                {
+                    "bet_index": 102,
+                    "roi": 14.93
+                },
+                {
+                    "bet_index": 103,
+                    "roi": 18.33
+                },
+                {
+                    "bet_index": 104,
+                    "roi": 14.25
+                },
+                {
+                    "bet_index": 105,
+                    "roi": 14.95
+                },
+                {
+                    "bet_index": 106,
+                    "roi": 15.62
+                },
+                {
+                    "bet_index": 107,
+                    "roi": 18.41
+                },
+                {
+                    "bet_index": 108,
+                    "roi": 18.13
+                },
+                {
+                    "bet_index": 109,
+                    "roi": 21.43
+                },
+                {
+                    "bet_index": 110,
+                    "roi": 21.24
+                },
+                {
+                    "bet_index": 111,
+                    "roi": 22.35
+                },
+                {
+                    "bet_index": 112,
+                    "roi": 21.01
+                },
+                {
+                    "bet_index": 113,
+                    "roi": 21.86
+                },
+                {
+                    "bet_index": 114,
+                    "roi": 18.87
+                },
+                {
+                    "bet_index": 115,
+                    "roi": 18.58
+                },
+                {
+                    "bet_index": 116,
+                    "roi": 19.49
+                },
+                {
+                    "bet_index": 117,
+                    "roi": 22.37
+                },
+                {
+                    "bet_index": 118,
+                    "roi": 23.19
+                },
+                {
+                    "bet_index": 119,
+                    "roi": 20.76
+                },
+                {
+                    "bet_index": 120,
+                    "roi": 18.71
+                },
+                {
+                    "bet_index": 121,
+                    "roi": 17.76
+                },
+                {
+                    "bet_index": 122,
+                    "roi": 14.74
+                },
+                {
+                    "bet_index": 123,
+                    "roi": 12.01
+                },
+                {
+                    "bet_index": 124,
+                    "roi": 9.87
+                },
+                {
+                    "bet_index": 125,
+                    "roi": 10.63
+                },
+                {
+                    "bet_index": 126,
+                    "roi": 12.28
+                },
+                {
+                    "bet_index": 127,
+                    "roi": 15.65
+                },
+                {
+                    "bet_index": 128,
+                    "roi": 16.44
+                },
+                {
+                    "bet_index": 129,
+                    "roi": 16.72
+                },
+                {
+                    "bet_index": 130,
+                    "roi": 16.12
+                },
+                {
+                    "bet_index": 131,
+                    "roi": 19.24
+                },
+                {
+                    "bet_index": 132,
+                    "roi": 15.42
+                },
+                {
+                    "bet_index": 133,
+                    "roi": 13.76
+                },
+                {
+                    "bet_index": 134,
+                    "roi": 16.34
+                },
+                {
+                    "bet_index": 135,
+                    "roi": 15.21
+                },
+                {
+                    "bet_index": 136,
+                    "roi": 15.76
+                },
+                {
+                    "bet_index": 137,
+                    "roi": 13.41
+                },
+                {
+                    "bet_index": 138,
+                    "roi": 17.72
+                },
+                {
+                    "bet_index": 139,
+                    "roi": 19.88
+                },
+                {
+                    "bet_index": 140,
+                    "roi": 21.78
+                },
+                {
+                    "bet_index": 141,
+                    "roi": 20.29
+                },
+                {
+                    "bet_index": 142,
+                    "roi": 20.1
+                },
+                {
+                    "bet_index": 143,
+                    "roi": 21.68
+                },
+                {
+                    "bet_index": 144,
+                    "roi": 22.89
+                },
+                {
+                    "bet_index": 145,
+                    "roi": 23.54
+                },
+                {
+                    "bet_index": 146,
+                    "roi": 24.36
+                },
+                {
+                    "bet_index": 147,
+                    "roi": 25.48
+                },
+                {
+                    "bet_index": 148,
+                    "roi": 22.03
+                },
+                {
+                    "bet_index": 149,
+                    "roi": 21.15
+                },
+                {
+                    "bet_index": 150,
+                    "roi": 20.88
+                },
+                {
+                    "bet_index": 151,
+                    "roi": 19.43
+                },
+                {
+                    "bet_index": 152,
+                    "roi": 19.58
+                },
+                {
+                    "bet_index": 153,
+                    "roi": 20.07
+                },
+                {
+                    "bet_index": 154,
+                    "roi": 21.59
+                },
+                {
+                    "bet_index": 155,
+                    "roi": 22.89
+                },
+                {
+                    "bet_index": 156,
+                    "roi": 21.99
+                },
+                {
+                    "bet_index": 157,
+                    "roi": 20.59
+                },
+                {
+                    "bet_index": 158,
+                    "roi": 22.37
+                },
+                {
+                    "bet_index": 159,
+                    "roi": 22.81
+                },
+                {
+                    "bet_index": 160,
+                    "roi": 22.74
+                },
+                {
+                    "bet_index": 161,
+                    "roi": 19.06
+                },
+                {
+                    "bet_index": 162,
+                    "roi": 21.98
+                },
+                {
+                    "bet_index": 163,
+                    "roi": 22.72
+                },
+                {
+                    "bet_index": 164,
+                    "roi": 21.91
+                },
+                {
+                    "bet_index": 165,
+                    "roi": 19.99
+                },
+                {
+                    "bet_index": 166,
+                    "roi": 21.14
+                },
+                {
+                    "bet_index": 167,
+                    "roi": 23.64
+                },
+                {
+                    "bet_index": 168,
+                    "roi": 22.89
+                },
+                {
+                    "bet_index": 169,
+                    "roi": 20.56
+                },
+                {
+                    "bet_index": 170,
+                    "roi": 17.35
+                },
+                {
+                    "bet_index": 171,
+                    "roi": 17.87
+                },
+                {
+                    "bet_index": 172,
+                    "roi": 15.71
+                },
+                {
+                    "bet_index": 173,
+                    "roi": 17.04
+                },
+                {
+                    "bet_index": 174,
+                    "roi": 19.41
+                },
+                {
+                    "bet_index": 175,
+                    "roi": 20.39
+                },
+                {
+                    "bet_index": 176,
+                    "roi": 20.25
+                },
+                {
+                    "bet_index": 177,
+                    "roi": 19.58
+                },
+                {
+                    "bet_index": 178,
+                    "roi": 17.01
+                },
+                {
+                    "bet_index": 179,
+                    "roi": 19.78
+                },
+                {
+                    "bet_index": 180,
+                    "roi": 20.76
+                },
+                {
+                    "bet_index": 181,
+                    "roi": 21.76
+                },
+                {
+                    "bet_index": 182,
+                    "roi": 23.63
+                },
+                {
+                    "bet_index": 183,
+                    "roi": 23.95
+                },
+                {
+                    "bet_index": 184,
+                    "roi": 23.8
+                },
+                {
+                    "bet_index": 185,
+                    "roi": 23.72
+                },
+                {
+                    "bet_index": 186,
+                    "roi": 24.13
+                },
+                {
+                    "bet_index": 187,
+                    "roi": 25.29
+                },
+                {
+                    "bet_index": 188,
+                    "roi": 27.37
+                },
+                {
+                    "bet_index": 189,
+                    "roi": 24.42
+                },
+                {
+                    "bet_index": 190,
+                    "roi": 22.23
+                },
+                {
+                    "bet_index": 191,
+                    "roi": 20.44
+                },
+                {
+                    "bet_index": 192,
+                    "roi": 22.05
+                },
+                {
+                    "bet_index": 193,
+                    "roi": 20.44
+                },
+                {
+                    "bet_index": 194,
+                    "roi": 19.68
+                },
+                {
+                    "bet_index": 195,
+                    "roi": 21.7
+                },
+                {
+                    "bet_index": 196,
+                    "roi": 23.58
+                },
+                {
+                    "bet_index": 197,
+                    "roi": 25.02
+                },
+                {
+                    "bet_index": 198,
+                    "roi": 24.62
+                },
+                {
+                    "bet_index": 199,
+                    "roi": 25.12
+                },
+                {
+                    "bet_index": 200,
+                    "roi": 26.25
+                },
+                {
+                    "bet_index": 201,
+                    "roi": 22.12
+                },
+                {
+                    "bet_index": 202,
+                    "roi": 22.21
+                },
+                {
+                    "bet_index": 203,
+                    "roi": 23.52
+                },
+                {
+                    "bet_index": 204,
+                    "roi": 26.63
+                },
+                {
+                    "bet_index": 205,
+                    "roi": 26.03
+                },
+                {
+                    "bet_index": 206,
+                    "roi": 25.27
+                },
+                {
+                    "bet_index": 207,
+                    "roi": 25.45
+                },
+                {
+                    "bet_index": 208,
+                    "roi": 24.02
+                },
+                {
+                    "bet_index": 209,
+                    "roi": 23.54
+                },
+                {
+                    "bet_index": 210,
+                    "roi": 24.21
+                },
+                {
+                    "bet_index": 211,
+                    "roi": 24.79
+                },
+                {
+                    "bet_index": 212,
+                    "roi": 27.3
+                },
+                {
+                    "bet_index": 213,
+                    "roi": 24.95
+                },
+                {
+                    "bet_index": 214,
+                    "roi": 25.1
+                },
+                {
+                    "bet_index": 215,
+                    "roi": 23.46
+                },
+                {
+                    "bet_index": 216,
+                    "roi": 23.53
+                },
+                {
+                    "bet_index": 217,
+                    "roi": 20.43
+                },
+                {
+                    "bet_index": 218,
+                    "roi": 17.04
+                },
+                {
+                    "bet_index": 219,
+                    "roi": 16.88
+                },
+                {
+                    "bet_index": 220,
+                    "roi": 18.71
+                },
+                {
+                    "bet_index": 221,
+                    "roi": 20.23
+                },
+                {
+                    "bet_index": 222,
+                    "roi": 21.41
+                },
+                {
+                    "bet_index": 223,
+                    "roi": 20.49
+                },
+                {
+                    "bet_index": 224,
+                    "roi": 22.67
+                },
+                {
+                    "bet_index": 225,
+                    "roi": 20.75
+                },
+                {
+                    "bet_index": 226,
+                    "roi": 18.29
+                },
+                {
+                    "bet_index": 227,
+                    "roi": 18.45
+                },
+                {
+                    "bet_index": 228,
+                    "roi": 16.94
+                },
+                {
+                    "bet_index": 229,
+                    "roi": 15.35
+                },
+                {
+                    "bet_index": 230,
+                    "roi": 14.94
+                },
+                {
+                    "bet_index": 231,
+                    "roi": 16.24
+                },
+                {
+                    "bet_index": 232,
+                    "roi": 18.6
+                },
+                {
+                    "bet_index": 233,
+                    "roi": 19.73
+                },
+                {
+                    "bet_index": 234,
+                    "roi": 17.35
+                },
+                {
+                    "bet_index": 235,
+                    "roi": 17.73
+                },
+                {
+                    "bet_index": 236,
+                    "roi": 18.72
+                },
+                {
+                    "bet_index": 237,
+                    "roi": 17.75
+                },
+                {
+                    "bet_index": 238,
+                    "roi": 17.18
+                },
+                {
+                    "bet_index": 239,
+                    "roi": 17.48
+                },
+                {
+                    "bet_index": 240,
+                    "roi": 18.56
+                },
+                {
+                    "bet_index": 241,
+                    "roi": 18.34
+                },
+                {
+                    "bet_index": 242,
+                    "roi": 19.31
+                },
+                {
+                    "bet_index": 243,
+                    "roi": 21.24
+                },
+                {
+                    "bet_index": 244,
+                    "roi": 22.28
+                },
+                {
+                    "bet_index": 245,
+                    "roi": 23.34
+                },
+                {
+                    "bet_index": 246,
+                    "roi": 21.59
+                },
+                {
+                    "bet_index": 247,
+                    "roi": 21.92
+                },
+                {
+                    "bet_index": 248,
+                    "roi": 24
+                },
+                {
+                    "bet_index": 249,
+                    "roi": 22.22
+                }
+            ],
+            "edge_decay_pct": -10.05,
+            "edge_decay_alert": null
+        }
+    },
+    {
+        "id": "ea8ad047-df2f-4362-af4b-160b3c0e4d5c",
+        "created_at": "2026-06-16T18:38:10.918077",
+        "name": "BTTS - China - Super league - Otimizada (EV: 1.15 | Odds: 1.00-50.00)",
+        "params": {
+            "leagues": [
+                "china/super-league"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "btts_yes"
+            ],
+            "valueThreshold": 1.15,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 1,
+            "maxOdds": 50,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
+        },
+        "summary": {
+            "initial_bankroll": 1000,
+            "final_bankroll": 3045.45,
+            "net_profit": 2045.45,
+            "profit_in_stakes": 243.59,
+            "total_bets": 378,
+            "wins": 210,
+            "losses": 168,
+            "win_rate": 55.6,
+            "roi": 61.54,
+            "max_drawdown": 3.21,
+            "total_staked": 3323.76,
+            "avg_odds": 3.04,
+            "sharpe_ratio": 6.33,
+            "sortino_ratio": 37.5,
+            "skewness": 1.9,
+            "max_consec_wins": 7,
+            "max_consec_losses": 6,
+            "avg_clv": null,
+            "bcl_percent": null,
+            "p_value": 0,
+            "brier_score": 0.2461,
+            "brier_score_market": 0.2781,
+            "brier_improvement": 11.51,
+            "bootstrap_roi_ci_lower": 43.01,
+            "bootstrap_roi_ci_upper": 81.79,
+            "bootstrap_roi_median": 60.93,
+            "prob_positive_roi": 1,
+            "min_sample_size": 63,
+            "sample_sufficient": true,
+            "power_ratio": 6,
+            "rolling_roi": [
+                {
+                    "bet_index": 99,
+                    "roi": 67.21
+                },
+                {
+                    "bet_index": 100,
+                    "roi": 70.29
+                },
+                {
+                    "bet_index": 101,
+                    "roi": 70.28
+                },
+                {
+                    "bet_index": 102,
+                    "roi": 70.42
+                },
+                {
+                    "bet_index": 103,
+                    "roi": 72
+                },
+                {
+                    "bet_index": 104,
+                    "roi": 71.85
+                },
+                {
+                    "bet_index": 105,
+                    "roi": 74.17
+                },
+                {
+                    "bet_index": 106,
+                    "roi": 78.21
+                },
+                {
+                    "bet_index": 107,
+                    "roi": 78.21
+                },
+                {
+                    "bet_index": 108,
+                    "roi": 76.11
+                },
+                {
+                    "bet_index": 109,
+                    "roi": 78.46
+                },
+                {
+                    "bet_index": 110,
+                    "roi": 70.65
+                },
+                {
+                    "bet_index": 111,
+                    "roi": 73.23
+                },
+                {
+                    "bet_index": 112,
+                    "roi": 70.99
+                },
+                {
+                    "bet_index": 113,
+                    "roi": 75.73
+                },
+                {
+                    "bet_index": 114,
+                    "roi": 58.34
+                },
+                {
+                    "bet_index": 115,
+                    "roi": 58.46
+                },
+                {
+                    "bet_index": 116,
+                    "roi": 62.44
+                },
+                {
+                    "bet_index": 117,
+                    "roi": 64.99
+                },
+                {
+                    "bet_index": 118,
+                    "roi": 63.86
+                },
+                {
+                    "bet_index": 119,
+                    "roi": 64.87
+                },
+                {
+                    "bet_index": 120,
+                    "roi": 64.74
+                },
+                {
+                    "bet_index": 121,
+                    "roi": 64.21
+                },
+                {
+                    "bet_index": 122,
+                    "roi": 62.21
+                },
+                {
+                    "bet_index": 123,
+                    "roi": 60.13
+                },
+                {
+                    "bet_index": 124,
+                    "roi": 57.8
+                },
+                {
+                    "bet_index": 125,
+                    "roi": 61.56
+                },
+                {
+                    "bet_index": 126,
+                    "roi": 64.11
+                },
+                {
+                    "bet_index": 127,
+                    "roi": 64.11
+                },
+                {
+                    "bet_index": 128,
+                    "roi": 61.17
+                },
+                {
+                    "bet_index": 129,
+                    "roi": 57.23
+                },
+                {
+                    "bet_index": 130,
+                    "roi": 57.23
+                },
+                {
+                    "bet_index": 131,
+                    "roi": 59.95
+                },
+                {
+                    "bet_index": 132,
+                    "roi": 58.26
+                },
+                {
+                    "bet_index": 133,
+                    "roi": 59.6
+                },
+                {
+                    "bet_index": 134,
+                    "roi": 52.91
+                },
+                {
+                    "bet_index": 135,
+                    "roi": 52.87
+                },
+                {
+                    "bet_index": 136,
+                    "roi": 47.99
+                },
+                {
+                    "bet_index": 137,
+                    "roi": 47.32
+                },
+                {
+                    "bet_index": 138,
+                    "roi": 49.68
+                },
+                {
+                    "bet_index": 139,
+                    "roi": 49.68
+                },
+                {
+                    "bet_index": 140,
+                    "roi": 52.06
+                },
+                {
+                    "bet_index": 141,
+                    "roi": 52.06
+                },
+                {
+                    "bet_index": 142,
+                    "roi": 52.06
+                },
+                {
+                    "bet_index": 143,
+                    "roi": 51.19
+                },
+                {
+                    "bet_index": 144,
+                    "roi": 52.61
+                },
+                {
+                    "bet_index": 145,
+                    "roi": 54.62
+                },
+                {
+                    "bet_index": 146,
+                    "roi": 56.37
+                },
+                {
+                    "bet_index": 147,
+                    "roi": 50.89
+                },
+                {
+                    "bet_index": 148,
+                    "roi": 52.17
+                },
+                {
+                    "bet_index": 149,
+                    "roi": 52.7
+                },
+                {
+                    "bet_index": 150,
+                    "roi": 53.21
+                },
+                {
+                    "bet_index": 151,
+                    "roi": 51.04
+                },
+                {
+                    "bet_index": 152,
+                    "roi": 55.66
+                },
+                {
+                    "bet_index": 153,
+                    "roi": 53.53
+                },
+                {
+                    "bet_index": 154,
+                    "roi": 53.3
+                },
+                {
+                    "bet_index": 155,
+                    "roi": 56.38
+                },
+                {
+                    "bet_index": 156,
+                    "roi": 56.9
+                },
+                {
+                    "bet_index": 157,
+                    "roi": 56.9
+                },
+                {
+                    "bet_index": 158,
+                    "roi": 56.38
+                },
+                {
+                    "bet_index": 159,
+                    "roi": 55.61
+                },
+                {
+                    "bet_index": 160,
+                    "roi": 57.68
+                },
+                {
+                    "bet_index": 161,
+                    "roi": 62.73
+                },
+                {
+                    "bet_index": 162,
+                    "roi": 61.89
+                },
+                {
+                    "bet_index": 163,
+                    "roi": 61.11
+                },
+                {
+                    "bet_index": 164,
+                    "roi": 64.04
+                },
+                {
+                    "bet_index": 165,
+                    "roi": 63.5
+                },
+                {
+                    "bet_index": 166,
+                    "roi": 61.22
+                },
+                {
+                    "bet_index": 167,
+                    "roi": 57.67
+                },
+                {
+                    "bet_index": 168,
+                    "roi": 57.67
+                },
+                {
+                    "bet_index": 169,
+                    "roi": 55.55
+                },
+                {
+                    "bet_index": 170,
+                    "roi": 55.55
+                },
+                {
+                    "bet_index": 171,
+                    "roi": 55.78
+                },
+                {
+                    "bet_index": 172,
+                    "roi": 57.04
+                },
+                {
+                    "bet_index": 173,
+                    "roi": 56.94
+                },
+                {
+                    "bet_index": 174,
+                    "roi": 59.58
+                },
+                {
+                    "bet_index": 175,
+                    "roi": 60.48
+                },
+                {
+                    "bet_index": 176,
+                    "roi": 58.69
+                },
+                {
+                    "bet_index": 177,
+                    "roi": 60.19
+                },
+                {
+                    "bet_index": 178,
+                    "roi": 56.18
+                },
+                {
+                    "bet_index": 179,
+                    "roi": 55.67
+                },
+                {
+                    "bet_index": 180,
+                    "roi": 58.61
+                },
+                {
+                    "bet_index": 181,
+                    "roi": 56.74
+                },
+                {
+                    "bet_index": 182,
+                    "roi": 59.5
+                },
+                {
+                    "bet_index": 183,
+                    "roi": 59.5
+                },
+                {
+                    "bet_index": 184,
+                    "roi": 62.26
+                },
+                {
+                    "bet_index": 185,
+                    "roi": 59.41
+                },
+                {
+                    "bet_index": 186,
+                    "roi": 58.73
+                },
+                {
+                    "bet_index": 187,
+                    "roi": 55.96
+                },
+                {
+                    "bet_index": 188,
+                    "roi": 55.96
+                },
+                {
+                    "bet_index": 189,
+                    "roi": 59.18
+                },
+                {
+                    "bet_index": 190,
+                    "roi": 56.41
+                },
+                {
+                    "bet_index": 191,
+                    "roi": 69.41
+                },
+                {
+                    "bet_index": 192,
+                    "roi": 68.61
+                },
+                {
+                    "bet_index": 193,
+                    "roi": 68.35
+                },
+                {
+                    "bet_index": 194,
+                    "roi": 66.18
+                },
+                {
+                    "bet_index": 195,
+                    "roi": 68.76
+                },
+                {
+                    "bet_index": 196,
+                    "roi": 72.04
+                },
+                {
+                    "bet_index": 197,
+                    "roi": 74.27
+                },
+                {
+                    "bet_index": 198,
+                    "roi": 72.67
+                },
+                {
+                    "bet_index": 199,
+                    "roi": 72.1
+                },
+                {
+                    "bet_index": 200,
+                    "roi": 69.12
+                },
+                {
+                    "bet_index": 201,
+                    "roi": 69.33
+                },
+                {
+                    "bet_index": 202,
+                    "roi": 68.99
+                },
+                {
+                    "bet_index": 203,
+                    "roi": 68.79
+                },
+                {
+                    "bet_index": 204,
+                    "roi": 70.55
+                },
+                {
+                    "bet_index": 205,
+                    "roi": 66.65
+                },
+                {
+                    "bet_index": 206,
+                    "roi": 63.01
+                },
+                {
+                    "bet_index": 207,
+                    "roi": 65.03
+                },
+                {
+                    "bet_index": 208,
+                    "roi": 65.26
+                },
+                {
+                    "bet_index": 209,
+                    "roi": 61.66
+                },
+                {
+                    "bet_index": 210,
+                    "roi": 62.5
+                },
+                {
+                    "bet_index": 211,
+                    "roi": 62.73
+                },
+                {
+                    "bet_index": 212,
+                    "roi": 62.73
+                },
+                {
+                    "bet_index": 213,
+                    "roi": 62.15
+                },
+                {
+                    "bet_index": 214,
+                    "roi": 61.63
+                },
+                {
+                    "bet_index": 215,
+                    "roi": 61.58
+                },
+                {
+                    "bet_index": 216,
+                    "roi": 59.79
+                },
+                {
+                    "bet_index": 217,
+                    "roi": 59.57
+                },
+                {
+                    "bet_index": 218,
+                    "roi": 56.84
+                },
+                {
+                    "bet_index": 219,
+                    "roi": 56.17
+                },
+                {
+                    "bet_index": 220,
+                    "roi": 57.29
+                },
+                {
+                    "bet_index": 221,
+                    "roi": 58.9
+                },
+                {
+                    "bet_index": 222,
+                    "roi": 60.78
+                },
+                {
+                    "bet_index": 223,
+                    "roi": 60.78
+                },
+                {
+                    "bet_index": 224,
+                    "roi": 61.31
+                },
+                {
+                    "bet_index": 225,
+                    "roi": 57.64
+                },
+                {
+                    "bet_index": 226,
+                    "roi": 55.67
+                },
+                {
+                    "bet_index": 227,
+                    "roi": 55.67
+                },
+                {
+                    "bet_index": 228,
+                    "roi": 55.67
+                },
+                {
+                    "bet_index": 229,
+                    "roi": 57.76
+                },
+                {
+                    "bet_index": 230,
+                    "roi": 60.28
+                },
+                {
+                    "bet_index": 231,
+                    "roi": 60.48
+                },
+                {
+                    "bet_index": 232,
+                    "roi": 62.14
+                },
+                {
+                    "bet_index": 233,
+                    "roi": 59.64
+                },
+                {
+                    "bet_index": 234,
+                    "roi": 61.75
+                },
+                {
+                    "bet_index": 235,
+                    "roi": 59.24
+                },
+                {
+                    "bet_index": 236,
+                    "roi": 59.77
+                },
+                {
+                    "bet_index": 237,
+                    "roi": 58.19
+                },
+                {
+                    "bet_index": 238,
+                    "roi": 55.15
+                },
+                {
+                    "bet_index": 239,
+                    "roi": 55.15
+                },
+                {
+                    "bet_index": 240,
+                    "roi": 52.81
+                },
+                {
+                    "bet_index": 241,
+                    "roi": 52.81
+                },
+                {
+                    "bet_index": 242,
+                    "roi": 55.73
+                },
+                {
+                    "bet_index": 243,
+                    "roi": 55.31
+                },
+                {
+                    "bet_index": 244,
+                    "roi": 51.69
+                },
+                {
+                    "bet_index": 245,
+                    "roi": 52.59
+                },
+                {
+                    "bet_index": 246,
+                    "roi": 51.69
+                },
+                {
+                    "bet_index": 247,
+                    "roi": 51.44
+                },
+                {
+                    "bet_index": 248,
+                    "roi": 48.66
+                },
+                {
+                    "bet_index": 249,
+                    "roi": 49.85
+                },
+                {
+                    "bet_index": 250,
+                    "roi": 49.35
+                },
+                {
+                    "bet_index": 251,
+                    "roi": 49.35
+                },
+                {
+                    "bet_index": 252,
+                    "roi": 45.22
+                },
+                {
+                    "bet_index": 253,
+                    "roi": 47.45
+                },
+                {
+                    "bet_index": 254,
+                    "roi": 49.21
+                },
+                {
+                    "bet_index": 255,
+                    "roi": 46.11
+                },
+                {
+                    "bet_index": 256,
+                    "roi": 47.84
+                },
+                {
+                    "bet_index": 257,
+                    "roi": 49.98
+                },
+                {
+                    "bet_index": 258,
+                    "roi": 52.22
+                },
+                {
+                    "bet_index": 259,
+                    "roi": 47.86
+                },
+                {
+                    "bet_index": 260,
+                    "roi": 48.03
+                },
+                {
+                    "bet_index": 261,
+                    "roi": 40.15
+                },
+                {
+                    "bet_index": 262,
+                    "roi": 37.41
+                },
+                {
+                    "bet_index": 263,
+                    "roi": 40.2
+                },
+                {
+                    "bet_index": 264,
+                    "roi": 40.07
+                },
+                {
+                    "bet_index": 265,
+                    "roi": 42.67
+                },
+                {
+                    "bet_index": 266,
+                    "roi": 42.67
+                },
+                {
+                    "bet_index": 267,
+                    "roi": 45.86
+                },
+                {
+                    "bet_index": 268,
+                    "roi": 50.26
+                },
+                {
+                    "bet_index": 269,
+                    "roi": 50.26
+                },
+                {
+                    "bet_index": 270,
+                    "roi": 50.26
+                },
+                {
+                    "bet_index": 271,
+                    "roi": 50.58
+                },
+                {
+                    "bet_index": 272,
+                    "roi": 48.71
+                },
+                {
+                    "bet_index": 273,
+                    "roi": 48.79
+                },
+                {
+                    "bet_index": 274,
+                    "roi": 46.11
+                },
+                {
+                    "bet_index": 275,
+                    "roi": 45.76
+                },
+                {
+                    "bet_index": 276,
+                    "roi": 45.5
+                },
+                {
+                    "bet_index": 277,
+                    "roi": 45.14
+                },
+                {
+                    "bet_index": 278,
+                    "roi": 48.54
+                },
+                {
+                    "bet_index": 279,
+                    "roi": 48.54
+                },
+                {
+                    "bet_index": 280,
+                    "roi": 45.51
+                },
+                {
+                    "bet_index": 281,
+                    "roi": 49.78
+                },
+                {
+                    "bet_index": 282,
+                    "roi": 47.5
+                },
+                {
+                    "bet_index": 283,
+                    "roi": 49.58
+                },
+                {
+                    "bet_index": 284,
+                    "roi": 48.65
+                },
+                {
+                    "bet_index": 285,
+                    "roi": 51.23
+                },
+                {
+                    "bet_index": 286,
+                    "roi": 53.14
+                },
+                {
+                    "bet_index": 287,
+                    "roi": 53.14
+                },
+                {
+                    "bet_index": 288,
+                    "roi": 52.62
+                },
+                {
+                    "bet_index": 289,
+                    "roi": 52.42
+                },
+                {
+                    "bet_index": 290,
+                    "roi": 54.59
+                },
+                {
+                    "bet_index": 291,
+                    "roi": 43.8
+                },
+                {
+                    "bet_index": 292,
+                    "roi": 44.29
+                },
+                {
+                    "bet_index": 293,
+                    "roi": 43.16
+                },
+                {
+                    "bet_index": 294,
+                    "roi": 45.62
+                },
+                {
+                    "bet_index": 295,
+                    "roi": 42.93
+                },
+                {
+                    "bet_index": 296,
+                    "roi": 42.13
+                },
+                {
+                    "bet_index": 297,
+                    "roi": 39.67
+                },
+                {
+                    "bet_index": 298,
+                    "roi": 44.81
+                },
+                {
+                    "bet_index": 299,
+                    "roi": 44.81
+                },
+                {
+                    "bet_index": 300,
+                    "roi": 50.82
+                },
+                {
+                    "bet_index": 301,
+                    "roi": 48.33
+                },
+                {
+                    "bet_index": 302,
+                    "roi": 48.61
+                },
+                {
+                    "bet_index": 303,
+                    "roi": 52.77
+                },
+                {
+                    "bet_index": 304,
+                    "roi": 52.79
+                },
+                {
+                    "bet_index": 305,
+                    "roi": 55.33
+                },
+                {
+                    "bet_index": 306,
+                    "roi": 52.66
+                },
+                {
+                    "bet_index": 307,
+                    "roi": 50.57
+                },
+                {
+                    "bet_index": 308,
+                    "roi": 50.34
+                },
+                {
+                    "bet_index": 309,
+                    "roi": 49.47
+                },
+                {
+                    "bet_index": 310,
+                    "roi": 46.08
+                },
+                {
+                    "bet_index": 311,
+                    "roi": 46.13
+                },
+                {
+                    "bet_index": 312,
+                    "roi": 48.38
+                },
+                {
+                    "bet_index": 313,
+                    "roi": 44.18
+                },
+                {
+                    "bet_index": 314,
+                    "roi": 46.91
+                },
+                {
+                    "bet_index": 315,
+                    "roi": 47.51
+                },
+                {
+                    "bet_index": 316,
+                    "roi": 48.53
+                },
+                {
+                    "bet_index": 317,
+                    "roi": 46.26
+                },
+                {
+                    "bet_index": 318,
+                    "roi": 48.56
+                },
+                {
+                    "bet_index": 319,
+                    "roi": 49.04
+                },
+                {
+                    "bet_index": 320,
+                    "roi": 45.52
+                },
+                {
+                    "bet_index": 321,
+                    "roi": 44.13
+                },
+                {
+                    "bet_index": 322,
+                    "roi": 41.7
+                },
+                {
+                    "bet_index": 323,
+                    "roi": 41.7
+                },
+                {
+                    "bet_index": 324,
+                    "roi": 41.23
+                },
+                {
+                    "bet_index": 325,
+                    "roi": 44.42
+                },
+                {
+                    "bet_index": 326,
+                    "roi": 43.93
+                },
+                {
+                    "bet_index": 327,
+                    "roi": 46.81
+                },
+                {
+                    "bet_index": 328,
+                    "roi": 49.2
+                },
+                {
+                    "bet_index": 329,
+                    "roi": 50.94
+                },
+                {
+                    "bet_index": 330,
+                    "roi": 50.76
+                },
+                {
+                    "bet_index": 331,
+                    "roi": 52.05
+                },
+                {
+                    "bet_index": 332,
+                    "roi": 53.53
+                },
+                {
+                    "bet_index": 333,
+                    "roi": 55.04
+                },
+                {
+                    "bet_index": 334,
+                    "roi": 52.4
+                },
+                {
+                    "bet_index": 335,
+                    "roi": 54.69
+                },
+                {
+                    "bet_index": 336,
+                    "roi": 59.98
+                },
+                {
+                    "bet_index": 337,
+                    "roi": 60.81
+                },
+                {
+                    "bet_index": 338,
+                    "roi": 62.95
+                },
+                {
+                    "bet_index": 339,
+                    "roi": 62.95
+                },
+                {
+                    "bet_index": 340,
+                    "roi": 62.95
+                },
+                {
+                    "bet_index": 341,
+                    "roi": 62.95
+                },
+                {
+                    "bet_index": 342,
+                    "roi": 60.04
+                },
+                {
+                    "bet_index": 343,
+                    "roi": 59.87
+                },
+                {
+                    "bet_index": 344,
+                    "roi": 59.87
+                },
+                {
+                    "bet_index": 345,
+                    "roi": 59.26
+                },
+                {
+                    "bet_index": 346,
+                    "roi": 59.58
+                },
+                {
+                    "bet_index": 347,
+                    "roi": 59.63
+                },
+                {
+                    "bet_index": 348,
+                    "roi": 61.32
+                },
+                {
+                    "bet_index": 349,
+                    "roi": 60.75
+                },
+                {
+                    "bet_index": 350,
+                    "roi": 60.75
+                },
+                {
+                    "bet_index": 351,
+                    "roi": 61.28
+                },
+                {
+                    "bet_index": 352,
+                    "roi": 65.61
+                },
+                {
+                    "bet_index": 353,
+                    "roi": 65.93
+                },
+                {
+                    "bet_index": 354,
+                    "roi": 63.71
+                },
+                {
+                    "bet_index": 355,
+                    "roi": 64.25
+                },
+                {
+                    "bet_index": 356,
+                    "roi": 62
+                },
+                {
+                    "bet_index": 357,
+                    "roi": 62.9
+                },
+                {
+                    "bet_index": 358,
+                    "roi": 60.66
+                },
+                {
+                    "bet_index": 359,
+                    "roi": 63.11
+                },
+                {
+                    "bet_index": 360,
+                    "roi": 62.66
+                },
+                {
+                    "bet_index": 361,
+                    "roi": 65.49
+                },
+                {
+                    "bet_index": 362,
+                    "roi": 70.24
+                },
+                {
+                    "bet_index": 363,
+                    "roi": 67.43
+                },
+                {
+                    "bet_index": 364,
+                    "roi": 66.7
+                },
+                {
+                    "bet_index": 365,
+                    "roi": 64.21
+                },
+                {
+                    "bet_index": 366,
+                    "roi": 66.54
+                },
+                {
+                    "bet_index": 367,
+                    "roi": 66.23
+                },
+                {
+                    "bet_index": 368,
+                    "roi": 64.39
+                },
+                {
+                    "bet_index": 369,
+                    "roi": 64.93
+                },
+                {
+                    "bet_index": 370,
+                    "roi": 67.66
+                },
+                {
+                    "bet_index": 371,
+                    "roi": 67.15
+                },
+                {
+                    "bet_index": 372,
+                    "roi": 65.11
+                },
+                {
+                    "bet_index": 373,
+                    "roi": 62.11
+                },
+                {
+                    "bet_index": 374,
+                    "roi": 64.65
+                },
+                {
+                    "bet_index": 375,
+                    "roi": 64.89
+                },
+                {
+                    "bet_index": 376,
+                    "roi": 64.47
+                },
+                {
+                    "bet_index": 377,
+                    "roi": 62.6
+                }
+            ],
+            "edge_decay_pct": -9.96,
+            "edge_decay_alert": null
+        }
+    },
+    {
         "id": "d4a0f0e4-af1c-40b8-a82a-4fb048d804d5",
         "created_at": "2026-06-14T20:49:41.663086",
         "name": "BTTS - Otimizada (EV: 1.09 | Odds: 1.00-50.00) - taly Serie A",

@@ -1,5 +1,7 @@
+import pandas as pd
 import numpy as np
 import math
+from .elo_model import estimate_dynamic_rho
 
 def find_best_team_match(api_name, historical_teams):
     if not api_name:
@@ -87,54 +89,67 @@ def get_fair_ah_odds(ah_probs):
     return float(max(1.01, min(99.0, odds)))
 
 class PoissonModel:
-    def __init__(self, rolling_window_days=365, min_matches=10):
+    def __init__(self, rolling_window_days=365, min_matches=10, decay_xi=0.0065):
         self.rolling_window_days = rolling_window_days
         self.min_matches = min_matches
+        self.decay_xi = decay_xi
 
     def compute_team_ratings(self, historical_df, target_date):
         """
         Computes rolling attack and defense ratings for all teams based on matches
-        played BEFORE target_date.
+        played BEFORE target_date, applying exponential time decay.
         """
         # Filter matches before target date and within rolling window
         target_dt = pd.to_datetime(target_date)
         window_start = target_dt - pd.Timedelta(days=self.rolling_window_days)
         
         mask = (historical_df['Date'] < target_dt) & (historical_df['Date'] >= window_start)
-        recent_matches = historical_df[mask]
+        recent_matches = historical_df[mask].copy()
         
         if len(recent_matches) < self.min_matches:
             # If not enough matches in the league yet, return empty ratings (regressed to average)
             return {}, {}, 1.0, 1.0
             
-        # Calculate league averages
-        avg_home_goals = recent_matches['FTHG'].mean()
-        avg_away_goals = recent_matches['FTAG'].mean()
+        # Compute exponential time decay weights
+        days_diff = (target_dt - recent_matches['Date']).dt.days
+        recent_matches['Weight'] = np.exp(-self.decay_xi * days_diff)
+        
+        weight_sum = recent_matches['Weight'].sum()
+        
+        # Calculate weighted league averages
+        avg_home_goals = (recent_matches['FTHG'] * recent_matches['Weight']).sum() / weight_sum
+        avg_away_goals = (recent_matches['FTAG'] * recent_matches['Weight']).sum() / weight_sum
         
         # Avoid division by zero
         if pd.isna(avg_home_goals) or avg_home_goals == 0: avg_home_goals = 1.3
         if pd.isna(avg_away_goals) or avg_away_goals == 0: avg_away_goals = 1.0
         
+        def weighted_avg(group, col):
+            w = group['Weight']
+            w_sum = w.sum()
+            if w_sum == 0: return group[col].mean()
+            return (group[col] * w).sum() / w_sum
+
         # Calculate goals scored and conceded by team
         home_grouped = recent_matches.groupby('HomeTeam')
         away_grouped = recent_matches.groupby('AwayTeam')
         
         # Home team offensive strength: avg goals scored / league avg goals scored at home
-        home_att = (home_grouped['FTHG'].mean() / avg_home_goals).to_dict()
+        home_att = {team: weighted_avg(group, 'FTHG') / avg_home_goals for team, group in home_grouped}
         # Home team defensive strength: avg goals conceded / league avg goals conceded at home
-        home_def = (home_grouped['FTAG'].mean() / avg_away_goals).to_dict()
+        home_def = {team: weighted_avg(group, 'FTAG') / avg_away_goals for team, group in home_grouped}
         
         # Away team offensive strength: avg goals scored / league avg goals scored away
-        away_att = (away_grouped['FTAG'].mean() / avg_away_goals).to_dict()
+        away_att = {team: weighted_avg(group, 'FTAG') / avg_away_goals for team, group in away_grouped}
         # Away team defensive strength: avg goals conceded / league avg goals conceded away
-        away_def = (away_grouped['FTHG'].mean() / avg_home_goals).to_dict()
+        away_def = {team: weighted_avg(group, 'FTHG') / avg_home_goals for team, group in away_grouped}
         
         return home_att, home_def, away_att, away_def, avg_home_goals, avg_away_goals
 
     def compute_sot_ratings(self, historical_df, target_date):
         """
         Computes rolling attack and defense SOT ratings for all teams based on matches
-        played BEFORE target_date.
+        played BEFORE target_date, applying exponential time decay.
         """
         if 'HST' not in historical_df.columns or 'AST' not in historical_df.columns:
             return None
@@ -143,25 +158,37 @@ class PoissonModel:
         window_start = target_dt - pd.Timedelta(days=self.rolling_window_days)
         
         mask = (historical_df['Date'] < target_dt) & (historical_df['Date'] >= window_start)
-        recent_matches = historical_df[mask].dropna(subset=['HST', 'AST'])
+        recent_matches = historical_df[mask].dropna(subset=['HST', 'AST']).copy()
         
         if len(recent_matches) < self.min_matches:
             return None
             
-        avg_home_sot = recent_matches['HST'].mean()
-        avg_away_sot = recent_matches['AST'].mean()
+        # Compute exponential time decay weights
+        days_diff = (target_dt - recent_matches['Date']).dt.days
+        recent_matches['Weight'] = np.exp(-self.decay_xi * days_diff)
+        
+        weight_sum = recent_matches['Weight'].sum()
+        
+        avg_home_sot = (recent_matches['HST'] * recent_matches['Weight']).sum() / weight_sum
+        avg_away_sot = (recent_matches['AST'] * recent_matches['Weight']).sum() / weight_sum
         
         if pd.isna(avg_home_sot) or avg_home_sot == 0: avg_home_sot = 4.5
         if pd.isna(avg_away_sot) or avg_away_sot == 0: avg_away_sot = 3.5
         
+        def weighted_avg(group, col):
+            w = group['Weight']
+            w_sum = w.sum()
+            if w_sum == 0: return group[col].mean()
+            return (group[col] * w).sum() / w_sum
+
         home_grouped = recent_matches.groupby('HomeTeam')
         away_grouped = recent_matches.groupby('AwayTeam')
         
-        home_sot_att = (home_grouped['HST'].mean() / avg_home_sot).to_dict()
-        home_sot_def = (home_grouped['AST'].mean() / avg_away_sot).to_dict()
+        home_sot_att = {team: weighted_avg(group, 'HST') / avg_home_sot for team, group in home_grouped}
+        home_sot_def = {team: weighted_avg(group, 'AST') / avg_away_sot for team, group in home_grouped}
         
-        away_sot_att = (away_grouped['AST'].mean() / avg_away_sot).to_dict()
-        away_sot_def = (away_grouped['HST'].mean() / avg_home_sot).to_dict()
+        away_sot_att = {team: weighted_avg(group, 'AST') / avg_away_sot for team, group in away_grouped}
+        away_sot_def = {team: weighted_avg(group, 'HST') / avg_home_sot for team, group in away_grouped}
         
         return {
             'home_sot_att': home_sot_att,
@@ -233,7 +260,7 @@ class PoissonModel:
                 lambda_shots_away = max(0.1, min(5.0, lambda_shots_away))
                 
                 # Try xG blend
-                xg_ratings = self.compute_xg_ratings(historical_df, match_date)
+                xg_ratings = None
                 if xg_ratings:
                     h_xg_att = xg_ratings['home_xg_att'].get(matched_home, 1.0)
                     h_xg_def = xg_ratings['home_xg_def'].get(matched_home, 1.0)
@@ -278,6 +305,27 @@ class PoissonModel:
         
         # Apply Dixon-Coles adjustment for low-scoring matches (especially 0-0 and draws)
         rho = -0.085 # Standard parameter for football goals dependency
+        
+        # Estimate dynamic rho from historical_df if available
+        if historical_df is not None and not historical_df.empty:
+            target_dt = pd.to_datetime(match_date)
+            window_start = target_dt - pd.Timedelta(days=self.rolling_window_days)
+            mask = (historical_df['Date'] < target_dt) & (historical_df['Date'] >= window_start)
+            recent = historical_df[mask].dropna(subset=['FTHG', 'FTAG'])
+            if len(recent) >= 50:
+                avg_h = recent['FTHG'].mean()
+                avg_a = recent['FTAG'].mean()
+                lh_list = [avg_h] * len(recent)
+                la_list = [avg_a] * len(recent)
+                dyn_rho = estimate_dynamic_rho(
+                    recent['FTHG'].astype(int).tolist(),
+                    recent['FTAG'].astype(int).tolist(),
+                    lh_list,
+                    la_list
+                )
+                if dyn_rho is not None and not pd.isna(dyn_rho):
+                    rho = dyn_rho
+
         tau_00 = 1.0 - lambda_home * lambda_away * rho
         tau_10 = 1.0 + lambda_away * rho
         tau_01 = 1.0 + lambda_home * rho

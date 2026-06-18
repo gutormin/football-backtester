@@ -23,9 +23,58 @@ let lastBacktestParams = null;
 
 
 const API_BASE_URL = window.location.origin;
+window.currentDataSource = 'footballdata';
+window.futpythonApiKey = 'cmqa6oz0p01i1wq6lzxknltmd';
+
+function handleDataSourceChange() {
+    window.currentDataSource = document.getElementById('data-source-select').value;
+    const configDiv = document.getElementById('futpython-config');
+    if (window.currentDataSource === 'futpython') {
+        configDiv.style.display = 'block';
+    } else {
+        configDiv.style.display = 'none';
+    }
+    // Reload leagues
+    if (typeof loadLeagues === 'function') loadLeagues();
+    
+    // Also reload if there's a standalone select somewhere
+    const selects = document.querySelectorAll('.league-select');
+    selects.forEach(s => {
+        // Just empty it, it will be refetched
+        s.innerHTML = '';
+    });
+    
+    // Also reload calculator leagues
+    if (typeof populateCalculatorLeagues === 'function') {
+        populateCalculatorLeagues();
+    }
+}
+
+function saveFutpythonKey(val) {
+    window.futpythonApiKey = val;
+    localStorage.setItem('futpython_api_key', val);
+}
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Sync currentDataSource with whatever the browser restored in the select
+    const sourceSelect = document.getElementById('data-source-select');
+    if (sourceSelect) {
+        window.currentDataSource = sourceSelect.value;
+        const configDiv = document.getElementById('futpython-config');
+        if (window.currentDataSource === 'futpython' && configDiv) {
+            configDiv.style.display = 'block';
+        }
+    }
+
+    // Load FutPythonTrader API Key from LocalStorage
+    const savedKey = localStorage.getItem('futpython_api_key');
+    if (savedKey) {
+        window.futpythonApiKey = savedKey;
+        const keyInput = document.getElementById('futpython-api-key');
+        if (keyInput) keyInput.value = savedKey;
+    }
+    
     initApp();
     
     // Close modal when clicking outside of modal container
@@ -143,9 +192,11 @@ async function loadLeagues() {
     listContainer.innerHTML = '';
     
     try {
-        const res = await fetch(`${API_BASE_URL}/api/leagues`);
+        const res = await fetch(`${API_BASE_URL}/api/leagues?source=${window.currentDataSource}&t=${Date.now()}`, { cache: 'no-store' });
         if (!res.ok) throw new Error("Failed to load leagues");
         const leagues = await res.json();
+        
+        window.AVAILABLE_LEAGUES = leagues;
         
         // Sort leagues: European seasonal first, then extra international
         leagues.sort((a, b) => a.name.localeCompare(b.name));
@@ -179,6 +230,11 @@ function toggleStakeLabel() {
 }
 
 function updateCharts(dates, bankrolls, fixedData, propData, kellyData, leagueStats, monthlyStats, oddsStats, optimizedData) {
+    if (equityChart) equityChart.destroy();
+    if (leagueChart) leagueChart.destroy();
+    if (monthlyChart) monthlyChart.destroy();
+    if (oddsChart) oddsChart.destroy();
+
     const ctxEquity = document.getElementById('equity-chart').getContext('2d');
 const gradient = ctxEquity.createLinearGradient(0, 0, 0, 400);
 gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
@@ -199,6 +255,7 @@ gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
     else if (rule === 'kelly_quarter') kellyFractionText = '1/4';
 
     else if (rule === 'kelly_eighth') kellyFractionText = '1/8';
+        else if (rule === 'kelly_sixteenth') kellyFractionText = '1/16';
 
 
 
@@ -704,15 +761,15 @@ function renderRiskManagement(results) {
 
     // 2. Estresse Estatístico
 
-    document.getElementById('gr-max-drawdown').textContent = summary.max_drawdown !== undefined ? summary.max_drawdown.toFixed(2) + '%' : '--';
+    document.getElementById('gr-max-drawdown').textContent = summary.max_drawdown != null ? summary.max_drawdown.toFixed(2) + '%' : '--';
 
-    document.getElementById('gr-sharpe').textContent = summary.sharpe_ratio !== undefined ? summary.sharpe_ratio.toFixed(2) : '--';
+    document.getElementById('gr-sharpe').textContent = summary.sharpe_ratio != null ? summary.sharpe_ratio.toFixed(2) : '--';
 
-    document.getElementById('gr-sortino').textContent = summary.sortino_ratio !== undefined ? summary.sortino_ratio.toFixed(2) : '--';
+    document.getElementById('gr-sortino').textContent = summary.sortino_ratio != null ? summary.sortino_ratio.toFixed(2) : '--';
 
-    document.getElementById('gr-skewness').textContent = summary.skewness !== undefined ? summary.skewness.toFixed(2) : '--';
+    document.getElementById('gr-skewness').textContent = summary.skewness != null ? summary.skewness.toFixed(2) : '--';
 
-    document.getElementById('gr-edge-decay').textContent = summary.edge_decay_pct !== undefined ? summary.edge_decay_pct.toFixed(1) + '%' : '--';
+    document.getElementById('gr-edge-decay').textContent = summary.edge_decay_pct != null ? summary.edge_decay_pct.toFixed(1) + '%' : '--';
 
     
 
@@ -720,7 +777,7 @@ function renderRiskManagement(results) {
 
     let pval = '--';
 
-    if (summary.p_value !== undefined) {
+    if (summary.p_value != null) {
 
         if (summary.p_value < 0.001) pval = '< 0.001';
 
@@ -1089,6 +1146,7 @@ async function runScanner(scanType) {
         else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
 
         else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
+        else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
 
     }
 
@@ -1120,7 +1178,11 @@ async function runScanner(scanType) {
 
         maxOdds: parseFloat(document.getElementById('max-odds').value) || 50.0,
 
-        use_ml: document.getElementById('use-ml-toggle')?.checked || false
+        use_ml: document.getElementById('use-ml-toggle')?.checked || false,
+
+        data_source: window.currentDataSource,
+
+        futpython_api_key: window.futpythonApiKey
 
     };
 
@@ -3100,7 +3162,7 @@ async function populateCalculatorLeagues() {
 
     try {
 
-        const res = await fetch(`${API_BASE_URL}/api/leagues`);
+        const res = await fetch(`${API_BASE_URL}/api/leagues?source=${window.currentDataSource}&t=${Date.now()}`, { cache: 'no-store' });
 
         if (!res.ok) throw new Error("Failed to load leagues");
 
@@ -3153,8 +3215,9 @@ async function onCalculatorLeagueChange() {
     
 
     try {
-
-        const res = await fetch(`${API_BASE_URL}/api/teams?league=${leagueCode}`);
+        const source = document.getElementById('data-source-select').value;
+        const apiKey = document.getElementById('futpython-api-key').value;
+        const res = await fetch(`${API_BASE_URL}/api/teams?league=${leagueCode}&source=${source}&api_key=${apiKey}`);
 
         if (!res.ok) throw new Error("Failed to load teams");
 
@@ -3256,13 +3319,15 @@ async function runRealtimePrediction() {
 
     try {
 
+        const data_source = document.getElementById('data-source-select').value;
+        const futpython_api_key = document.getElementById('futpython-api-key').value;
         const res = await fetch(`${API_BASE_URL}/api/predict`, {
 
             method: 'POST',
 
             headers: { 'Content-Type': 'application/json' },
 
-            body: JSON.stringify({ league, homeTeam, awayTeam })
+            body: JSON.stringify({ league, homeTeam, awayTeam, data_source, futpython_api_key })
 
         });
 
@@ -4251,6 +4316,7 @@ async function saveSchedulerConfigUi() {
         else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
 
         else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
+        else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
 
     }
 
@@ -4429,59 +4495,65 @@ async function loadUpcomingMatches() {
         else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
 
         else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
+        else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
 
     }
 
     
 
+
+    const opMode = document.getElementById('select-operation-mode') ? document.getElementById('select-operation-mode').value : 'manual';
     const upcomingSource = document.getElementById('select-upcoming-source') ? document.getElementById('select-upcoming-source').value : 'api';
-
     
-
-    const params = new URLSearchParams({
-
-        market: Array.from(document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]:checked')).map(cb => cb.value)[0] || 'home',
-
-        valueThreshold: parseFloat(document.getElementById('val-threshold').value),
-
-        minOdds: parseFloat(document.getElementById('min-odds').value) || 1.0,
-
-        maxOdds: parseFloat(document.getElementById('max-odds').value) || 50.0,
-
-        stakingRule: stakingRule,
-
-        stakeValue: stakeValue,
-
-        initialBankroll: parseFloat(document.getElementById('init-bankroll').value),
-
-        source: upcomingSource
-
-    });
-
+    let fetchUrl = '';
     
-
+    if (opMode === 'autopilot') {
+        fetchUrl = `${API_BASE_URL}/api/autopilot?source=${upcomingSource}`;
+    } else {
+        const selectedLeagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked')).map(cb => cb.value);
+        if (selectedLeagues.length === 0) {
+            showToast("Selecione pelo menos uma liga na barra lateral.", "error");
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Atualizar Grade';
+            container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-loss); padding: 40px 0;">Nenhuma liga selecionada.</div>`;
+            return;
+        }
+        
+        const selectedMarkets = Array.from(document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]:checked')).map(cb => cb.value);
+        if (selectedMarkets.length === 0) {
+            showToast("Selecione pelo menos um mercado na barra lateral.", "error");
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Atualizar Grade';
+            container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-loss); padding: 40px 0;">Nenhum mercado selecionado.</div>`;
+            return;
+        }
+        const marketsParam = selectedMarkets.join(',');
+        
+        const params = new URLSearchParams({
+            markets: marketsParam,
+            valueThreshold: parseFloat(document.getElementById('val-threshold').value),
+            minOdds: parseFloat(document.getElementById('min-odds').value) || 1.0,
+            maxOdds: parseFloat(document.getElementById('max-odds').value) || 50.0,
+            stakingRule: stakingRule,
+            stakeValue: stakeValue,
+            initialBankroll: parseFloat(document.getElementById('init-bankroll').value),
+            source: upcomingSource
+        });
+        
+        fetchUrl = `${API_BASE_URL}/api/upcoming?${params}`;
+    }
+    
     try {
-
-        const res = await fetch(`${API_BASE_URL}/api/upcoming?${params}`);
-
-        if (!res.ok) throw new Error("Falha ao carregar jogos futuros.");
-
+        const res = await fetch(fetchUrl);
         const data = await res.json();
 
         
 
-        // Filter upcoming matches by selected leagues if source is CSV, otherwise show all today's matches from API
-
+        // Filter upcoming matches by selected leagues ONLY if in manual mode
         let filteredData = data;
-
-        if (upcomingSource === 'csv') {
-
-            const selectedLeagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked'))
-
-                .map(cb => cb.value);
-
-            filteredData = data.filter(match => selectedLeagues.includes(match.league_code));
-
+        if (opMode !== 'autopilot') {
+            const currentSelectedLeagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked')).map(cb => cb.value);
+            filteredData = data.filter(match => currentSelectedLeagues.includes(match.league_code));
         }
 
         
@@ -5253,6 +5325,7 @@ function displayStakingComparison(results) {
     else if (rule === 'kelly_quarter') kellyFractionText = '1/4 de Kelly';
 
     else if (rule === 'kelly_eighth') kellyFractionText = '1/8 de Kelly';
+        else if (rule === 'kelly_sixteenth') kellyFractionText = '1/16 de Kelly';
 
     
 
@@ -6435,6 +6508,7 @@ async function runEqsScanner(scanType) {
         else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
 
         else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
+        else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
 
     }
 
@@ -6466,7 +6540,11 @@ async function runEqsScanner(scanType) {
 
         maxOdds: parseFloat(document.getElementById('max-odds').value) || 50.0,
 
-        use_ml: document.getElementById('use-ml-toggle')?.checked || false
+        use_ml: document.getElementById('use-ml-toggle')?.checked || false,
+
+        data_source: window.currentDataSource,
+
+        futpython_api_key: window.futpythonApiKey
 
     };
 
@@ -7364,6 +7442,11 @@ async function runSteamScan() {
             alert("Por favor, selecione pelo menos uma liga para o Radar de Smart Money.");
             return;
         }
+
+        if (window.currentDataSource === 'futpython') {
+            alert("O Backtest de Queda de Odds (Modo Laboratório) requer dados históricos de abertura e fechamento (Max/Avg/Pinnacle) para detectar quedas de cotações.\n\nEsses dados estão disponíveis apenas na base de dados Padrão Global (Football-Data).\n\nA base da FutPythonTrader possui apenas as odds finais. Use o 'Radar Ao Vivo' (abaixo) para monitorar as quedas do dia em tempo real!");
+            return;
+        }
         
         tableContainer.innerHTML = '';
         overlay.style.display = 'block';
@@ -7392,7 +7475,9 @@ async function runSteamScan() {
                 endDate: endDate,
                 markets: markets.length > 0 ? markets : ['home', 'away', 'draw'],
                 minDropPct: minDropPct,
-                stakeValue: stakeValue
+                stakeValue: stakeValue,
+                data_source: window.currentDataSource,
+                futpython_api_key: window.futpythonApiKey
             })
         });
         
@@ -7805,7 +7890,9 @@ window.runBacktest = async function() {
             maxOdds: maxOdds,
             exchange_commission: exchangeCommission,
             out_of_sample: oos,
-            use_ml: useMl
+            use_ml: useMl,
+            data_source: window.currentDataSource,
+            futpython_api_key: window.futpythonApiKey
         };
         const response = await fetch('/api/backtest', {
             method: 'POST',
@@ -7817,6 +7904,9 @@ window.runBacktest = async function() {
         if (response.ok && !data.error) {
             lastBacktestSummary = data;
             lastBacktestParams = payload;
+            
+            const btnSave = document.getElementById('btn-save-strategy');
+            if(btnSave) btnSave.style.display = 'inline-block';
 
             const summary = data.summary;
             if(document.getElementById('metric-net-profit')) document.getElementById('metric-net-profit').innerText = '$' + summary.net_profit.toFixed(2);
@@ -7833,8 +7923,8 @@ window.runBacktest = async function() {
             if(document.getElementById('metric-skewness')) document.getElementById('metric-skewness').innerText = (summary.skewness || 0).toFixed(2);
             if(document.getElementById('metric-consec-wins')) document.getElementById('metric-consec-wins').innerText = summary.max_consec_wins || 0;
             if(document.getElementById('metric-consec-losses')) document.getElementById('metric-consec-losses').innerText = summary.max_consec_losses || 0;
-            if(document.getElementById('metric-clv') && summary.avg_clv != null) document.getElementById('metric-clv').innerText = (summary.avg_clv >= 0 ? '+' : '') + summary.avg_clv.toFixed(1) + '%';
-            if(document.getElementById('metric-bcl') && summary.bcl_percent != null) document.getElementById('metric-bcl').innerText = summary.bcl_percent.toFixed(1) + '%';
+            if(document.getElementById('metric-clv')) document.getElementById('metric-clv').innerText = summary.avg_clv != null ? ((summary.avg_clv >= 0 ? '+' : '') + summary.avg_clv.toFixed(1) + '%') : 'N/A';
+            if(document.getElementById('metric-bcl')) document.getElementById('metric-bcl').innerText = summary.bcl_percent != null ? (summary.bcl_percent.toFixed(1) + '%') : 'N/A';
             
             const bets = data.bets || [];
             const dates = bets.map((b, i) => b.date ? b.date.substring(0, 10) : i);
@@ -7939,11 +8029,17 @@ window.runBacktest = async function() {
             const banner = document.getElementById('active-strategy-banner');
             if (banner) banner.style.display = 'flex';
             const leagueNames = leagues.map(code => {
-                const lbl = document.querySelector(`label[for="league-${code}"]`);
-                return lbl ? lbl.innerText : code;
+                const lbl = document.querySelector(`label[for="league-${code}"]`) || document.querySelector(`label:has(input[value="${code}"])`);
+                return lbl ? lbl.innerText.trim() : code;
             }).join(', ');
+            
+            const marketNames = markets.map(code => {
+                const lbl = document.querySelector(`label:has(input[value="${code}"])`);
+                return lbl ? lbl.innerText.trim() : code;
+            }).join(', ');
+            
             if(document.getElementById('active-leagues-text')) document.getElementById('active-leagues-text').innerText = leagueNames || 'N/A';
-            if(document.getElementById('active-market-text')) document.getElementById('active-market-text').innerText = markets.join(', ') || 'N/A';
+            if(document.getElementById('active-market-text')) document.getElementById('active-market-text').innerText = marketNames || 'N/A';
             if(document.getElementById('active-odds-text')) document.getElementById('active-odds-text').innerText = `${minOdds.toFixed(2)} - ${maxOdds.toFixed(2)}`;
             if(document.getElementById('active-ev-text')) document.getElementById('active-ev-text').innerText = valThreshold.toFixed(2);
 
@@ -7972,3 +8068,28 @@ window.renderQuartiles = function(q) {};
 
 
 // [window.updateAiAnalysis removido — EQS agora usa renderEdgeQualityScore() com dados reais do backend]
+
+
+// Global function to toggle groups
+window.toggleGroup = function(groupEl) {
+    let checkboxes = [];
+    let el = groupEl.nextElementSibling;
+    while (el && !el.classList.contains('multiselect-optgroup')) {
+        if (el.tagName === 'LABEL' || el.classList.contains('multiselect-option-item')) {
+            const cb = el.querySelector('input[type="checkbox"]');
+            if (cb) checkboxes.push(cb);
+        }
+        el = el.nextElementSibling;
+    }
+    
+    if (checkboxes.length > 0) {
+        const allChecked = checkboxes.every(cb => cb.checked);
+        checkboxes.forEach(cb => { 
+            cb.checked = !allChecked; 
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        if(typeof onMarketSelectionChange === 'function') {
+            onMarketSelectionChange();
+        }
+    }
+};

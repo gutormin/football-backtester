@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv
+.env
+
+# Javascript Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project config files containing sensitive data (keys/tokens)
+data/api_config.json
+data/futpython_config.json
+data/telegram_config.json
+data/telegram_scheduler_config.json
+data/telegram_arbitrage_config.json
+data/telegram_tips_sent.json
+data/telegram_arbitrage_tips_sent.json
+data/history_strategies.json
+
+# Scratch files and temporary tests
+scratch/
+test_*.txt
+*.txt
+*.bat
+*temp*.py
+*temp*
+compare_backtests.py
+verify_blend_fix.py
+compare_bets_detailed.py

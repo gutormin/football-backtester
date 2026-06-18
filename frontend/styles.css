@@ -2605,3 +2605,14 @@ tbody tr:hover {
     color: var(--danger);
 }
 
+
+
+/* Mass Toggle Optgroup */
+.multiselect-optgroup {
+    cursor: pointer;
+    transition: color 0.2s;
+    user-select: none;
+}
+.multiselect-optgroup:hover {
+    color: #8b5cf6;
+}

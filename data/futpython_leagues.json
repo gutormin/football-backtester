@@ -1,0 +1,293 @@
+{
+    "argentina": [
+        "primera-nacional",
+        "liga-profesional",
+        "copa-de-la-liga-profesional",
+        "torneo-betano"
+    ],
+    "brazil": [
+        "serie-a-betano",
+        "serie-b-betano",
+        "serie-c",
+        "paulista",
+        "brasileiro-women",
+        "copa-betano-do-brasil",
+        "serie-b",
+        "serie-b-superbet",
+        "serie-d"
+    ],
+    "australia": [
+        "a-league",
+        "australian-championship"
+    ],
+    "austria": [
+        "2-liga",
+        "bundesliga"
+    ],
+    "belgium": [
+        "challenger-pro-league",
+        "jupiler-pro-league"
+    ],
+    "bolivia": [
+        "copa-pacena",
+        "copa-simon-bolivar",
+        "division-profesional"
+    ],
+    "bosnia-and-herzegovina": [
+        "prva-liga-fbih",
+        "wwin-liga-bih"
+    ],
+    "bulgaria": [
+        "efbet-league",
+        "vtora-liga"
+    ],
+    "chile": [
+        "copa-chile",
+        "copa-de-la-liga",
+        "liga-de-ascenso",
+        "liga-de-primera"
+    ],
+    "china": [
+        "league-one",
+        "super-league"
+    ],
+    "colombia": [
+        "copa-colombia",
+        "primera-a",
+        "primera-b"
+    ],
+    "croatia": [
+        "hnl",
+        "prva-nl"
+    ],
+    "cyprus": [
+        "cyprus-league",
+        "division-2"
+    ],
+    "czech-republic": [
+        "chance-liga",
+        "chnl"
+    ],
+    "denmark": [
+        "1st-division",
+        "superliga"
+    ],
+    "ecuador": [
+        "copa-ecuador",
+        "liga-pro",
+        "serie-b"
+    ],
+    "egypt": [
+        "division-2-a",
+        "premier-league"
+    ],
+    "england": [
+        "championship",
+        "efl-cup",
+        "fa-cup",
+        "league-one",
+        "league-two",
+        "national-league",
+        "premier-league",
+        "wsl"
+    ],
+    "estonia": [
+        "esiliiga",
+        "meistriliiga"
+    ],
+    "europe": [
+        "champions-league",
+        "euro",
+        "europa-conference-league",
+        "europa-league",
+        "uefa-nations-league"
+    ],
+    "finland": [
+        "veikkausliiga",
+        "ykkosliiga"
+    ],
+    "france": [
+        "coupe-de-france",
+        "ligue-1",
+        "ligue-2",
+        "national",
+        "national-2-group-a",
+        "national-2-group-b",
+        "national-2-group-c",
+        "premiere-ligue-women"
+    ],
+    "germany": [
+        "2-bundesliga",
+        "3-liga",
+        "bundesliga-women",
+        "bundesliga",
+        "dfb-pokal"
+    ],
+    "greece": [
+        "super-league",
+        "super-league-2"
+    ],
+    "iceland": [
+        "besta-deild-karla",
+        "division-1"
+    ],
+    "ireland": [
+        "division-1",
+        "premier-division"
+    ],
+    "israel": [
+        "leumit-league",
+        "ligat-ha-al"
+    ],
+    "italy": [
+        "coppa-italia",
+        "serie-a",
+        "serie-a-women",
+        "serie-b",
+        "serie-c-group-a",
+        "serie-c-group-b",
+        "serie-c-group-c",
+        "serie-d-group-a",
+        "serie-d-group-b",
+        "serie-d-group-c",
+        "serie-d-group-d",
+        "serie-d-group-e",
+        "serie-d-group-f",
+        "serie-d-group-g",
+        "serie-d-group-h"
+    ],
+    "japan": [
+        "j1-league",
+        "j2-j3-league",
+        "j2-league",
+        "j3-league"
+    ],
+    "mexico": [
+        "liga-de-expansion-mx",
+        "liga-mx"
+    ],
+    "netherlands": [
+        "eerste-divisie",
+        "eredivisie",
+        "knvb-beker"
+    ],
+    "northern-ireland": [
+        "nifl-championship",
+        "nifl-premiership"
+    ],
+    "norway": [
+        "eliteserien",
+        "obos-ligaen"
+    ],
+    "paraguay": [
+        "copa-de-primera",
+        "copa-paraguay",
+        "division-intermedia"
+    ],
+    "peru": [
+        "liga-1",
+        "liga-2"
+    ],
+    "poland": [
+        "division-1",
+        "ekstraklasa"
+    ],
+    "portugal": [
+        "league-cup",
+        "liga-3",
+        "liga-portugal",
+        "liga-portugal-2",
+        "taca-de-portugal"
+    ],
+    "romania": [
+        "liga-2",
+        "superliga"
+    ],
+    "saudi-arabia": [
+        "division-1",
+        "saudi-professional-league"
+    ],
+    "scotland": [
+        "championship",
+        "league-cup",
+        "league-one",
+        "league-two",
+        "premiership",
+        "scottish-cup"
+    ],
+    "serbia": [
+        "mozzart-bet-prva-liga",
+        "mozzart-bet-super-liga"
+    ],
+    "slovakia": [
+        "2-liga",
+        "nike-liga"
+    ],
+    "slovenia": [
+        "2-snl",
+        "prva-liga"
+    ],
+    "south-africa": [
+        "betway-premiership",
+        "motsepe-foundation-championship"
+    ],
+    "south-america": [
+        "copa-america",
+        "copa-libertadores",
+        "copa-sudamericana"
+    ],
+    "south-korea": [
+        "k-league-1",
+        "k-league-2"
+    ],
+    "spain": [
+        "copa-del-rey",
+        "laliga",
+        "laliga2",
+        "primera-rfef-group-1",
+        "liga-f-women",
+        "primera-rfef-group-2",
+        "segunda-rfef-group-1",
+        "segunda-rfef-group-2",
+        "segunda-rfef-group-3",
+        "segunda-rfef-group-4",
+        "segunda-rfef-group-5"
+    ],
+    "sweden": [
+        "allsvenskan",
+        "superettan"
+    ],
+    "switzerland": [
+        "challenge-league",
+        "super-league"
+    ],
+    "turkey": [
+        "1-lig",
+        "super-lig",
+        "turkish-cup"
+    ],
+    "ukraine": [
+        "persha-liga",
+        "premier-league"
+    ],
+    "uruguay": [
+        "liga-auf-uruguaya",
+        "segunda-division"
+    ],
+    "usa": [
+        "mls",
+        "nwsl-women",
+        "usl-championship"
+    ],
+    "venezuela": [
+        "liga-futve"
+    ],
+    "wales": [
+        "cymru-premier",
+        "fa-cup",
+        "league-cup"
+    ],
+    "world": [
+        "world-championship"
+    ]
+}

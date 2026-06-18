@@ -26,6 +26,16 @@
 </div>
 <form id="backtest-form" onsubmit="event.preventDefault(); runBacktest();">
 <div class="form-section">
+<h3><i class="fa-solid fa-database"></i> Fonte de Dados</h3>
+<select id="data-source-select" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px; margin-bottom: 10px;" onchange="handleDataSourceChange()">
+    <option value="footballdata">Padrão Global (Football-Data)</option>
+    <option value="futpython">América do Sul (FutPythonTrader)</option>
+</select>
+<div id="futpython-config" style="display: none; margin-bottom: 10px;">
+    <input type="text" id="futpython-api-key" placeholder="API Key da FutPythonTrader..." value="cmqa6oz0p01i1wq6lzxknltmd" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px;" onchange="saveFutpythonKey(this.value)">
+</div>
+</div>
+<div class="form-section">
 <h3><i class="fa-solid fa-trophy"></i> Ligas</h3>
 <div class="leagues-container-wrapper">
 <div class="league-quick-actions">
@@ -78,7 +88,7 @@
 <button onclick="selectAllMarkets(false, event)" type="button">Limpar</button>
 </div>
 <div class="multiselect-options" id="market-checkboxes-container">
-<div class="multiselect-optgroup">Resultado 1X2</div>
+<div class="multiselect-optgroup" onclick="toggleGroup(this, event)">Resultado 1X2</div>
 <label class="multiselect-option-item">
 <input checked="" onchange="onMarketSelectionChange()" type="checkbox" value="home"/> Mandante (1)
                                     </label>
@@ -88,7 +98,7 @@
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="draw"/> Empate (X)
                                     </label>
-<div class="multiselect-optgroup">Dupla Chance (Lay)</div>
+<div class="multiselect-optgroup" onclick="toggleGroup(this, event)">Dupla Chance (Lay)</div>
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="lay_home"/> Contra Mandante (X2)
                                     </label>
@@ -98,7 +108,7 @@
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="lay_draw"/> Contra Empate (12)
                                     </label>
-<div class="multiselect-optgroup">Gols (Over/Under)</div>
+<div class="multiselect-optgroup" onclick="toggleGroup(this, event)">Gols (Over/Under)</div>
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="over15"/> Over 1.5 Gols
                                     </label>
@@ -126,14 +136,14 @@
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="under55"/> Under 5.5 Gols
                                     </label>
-<div class="multiselect-optgroup">Ambas Marcam</div>
+<div class="multiselect-optgroup" onclick="toggleGroup(this, event)">Ambas Marcam</div>
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="btts_yes"/> Ambas Marcam Sim
                                     </label>
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="btts_no"/> Ambas Marcam Não
                                     </label>
-                                    <div class="multiselect-optgroup">Handicap Asiático (Main Spread)</div>
+                                    <div class="multiselect-optgroup" onclick="toggleGroup(this, event)">Handicap Asiático (Main Spread)</div>
                                     <label class="multiselect-option-item">
                                         <input type="checkbox" value="ah_home" onchange="onMarketSelectionChange()"> AH Casa
                                     </label>
@@ -141,7 +151,7 @@
                                         <input type="checkbox" value="ah_away" onchange="onMarketSelectionChange()"> AH Fora
                                     </label>
 
-                                    <div class="multiselect-optgroup">Placar Exato</div>
+                                    <div class="multiselect-optgroup" onclick="toggleGroup(this, event)">Placar Exato</div>
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="cs_10"/> Placar Exato 1-0
                                     </label>
@@ -166,7 +176,7 @@
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="cs_12"/> Placar Exato 1-2
                                     </label>
-<div class="multiselect-optgroup">Lay Placar Exato</div>
+<div class="multiselect-optgroup" onclick="toggleGroup(this, event)">Lay Placar Exato</div>
 <label class="multiselect-option-item">
 <input onchange="onMarketSelectionChange()" type="checkbox" value="lay_cs_10"/> Lay Placar 1-0
                                     </label>
@@ -238,8 +248,9 @@
 <option value="proportional">Proporcional (%)</option>
 <option value="kelly">Full Kelly Criterion</option>
 <option value="kelly_half">Kelly Criterion (1/2)</option>
-<option value="kelly_quarter">Kelly Criterion (1/4)</option>
+<option value="kelly_quarter" selected>Kelly Criterion (1/4)</option>
 <option value="kelly_eighth">Kelly Criterion (1/8)</option>
+                            <option value="kelly_sixteenth">Kelly Criterion (1/16)</option>
 </select>
 </div>
 </div>
@@ -403,21 +414,27 @@
         </div>
         
         <div class="glassmorphism" style="margin-top: 20px; padding: 20px;">
-            <h4 style="color: var(--primary); margin-bottom: 15px; font-size: 15px;"><i class="fa-solid fa-book-open"></i> Como utilizar o Smart Money (Dropping Odds)</h4>
+            <h4 style="color: var(--primary); margin-bottom: 15px; font-size: 15px;"><i class="fa-solid fa-book-open"></i> Guia Prático: Como Apostar no Dia a Dia com o Radar</h4>
             
             <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; display: flex; flex-direction: column; gap: 15px;">
-                <p>O <strong>Smart Money</strong> detecta quando grandes volumes de dinheiro institucional (sindicatos asiáticos, robôs ou apostadores profissionais) entram de forma agressiva em uma aposta, forçando as casas a "esmagarem" (derrubarem) a cotação rapidamente para se protegerem do prejuízo.</p>
+                <p>O Radar te mostra <strong>exatamente onde o dinheiro pesado (sindicatos asiáticos e robôs) está entrando</strong>. Veja como lucrar com isso hoje:</p>
                 
                 <div style="background: rgba(255,255,255,0.03); border-left: 3px solid #10b981; padding: 12px; border-radius: 4px;">
-                    <strong style="color: #10b981;">Estratégia 1: Seguir o Dinheiro (A Favor da Queda)</strong><br>
-                    Aposte na mesma seleção que sofreu a queda brusca. Tente encontrar casas de apostas "desatentas" (soft bookmakers) que ainda não perceberam o movimento global e ainda não derrubaram a odd.<br>
-                    <em>Exemplo:</em> O scanner aponta que a odd de Vitória do Flamengo despencou de <strong>@2.20</strong> para <strong>@1.60</strong> no mercado asiático. Você corre na sua casa de apostas local (que está atrasada) e consegue pegar o Flamengo ainda a <strong>@2.10</strong>. Você acaba de comprar uma aposta de extremo valor (EV+)!
+                    <strong style="color: #10b981; font-size: 14px;"><i class="fa-solid fa-1"></i> Identifique o Jogo e o Mercado</strong><br>
+                    Na tabela abaixo ou no Telegram, veja a coluna <strong>NICHO</strong>. Exemplo: <code>BRA > Home</code> significa Campeonato Brasileiro, apostando na <strong>Vitória do Mandante</strong>.<br>
+                    Se o radar apitou, significa que a odd desse mandante <strong>despencou no mercado global</strong>.
                 </div>
 
-                <div style="background: rgba(255,255,255,0.03); border-left: 3px solid #ef4444; padding: 12px; border-radius: 4px;">
-                    <strong style="color: #ef4444;">Estratégia 2: Contra a Manada (Lay the Public)</strong><br>
-                    Quando uma odd cai exageradamente devido a um "hype" (overreaction), a odd do time adversário sobe proporcionalmente. Se a queda for injustificada por emoção do público, a odd adversária fica hiper-inflada.<br>
-                    <em>Exemplo:</em> O Brasil vai jogar e a massa aposta cegamente na seleção. A odd do Brasil derrete de <strong>@1.40</strong> para <strong>@1.15</strong>, enquanto a odd do adversário explode de <strong>@6.00</strong> para <strong>@11.00</strong>. Ao apostar no Handicap Positivo do adversário, você lucra no longo prazo contra o "dinheiro burro" do mercado.
+                <div style="background: rgba(255,255,255,0.03); border-left: 3px solid var(--warning); padding: 12px; border-radius: 4px;">
+                    <strong style="color: var(--warning); font-size: 14px;"><i class="fa-solid fa-2"></i> Pegue as "Casas Atrasadas" (Aposta de Extremo Valor)</strong><br>
+                    O dinheiro derrubou a odd no mundo todo, mas casas de apostas comuns (Bet365, Betano, Betfair) <strong>demoram alguns minutos</strong> para atualizar e perceber a queda.<br>
+                    <em>Na prática:</em> Se o radar avisa que a odd de um time despencou globalmente de @2.20 para @1.60, você <strong>corre imediatamente na sua casa de apostas</strong>. Se lá ainda estiver pagando @2.00 ou @2.10, você faz a aposta! Você acabou de comprar uma cotação muito maior do que o mercado diz que ela vale.
+                </div>
+
+                <div style="background: rgba(255,255,255,0.03); border-left: 3px solid var(--primary); padding: 12px; border-radius: 4px;">
+                    <strong style="color: var(--primary); font-size: 14px;"><i class="fa-solid fa-3"></i> Valide com o Histórico (ROI)</strong><br>
+                    Não aposte em qualquer queda às cegas. A tabela abaixo te mostra o histórico!<br>
+                    <em>O Pulo do Gato:</em> Olhe para as colunas <strong>Taxa de Acerto</strong> e <strong>ROI</strong>. Prefira fazer a sua aposta apenas nos alertas que pertencem a nichos que estão com ROI <strong>Verde e Positivo</strong>. Eles comprovam que seguir aquela queda dá lucro a longo prazo.
                 </div>
             </div>
         </div>
@@ -1358,6 +1375,13 @@
 <label for="tg-scheduler-enabled" style="cursor: pointer; margin-bottom: 0;">Ativar Robô Automático</label>
 </div>
 <div class="form-group" style="margin-bottom: 10px;">
+<label for="select-tg-scheduler-mode">Modo de Operação</label>
+<select id="select-tg-scheduler-mode" style="background-color: rgba(10, 11, 16, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 6px 10px; font-size: 12px; outline: none; cursor: pointer; height: 32px;">
+    <option value="manual">Modo Manual (Filtros Lateral)</option>
+    <option value="autopilot">Piloto Automático (Histórico)</option>
+</select>
+</div>
+<div class="form-group" style="margin-bottom: 10px;">
 <label for="tg-scheduler-interval">Frequência Varredura (Horas)</label>
 <input id="tg-scheduler-interval" max="24" min="1" style="padding: 6px 10px;" type="number" value="6"/>
 </div>
@@ -1387,7 +1411,11 @@
 <p>Partidas agendadas para as próximas rodadas. Dicas (+EV) são detectadas e sinalizadas em tempo real baseado no mercado ativo.</p>
 </div>
 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-<select id="select-upcoming-source" style="background-color: rgba(10, 11, 16, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 8px 12px; font-size: 12px; outline: none; cursor: pointer; height: 38px; flex-shrink: 0;">
+                            <select id="select-operation-mode" style="background-color: rgba(10, 11, 16, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 8px 12px; font-size: 12px; outline: none; cursor: pointer; height: 38px; flex-shrink: 0; min-width: 150px;">
+                                <option value="manual">Modo Manual (Barra Lateral)</option>
+                                <option value="autopilot">Modo Piloto Automático (Histórico)</option>
+                            </select>
+                            <select id="select-upcoming-source" style="background-color: rgba(10, 11, 16, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 8px 12px; font-size: 12px; outline: none; cursor: pointer; height: 38px; flex-shrink: 0;">
 <option value="api">API DataFootball (Hoje)</option>
 <option value="csv">Football-Data CSV (Rodada)</option>
 </select>
@@ -1778,6 +1806,42 @@
         </div>
     </div>
 
-<script src="app.js?v=19"></script>
+<script src="app.js?v=22"></script>
+
+<script>
+window.toggleGroup = function(groupEl, event) {
+    if (event) {
+        event.stopPropagation();
+        if (event.stopImmediatePropagation) {
+            event.stopImmediatePropagation();
+        }
+    }
+    
+    let checkboxes = [];
+    let el = groupEl.nextElementSibling;
+    while (el && !el.classList.contains('multiselect-optgroup')) {
+        if (el.tagName === 'LABEL' || el.classList.contains('multiselect-option-item')) {
+            const cb = el.querySelector('input[type="checkbox"]');
+            if (cb) checkboxes.push(cb);
+        }
+        el = el.nextElementSibling;
+    }
+    
+    if (checkboxes.length > 0) {
+        const allChecked = checkboxes.every(cb => cb.checked);
+        checkboxes.forEach(cb => { 
+            cb.checked = !allChecked;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        
+        if (typeof onMarketSelectionChange === 'function') {
+            onMarketSelectionChange();
+        }
+        
+        groupEl.style.color = '#10b981';
+        setTimeout(() => { groupEl.style.color = ''; }, 500);
+    }
+};
+</script>
 </body>
 </html>
