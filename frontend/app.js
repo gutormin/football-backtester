@@ -20,7 +20,7 @@ let lastBacktestSummary = null;
 
 let lastBacktestParams = null;
 
-
+let appliedOptimizationSuggestions = new Set(); // Track applied suggestions to prevent re-rendering
 
 const API_BASE_URL = window.location.origin;
 window.currentDataSource = 'footballdata';
@@ -2508,9 +2508,9 @@ function renderChecklist(aiAnalysis, results) {
 
 function displayOptimizationSuggestions(suggestions) {
 
-    const optPanel = document.getElementById('ai-optimization-panel');
-
     const suggestionsContainer = document.getElementById('ai-optimization-suggestions');
+
+    const optPanel = document.getElementById('ai-optimization-panel');
 
     
 
@@ -2524,7 +2524,23 @@ function displayOptimizationSuggestions(suggestions) {
 
     
 
-    if (!suggestions || suggestions.length === 0) {
+    // Filter out already applied suggestions
+
+    const filteredSuggestions = (suggestions || []).filter(sug => {
+
+        if (sug.type === 'odds_warning' && appliedOptimizationSuggestions.has(sug.value)) return false;
+
+        if (sug.type === 'ev' && appliedOptimizationSuggestions.has(`ev_${sug.value}`)) return false;
+
+        if (sug.type === 'leagues' && appliedOptimizationSuggestions.has(`leagues_${JSON.stringify(sug.exclude_codes)}`)) return false;
+
+        return true;
+
+    });
+
+    
+
+    if (!filteredSuggestions || filteredSuggestions.length === 0) {
 
         suggestionsContainer.innerHTML = `
 
@@ -2544,7 +2560,7 @@ function displayOptimizationSuggestions(suggestions) {
 
     
 
-    suggestions.forEach((sug) => {
+    filteredSuggestions.forEach((sug) => {
 
         const div = document.createElement('div');
 
@@ -2768,29 +2784,41 @@ function displayOptimizationSuggestions(suggestions) {
 
 
 
-function applyEvSuggestion(value) {
+function applyEvSuggestion(val) {
 
-    document.getElementById('val-threshold').value = value;
+    const evInput = document.getElementById('val-threshold');
 
-    showToast(`Gatilho EV atualizado para ${value}. Rodando simulação otimizada...`, "success");
+    if (evInput) {
 
-    runBacktest();
+        evInput.value = val;
+
+        showToast(`Gatilho EV atualizado para ${val}. Rodando nova simulação...`, "success");
+
+        appliedOptimizationSuggestions.add(`ev_${val}`);
+
+        runBacktest();
+
+    }
 
 }
 
 
 
-function applyLeagueSuggestion(excludeCodes) {
+function applyLeagueSuggestion(codes) {
 
-    excludeCodes.forEach(code => {
+    codes.forEach(code => {
 
-        const cb = document.getElementById(`league-${code}`);
+        const cb = document.getElementById(`league-${code}`) || document.querySelector(`input[value="${code}"]`);
 
         if (cb) cb.checked = false;
 
     });
 
-    showToast(`Ligas deficitárias desmarcadas. Rodando simulação otimizada...`, "success");
+    
+
+    showToast(`Ligas problemáticas removidas. Reexecutando backtest...`, "success");
+
+    appliedOptimizationSuggestions.add(`leagues_${JSON.stringify(codes)}`);
 
     runBacktest();
 
@@ -2875,6 +2903,7 @@ function applyOddsSuggestion(rangeName) {
         }
         
         showToast(`Filtro avançado de odds otimizado. Rodando simulação...`, "success");
+        appliedOptimizationSuggestions.add(rangeName);
         runBacktest();
         return;
     }
