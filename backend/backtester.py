@@ -1862,6 +1862,34 @@ class ChronologicalBacktester:
             
             lambda_goals_home = avg_h_goals * h_att * a_def
             lambda_goals_away = avg_a_goals * a_att * h_def
+            
+            # HT Goals lambda
+            h_scored_ht = team_home_scored_ht[home_team][-self.rolling_games:]
+            h_conceded_ht = team_home_conceded_ht[home_team][-self.rolling_games:]
+            a_scored_ht = team_away_scored_ht[away_team][-self.rolling_games:]
+            a_conceded_ht = team_away_conceded_ht[away_team][-self.rolling_games:]
+            
+            leg_h_goals_ht = league_home_goals_ht[league_code][-100:]
+            leg_a_goals_ht = league_away_goals_ht[league_code][-100:]
+            
+            avg_h_goals_ht = np.mean(leg_h_goals_ht) if leg_h_goals_ht else (avg_h_goals * 0.45)
+            avg_a_goals_ht = np.mean(leg_a_goals_ht) if leg_a_goals_ht else (avg_a_goals * 0.45)
+            
+            if avg_h_goals_ht == 0: avg_h_goals_ht = 0.6
+            if avg_a_goals_ht == 0: avg_a_goals_ht = 0.45
+            
+            h_att_ht = (weighted_mean(h_scored_ht, 0.06) / avg_h_goals_ht) if h_scored_ht else 1.0
+            h_def_ht = (weighted_mean(h_conceded_ht, 0.06) / avg_a_goals_ht) if h_conceded_ht else 1.0
+            a_att_ht = (weighted_mean(a_scored_ht, 0.06) / avg_a_goals_ht) if a_scored_ht else 1.0
+            a_def_ht = (weighted_mean(a_conceded_ht, 0.06) / avg_h_goals_ht) if a_conceded_ht else 1.0
+            
+            h_att_ht = 1.0 if pd.isna(h_att_ht) else max(0.2, min(4.0, h_att_ht))
+            h_def_ht = 1.0 if pd.isna(h_def_ht) else max(0.2, min(4.0, h_def_ht))
+            a_att_ht = 1.0 if pd.isna(a_att_ht) else max(0.2, min(4.0, a_att_ht))
+            a_def_ht = 1.0 if pd.isna(a_def_ht) else max(0.2, min(4.0, a_def_ht))
+            
+            lambda_home_ht = avg_h_goals_ht * h_att_ht * a_def_ht
+            lambda_away_ht = avg_a_goals_ht * a_att_ht * h_def_ht
             lambda_home = lambda_goals_home
             lambda_away = lambda_goals_away
             
