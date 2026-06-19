@@ -276,12 +276,20 @@ class ChronologicalBacktester:
                 odds_a = row.get('B365A')
                 odds_over25 = row.get('B365>2.5')
                 odds_under25 = row.get('B365<2.5')
+                odds_over05_ht = row.get('B365>0.5HT')
+                odds_under05_ht = row.get('B365<0.5HT')
+                odds_over15_ht = row.get('B365>1.5HT')
+                odds_under15_ht = row.get('B365<1.5HT')
             elif odds_source == 'Avg':
                 odds_h = row.get('AvgH')
                 odds_d = row.get('AvgD')
                 odds_a = row.get('AvgA')
                 odds_over25 = row.get('Avg>2.5')
                 odds_under25 = row.get('Avg<2.5')
+                odds_over05_ht = row.get('B365>0.5HT')
+                odds_under05_ht = row.get('B365<0.5HT')
+                odds_over15_ht = row.get('B365>1.5HT')
+                odds_under15_ht = row.get('B365<1.5HT')
             else: # Max
                 odds_h = row.get('MaxH')
                 odds_d = row.get('MaxD')
@@ -626,27 +634,39 @@ class ChronologicalBacktester:
                     bet_won = (hthg < htag)
                     market_label = "HT Away"
                 elif mkt == 'ht_over05':
-                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if odds_over05_ht is not None and not pd.isna(odds_over05_ht) and odds_over05_ht > 1.0:
+                        bookie_odds = odds_over05_ht
+                    else:
+                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        bookie_odds = est_odds['bookie_ht_over05']
                     model_prob = prob_over_05_ht
-                    bookie_odds = est_odds['bookie_ht_over05']
                     bet_won = (hthg + htag > 0)
                     market_label = "HT Over 0.5"
                 elif mkt == 'ht_under05':
-                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if odds_under05_ht is not None and not pd.isna(odds_under05_ht) and odds_under05_ht > 1.0:
+                        bookie_odds = odds_under05_ht
+                    else:
+                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        bookie_odds = est_odds['bookie_ht_under05']
                     model_prob = 1.0 - prob_over_05_ht
-                    bookie_odds = est_odds['bookie_ht_under05']
                     bet_won = (hthg + htag == 0)
                     market_label = "HT Under 0.5"
                 elif mkt == 'ht_over15':
-                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if odds_over15_ht is not None and not pd.isna(odds_over15_ht) and odds_over15_ht > 1.0:
+                        bookie_odds = odds_over15_ht
+                    else:
+                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        bookie_odds = est_odds['bookie_ht_over15']
                     model_prob = prob_over_15_ht
-                    bookie_odds = est_odds['bookie_ht_over15']
                     bet_won = (hthg + htag > 1)
                     market_label = "HT Over 1.5"
                 elif mkt == 'ht_under15':
-                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if odds_under15_ht is not None and not pd.isna(odds_under15_ht) and odds_under15_ht > 1.0:
+                        bookie_odds = odds_under15_ht
+                    else:
+                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        bookie_odds = est_odds['bookie_ht_under15']
                     model_prob = 1.0 - prob_over_15_ht
-                    bookie_odds = est_odds['bookie_ht_under15']
                     bet_won = (hthg + htag <= 1)
                     market_label = "HT Under 1.5"
                 elif mkt == 'over15':
@@ -1820,6 +1840,10 @@ class ChronologicalBacktester:
             
             odds_over25 = row.get('B365>2.5') if odds_source == 'B365' else (row.get('Avg>2.5') if odds_source == 'Avg' else row.get('Max>2.5'))
             odds_under25 = row.get('B365<2.5') if odds_source == 'B365' else (row.get('Avg<2.5') if odds_source == 'Avg' else row.get('Max<2.5'))
+            odds_over05_ht = row.get('B365>0.5HT')
+            odds_under05_ht = row.get('B365<0.5HT')
+            odds_over15_ht = row.get('B365>1.5HT')
+            odds_under15_ht = row.get('B365<1.5HT')
             
             # Asian Handicap (Main Spread)
             ahh_line = row.get('AHh')
@@ -2097,28 +2121,40 @@ class ChronologicalBacktester:
                     bookie_odds = est_odds['bookie_ht_away']
                     bet_won = (hthg < htag)
                 elif mkt == 'ht_over05':
-                    if est_odds is None:
-                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if odds_over05_ht is not None and not pd.isna(odds_over05_ht) and odds_over05_ht > 1.0:
+                        bookie_odds = odds_over05_ht
+                    else:
+                        if est_odds is None:
+                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        bookie_odds = est_odds['bookie_ht_over05']
                     model_prob = prob_over_05_ht
-                    bookie_odds = est_odds['bookie_ht_over05']
                     bet_won = (hthg + htag > 0)
                 elif mkt == 'ht_under05':
-                    if est_odds is None:
-                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if odds_under05_ht is not None and not pd.isna(odds_under05_ht) and odds_under05_ht > 1.0:
+                        bookie_odds = odds_under05_ht
+                    else:
+                        if est_odds is None:
+                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        bookie_odds = est_odds['bookie_ht_under05']
                     model_prob = 1.0 - prob_over_05_ht
-                    bookie_odds = est_odds['bookie_ht_under05']
                     bet_won = (hthg + htag == 0)
                 elif mkt == 'ht_over15':
-                    if est_odds is None:
-                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if odds_over15_ht is not None and not pd.isna(odds_over15_ht) and odds_over15_ht > 1.0:
+                        bookie_odds = odds_over15_ht
+                    else:
+                        if est_odds is None:
+                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        bookie_odds = est_odds['bookie_ht_over15']
                     model_prob = prob_over_15_ht
-                    bookie_odds = est_odds['bookie_ht_over15']
                     bet_won = (hthg + htag > 1)
                 elif mkt == 'ht_under15':
-                    if est_odds is None:
-                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if odds_under15_ht is not None and not pd.isna(odds_under15_ht) and odds_under15_ht > 1.0:
+                        bookie_odds = odds_under15_ht
+                    else:
+                        if est_odds is None:
+                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        bookie_odds = est_odds['bookie_ht_under15']
                     model_prob = 1.0 - prob_over_15_ht
-                    bookie_odds = est_odds['bookie_ht_under15']
                     bet_won = (hthg + htag <= 1)
                 elif mkt == 'ah_home':
                     if ahh_line is None or pd.isna(ahh_line): return None
