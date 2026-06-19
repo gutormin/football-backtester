@@ -608,38 +608,45 @@ class ChronologicalBacktester:
                     bet_won = (fthg + ftag < 3)
                     market_label = "Under 2.5"
                 elif mkt == 'ht_home':
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_h_ht
-                    bookie_odds = 1.0 / (prob_h_ht + 0.035) if (prob_h_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_home']
                     bet_won = (hthg > htag)
-                    market_label = "HT Mandante"
+                    market_label = "HT Home"
                 elif mkt == 'ht_draw':
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_d_ht
-                    bookie_odds = 1.0 / (prob_d_ht + 0.035) if (prob_d_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_draw']
                     bet_won = (hthg == htag)
-                    market_label = "HT Empate"
+                    market_label = "HT Draw"
                 elif mkt == 'ht_away':
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_a_ht
-                    bookie_odds = 1.0 / (prob_a_ht + 0.035) if (prob_a_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_away']
                     bet_won = (hthg < htag)
-                    market_label = "HT Visitante"
+                    market_label = "HT Away"
                 elif mkt == 'ht_over05':
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_over_05_ht
-                    bookie_odds = 1.0 / (prob_over_05_ht + 0.035) if (prob_over_05_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_over05']
                     bet_won = (hthg + htag > 0)
                     market_label = "HT Over 0.5"
                 elif mkt == 'ht_under05':
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = 1.0 - prob_over_05_ht
-                    bookie_odds = 1.0 / ((1.0 - prob_over_05_ht) + 0.035) if ((1.0 - prob_over_05_ht) + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_under05']
                     bet_won = (hthg + htag == 0)
                     market_label = "HT Under 0.5"
                 elif mkt == 'ht_over15':
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_over_15_ht
-                    bookie_odds = 1.0 / (prob_over_15_ht + 0.035) if (prob_over_15_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_over15']
                     bet_won = (hthg + htag > 1)
                     market_label = "HT Over 1.5"
                 elif mkt == 'ht_under15':
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = 1.0 - prob_over_15_ht
-                    bookie_odds = 1.0 / ((1.0 - prob_over_15_ht) + 0.035) if ((1.0 - prob_over_15_ht) + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_under15']
                     bet_won = (hthg + htag <= 1)
                     market_label = "HT Under 1.5"
                 elif mkt == 'over15':
@@ -2072,32 +2079,46 @@ class ChronologicalBacktester:
                     bookie_odds = odds_under25
                     bet_won = (fthg + ftag < 3)
                 elif mkt == 'ht_home':
+                    if est_odds is None:
+                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_h_ht
-                    bookie_odds = 1.0 / (prob_h_ht + 0.035) if (prob_h_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_home']
                     bet_won = (hthg > htag)
                 elif mkt == 'ht_draw':
+                    if est_odds is None:
+                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_d_ht
-                    bookie_odds = 1.0 / (prob_d_ht + 0.035) if (prob_d_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_draw']
                     bet_won = (hthg == htag)
                 elif mkt == 'ht_away':
+                    if est_odds is None:
+                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_a_ht
-                    bookie_odds = 1.0 / (prob_a_ht + 0.035) if (prob_a_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_away']
                     bet_won = (hthg < htag)
                 elif mkt == 'ht_over05':
+                    if est_odds is None:
+                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_over_05_ht
-                    bookie_odds = 1.0 / (prob_over_05_ht + 0.035) if (prob_over_05_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_over05']
                     bet_won = (hthg + htag > 0)
                 elif mkt == 'ht_under05':
+                    if est_odds is None:
+                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = 1.0 - prob_over_05_ht
-                    bookie_odds = 1.0 / ((1.0 - prob_over_05_ht) + 0.035) if ((1.0 - prob_over_05_ht) + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_under05']
                     bet_won = (hthg + htag == 0)
                 elif mkt == 'ht_over15':
+                    if est_odds is None:
+                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_over_15_ht
-                    bookie_odds = 1.0 / (prob_over_15_ht + 0.035) if (prob_over_15_ht + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_over15']
                     bet_won = (hthg + htag > 1)
                 elif mkt == 'ht_under15':
+                    if est_odds is None:
+                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = 1.0 - prob_over_15_ht
-                    bookie_odds = 1.0 / ((1.0 - prob_over_15_ht) + 0.035) if ((1.0 - prob_over_15_ht) + 0.035) > 0 else 1.01
+                    bookie_odds = est_odds['bookie_ht_under15']
                     bet_won = (hthg + htag <= 1)
                 elif mkt == 'ah_home':
                     if ahh_line is None or pd.isna(ahh_line): return None

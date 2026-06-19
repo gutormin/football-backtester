@@ -464,7 +464,10 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
             'bookie_btts_yes': np.nan, 'bookie_btts_no': np.nan,
             'bookie_cs_10': np.nan, 'bookie_cs_20': np.nan, 'bookie_cs_21': np.nan,
             'bookie_cs_00': np.nan, 'bookie_cs_11': np.nan, 'bookie_cs_01': np.nan,
-            'bookie_cs_02': np.nan, 'bookie_cs_12': np.nan
+            'bookie_cs_02': np.nan, 'bookie_cs_12': np.nan,
+            'bookie_ht_home': np.nan, 'bookie_ht_draw': np.nan, 'bookie_ht_away': np.nan,
+            'bookie_ht_over05': np.nan, 'bookie_ht_under05': np.nan,
+            'bookie_ht_over15': np.nan, 'bookie_ht_under15': np.nan
         }
         
     # 2. Calculate bookmaker's implied probabilities (with margin/juice included)
@@ -546,6 +549,39 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
     fair_cs_02 = float(bk_matrix[0, 2])
     fair_cs_12 = float(bk_matrix[1, 2])
     
+    # HT probabilities for bookie
+    lambda_home_bookie_ht = lambda_home_bookie * 0.45
+    lambda_away_bookie_ht = lambda_away_bookie * 0.45
+    
+    home_probs_bk_ht = [math.exp(-lambda_home_bookie_ht) * (lambda_home_bookie_ht**i) / math.factorial(i) for i in range(max_g + 1)]
+    away_probs_bk_ht = [math.exp(-lambda_away_bookie_ht) * (lambda_away_bookie_ht**i) / math.factorial(i) for i in range(max_g + 1)]
+    bk_matrix_ht = np.outer(home_probs_bk_ht, away_probs_bk_ht)
+    
+    tau_00_ht = 1.0 - lambda_home_bookie_ht * lambda_away_bookie_ht * rho
+    tau_10_ht = 1.0 + lambda_away_bookie_ht * rho
+    tau_01_ht = 1.0 + lambda_home_bookie_ht * rho
+    tau_11_ht = 1.0 - rho
+    bk_matrix_ht[0, 0] *= max(0.0, tau_00_ht)
+    bk_matrix_ht[1, 0] *= max(0.0, tau_10_ht)
+    bk_matrix_ht[0, 1] *= max(0.0, tau_01_ht)
+    bk_matrix_ht[1, 1] *= max(0.0, tau_11_ht)
+    
+    bk_sum_ht = np.sum(bk_matrix_ht)
+    if bk_sum_ht > 0:
+        bk_matrix_ht = bk_matrix_ht / bk_sum_ht
+        
+    fair_ht_home = float(np.sum(np.tril(bk_matrix_ht, -1)))
+    fair_ht_draw = float(np.sum(np.diag(bk_matrix_ht)))
+    fair_ht_away = float(np.sum(np.triu(bk_matrix_ht, 1)))
+    fair_ht_over05 = 1.0 - float(bk_matrix_ht[0, 0])
+    fair_ht_under05 = float(bk_matrix_ht[0, 0])
+    
+    fair_ht_over15 = 0.0
+    for x in range(max_g + 1):
+        for y in range(max_g + 1):
+            if x + y > 1: fair_ht_over15 += bk_matrix_ht[x, y]
+    fair_ht_under15 = 1.0 - fair_ht_over15
+    
     # 6. Apply juice and return bookmaker odds
     def apply_juice(prob):
         if prob <= 0.001: return 99.0
@@ -570,5 +606,12 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
         'bookie_cs_11': apply_juice(fair_cs_11),
         'bookie_cs_01': apply_juice(fair_cs_01),
         'bookie_cs_02': apply_juice(fair_cs_02),
-        'bookie_cs_12': apply_juice(fair_cs_12)
+        'bookie_cs_12': apply_juice(fair_cs_12),
+        'bookie_ht_home': apply_juice(fair_ht_home),
+        'bookie_ht_draw': apply_juice(fair_ht_draw),
+        'bookie_ht_away': apply_juice(fair_ht_away),
+        'bookie_ht_over05': apply_juice(fair_ht_over05),
+        'bookie_ht_under05': apply_juice(fair_ht_under05),
+        'bookie_ht_over15': apply_juice(fair_ht_over15),
+        'bookie_ht_under15': apply_juice(fair_ht_under15)
     }
