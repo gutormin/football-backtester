@@ -2120,12 +2120,15 @@ class ChronologicalBacktester:
                     if x + y > 1: prob_over_15_ht += prob_matrix_ht[x, y]
             
             est_odds = None
-            
             def eval_market(mkt):
                 nonlocal est_odds
                 model_prob = 0.0
                 bookie_odds = np.nan
                 bet_won = False
+                
+                # Check for missing HT data for HT markets
+                if mkt.startswith('ht_') and (pd.isna(hthg) or pd.isna(htag)):
+                    return None
                 
                 if mkt in ('home', '1x2_home'):
                     model_prob = prob_h

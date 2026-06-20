@@ -770,24 +770,38 @@ def fetch_futpython_data(league_code, start_date, api_key):
                             df[col] = pd.to_numeric(df[col], errors='ignore')
                             
                 # Derive HTHG and HTAG from Min_Goals_Home and Min_Goals_Away if they exist
-                def parse_ht_goals(s):
-                    if pd.isna(s) or not str(s).strip() or str(s).strip() == '[]': return 0
+                import numpy as np
+                def parse_ht_goals_robust(row, min_col, ft_col):
+                    s_min = row.get(min_col)
+                    ft_val = row.get(ft_col, '0')
+                    try:
+                        ft_goals = int(float(str(ft_val).strip() or 0))
+                    except:
+                        ft_goals = 0
+
+                    if pd.isna(s_min) or not str(s_min).strip() or str(s_min).strip() == '[]':
+                        if ft_goals > 0:
+                            return np.nan
+                        return 0
+                        
                     import ast
                     goals = 0
                     try:
-                        lst = ast.literal_eval(str(s))
+                        lst = ast.literal_eval(str(s_min))
+                        if len(lst) != ft_goals:
+                            return np.nan
                         for m in lst:
                             m_str = str(m).split('+')[0].strip()
                             if m_str.isdigit() and int(m_str) <= 45:
                                 goals += 1
                     except:
-                        pass
+                        return np.nan
                     return goals
 
-                if 'Min_Goals_Home' in df.columns:
-                    df['HTHG'] = df['Min_Goals_Home'].apply(parse_ht_goals)
-                if 'Min_Goals_Away' in df.columns:
-                    df['HTAG'] = df['Min_Goals_Away'].apply(parse_ht_goals)
+                if 'Min_Goals_Home' in df.columns and 'FTHG' in df.columns:
+                    df['HTHG'] = df.apply(lambda r: parse_ht_goals_robust(r, 'Min_Goals_Home', 'FTHG'), axis=1)
+                if 'Min_Goals_Away' in df.columns and 'FTAG' in df.columns:
+                    df['HTAG'] = df.apply(lambda r: parse_ht_goals_robust(r, 'Min_Goals_Away', 'FTAG'), axis=1)
 
                 dataframes.append(df)
             elif res.status_code == 401:
