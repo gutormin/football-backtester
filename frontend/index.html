@@ -580,6 +580,38 @@
                         </div>
                     </div>
                 </div>
+                
+                <div style="margin-top: 20px; background: rgba(0,0,0,0.15); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                    <div style="padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="document.getElementById('ai-alerts-guide').style.display = document.getElementById('ai-alerts-guide').style.display === 'none' ? 'block' : 'none';">
+                        <strong style="color: var(--text-primary);"><i class="fa-solid fa-book-open" style="color: #3b82f6; margin-right: 8px;"></i> Guia Prático: Como funciona cada Alerta?</strong>
+                        <i class="fa-solid fa-chevron-down text-muted"></i>
+                    </div>
+                    <div id="ai-alerts-guide" style="display: none; padding: 20px;">
+                        <div style="margin-bottom: 20px;">
+                            <h5 style="color: #10b981; margin: 0 0 5px 0;"><i class="fa-solid fa-check-double"></i> Edge Puro-Sangue</h5>
+                            <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 10px 0;"><strong>Como funciona:</strong> A Inteligência Artificial valida uma oportunidade do Scanner conferindo se ela respeita o "DNA" histórico daquela liga no Cluster. Só envia o alerta se o EV+ (Valor Esperado) for garantido acima de 5%.</p>
+                            <div style="background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 4px; border-left: 3px solid #10b981; font-size: 12px; color: #d1d5db;">
+                                <strong>Exemplo:</strong> O scanner encontra 65% de chance de dar <i>Under 2.5</i> no jogo Palermo vs Brescia (Série B Italiana). A IA confere o Cluster e vê que a Série B Italiana é uma <i>Liga Truncada (Under)</i>. Match perfeito! Ela te manda no Telegram: <i>"Sinal Puro-Sangue: Apostar no Under 2.5. Odd Mínima Justa: @1.61"</i>. Você entra na casa de apostas, se a odd estiver @1.61 ou maior, você aposta.
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <h5 style="color: #ef4444; margin: 0 0 5px 0;"><i class="fa-solid fa-triangle-exclamation"></i> Anomalia de Odds (Contrarian)</h5>
+                            <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 10px 0;"><strong>Como funciona:</strong> A IA monitora se alguma Casa de Apostas "enlouqueceu" e está oferecendo odds que contradizem a matemática pura do grupo que aquela liga pertence.</p>
+                            <div style="background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 4px; border-left: 3px solid #ef4444; font-size: 12px; color: #d1d5db;">
+                                <strong>Exemplo:</strong> A Bundesliga Alemã pertence ao Cluster de <i>Ligas de Gols (Over)</i>. Porém, o robô percebe que a casa de aposta está oferecendo Odd @2.10 para o <i>Over 2.5</i> no jogo do Bayern. A IA grita no Telegram: <i>"Anomalia Encontrada! A casa está subestimando o ataque. Aposte no Over 2.5!"</i>.
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h5 style="color: #f59e0b; margin: 0 0 5px 0;"><i class="fa-solid fa-code-branch"></i> Mudança Sazonal (DNA Shift)</h5>
+                            <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 10px 0;"><strong>Como funciona:</strong> Todo mês a IA re-avalia o perfil de todas as ligas do mundo. Se uma liga repentinamente mudar o seu comportamento padrão, a IA te avisa para você "surfar" a onda antes das casas de aposta ajustarem os preços.</p>
+                            <div style="background: rgba(245, 158, 11, 0.1); padding: 10px; border-radius: 4px; border-left: 3px solid #f59e0b; font-size: 12px; color: #d1d5db;">
+                                <strong>Exemplo:</strong> A Primeira Liga de Portugal historicamente era <i>Ligas Equilibradas</i>. Neste semestre, os times retrancaram e a liga caiu no Cluster <i>Ligas Truncadas (Under)</i>. A IA te avisa: <i>"Mudança de Comportamento! Portugal agora é uma liga defensiva. Foque o scanner em mercados Under 2.5!"</i>.
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
