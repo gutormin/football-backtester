@@ -769,6 +769,26 @@ def fetch_futpython_data(league_code, start_date, api_key):
                             df[col] = df[col].astype(str).str.replace(',', '.')
                             df[col] = pd.to_numeric(df[col], errors='ignore')
                             
+                # Derive HTHG and HTAG from Min_Goals_Home and Min_Goals_Away if they exist
+                def parse_ht_goals(s):
+                    if pd.isna(s) or not str(s).strip() or str(s).strip() == '[]': return 0
+                    import ast
+                    goals = 0
+                    try:
+                        lst = ast.literal_eval(str(s))
+                        for m in lst:
+                            m_str = str(m).split('+')[0].strip()
+                            if m_str.isdigit() and int(m_str) <= 45:
+                                goals += 1
+                    except:
+                        pass
+                    return goals
+
+                if 'Min_Goals_Home' in df.columns:
+                    df['HTHG'] = df['Min_Goals_Home'].apply(parse_ht_goals)
+                if 'Min_Goals_Away' in df.columns:
+                    df['HTAG'] = df['Min_Goals_Away'].apply(parse_ht_goals)
+
                 dataframes.append(df)
             elif res.status_code == 401:
                 print("FutPythonTrader API Key inválida.")
