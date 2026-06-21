@@ -67,37 +67,50 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
 
     all_bets = []
 
-    print(f"[Portfolio] Rodando backtests individuais para {len(selected_strategies)} estratégias...")
-    for s in selected_strategies:
-        p = s['params']
-        bt = ChronologicalBacktester()
-        res = bt.run(
-            leagues=p.get('leagues', []),
-            start_date=p.get('startDate', p.get('start_date', '2021-01-01')),
-            end_date=p.get('endDate', p.get('end_date', datetime.today().strftime('%Y-%m-%d'))),
-            market=p.get('market'),
-            value_threshold=p.get('valueThreshold', p.get('value_threshold', 1.05)),
-            initial_bankroll=1000.0,
-            staking_rule='fixed',
-            stake_value=10.0,  # Individual backtest with $10; we recalculate below
-            odds_source=p.get('oddsSource', p.get('odds_source', 'B365')),
-            min_odds=p.get('minOdds', 1.0),
-            max_odds=p.get('maxOdds', 50.0),
-            data_source=p.get('data_source', 'football-data'),
-            use_ml=p.get('use_ml', False),
-            futpython_api_key=p.get('futpython_api_key', ''),
-            min_odds_h=p.get('minOddsH'), max_odds_h=p.get('maxOddsH'),
-            min_odds_d=p.get('minOddsD'), max_odds_d=p.get('maxOddsD'),
-            min_odds_a=p.get('minOddsA'), max_odds_a=p.get('maxOddsA'),
-            min_odds_over25=p.get('minOddsOver25'), max_odds_over25=p.get('maxOddsOver25'),
-            min_odds_under25=p.get('minOddsUnder25'), max_odds_under25=p.get('maxOddsUnder25')
-        )
+    import concurrent.futures
 
-        if "error" not in res and "bets" in res:
-            for b in res['bets']:
-                b['strategy_id'] = s['id']
-                b['strategy_name'] = s['name']
-                all_bets.append(b)
+    print(f"[Portfolio] Rodando backtests individuais para {len(selected_strategies)} estratégias em paralelo...")
+    
+    def process_strategy(s):
+        try:
+            p = s['params']
+            bt = ChronologicalBacktester()
+            res = bt.run(
+                leagues=p.get('leagues', []),
+                start_date=p.get('startDate', p.get('start_date', '2021-01-01')),
+                end_date=p.get('endDate', p.get('end_date', datetime.today().strftime('%Y-%m-%d'))),
+                market=p.get('market'),
+                value_threshold=p.get('valueThreshold', p.get('value_threshold', 1.05)),
+                initial_bankroll=1000.0,
+                staking_rule='fixed',
+                stake_value=10.0,
+                odds_source=p.get('oddsSource', p.get('odds_source', 'B365')),
+                min_odds=p.get('minOdds', 1.0),
+                max_odds=p.get('maxOdds', 50.0),
+                data_source=p.get('data_source', 'football-data'),
+                use_ml=p.get('use_ml', False),
+                futpython_api_key=p.get('futpython_api_key', ''),
+                min_odds_h=p.get('minOddsH'), max_odds_h=p.get('maxOddsH'),
+                min_odds_d=p.get('minOddsD'), max_odds_d=p.get('maxOddsD'),
+                min_odds_a=p.get('minOddsA'), max_odds_a=p.get('maxOddsA'),
+                min_odds_over25=p.get('minOddsOver25'), max_odds_over25=p.get('maxOddsOver25'),
+                min_odds_under25=p.get('minOddsUnder25'), max_odds_under25=p.get('maxOddsUnder25')
+            )
+            local_bets = []
+            if "error" not in res and "bets" in res:
+                for b in res['bets']:
+                    b['strategy_id'] = s['id']
+                    b['strategy_name'] = s['name']
+                    local_bets.append(b)
+            return local_bets
+        except Exception as e:
+            print(f"Error processing strategy {s['id']}: {e}")
+            return []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        results = executor.map(process_strategy, selected_strategies)
+        for bets in results:
+            all_bets.extend(bets)
 
     if not all_bets:
         return {"error": "Nenhuma aposta gerada pelas estratégias selecionadas."}
