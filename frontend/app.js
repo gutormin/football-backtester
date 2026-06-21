@@ -2955,8 +2955,17 @@ function clearDashboard() {
     document.getElementById('metric-final-bankroll').innerText = '$0.00';
 
     document.getElementById('metric-clv').innerText = '0.0%';
-
     document.getElementById('metric-bcl').innerText = '0.0%';
+
+    // Restore standard panels in case Portfolio was run
+    document.getElementById('portfolio-results-panel').style.display = 'none';
+    document.getElementById('standard-metrics-grid').style.display = 'grid';
+    const mainCharts = document.querySelector('.main-charts');
+    if (mainCharts) mainCharts.style.display = 'block';
+    const resultsTableSection = document.querySelector('.results-table-section');
+    if (resultsTableSection) resultsTableSection.style.display = 'block';
+    const chartsGrid = document.querySelector('.charts-grid');
+    if (chartsGrid) chartsGrid.style.display = 'grid';
 
     
 
@@ -8270,85 +8279,13 @@ window.runBacktest = async function() {
                 updateCharts(dates, bankrolls, fixedData, propData, kellyData, leagueStats, monthlyStats, oddsStats, optimizedData);
             }
 
-            if (typeof displayAiAnalysis === 'function') {
-                displayAiAnalysis(data.ai_analysis, data);
+            if (typeof window.renderLaboratoryPanels === 'function') {
+                window.renderLaboratoryPanels(data);
             }
-
-            if (data.ai_analysis && data.ai_analysis.score !== undefined) {
-                const eqsData = {
-                    score: data.ai_analysis.score,
-                    verdict: data.ai_analysis.verdict || 'Avaliando...',
-                    verdict_color: data.ai_analysis.verdict_color || 'warning',
-                    risk_recommendation: data.ai_analysis.risk_recommendation || data.ai_analysis.report || '',
-                    breakdown: data.ai_analysis.breakdown || []
-                };
-                if (typeof renderEdgeQualityScore === 'function') {
-                    renderEdgeQualityScore(eqsData);
-                }
-            }
-
-            if (typeof renderStatValidation === 'function') {
-                renderStatValidation(summary);
-            }
-
-            if (typeof renderOosResults === 'function' && data.ai_analysis) {
-                const oosSum = data.ai_analysis.oos_summary || null;
-                renderOosResults(oosSum, summary);
-            }
-
-            if (typeof renderRiskManagement === 'function') {
-                renderRiskManagement(data);
-            }
-
-            const stakingPanel = document.getElementById('staking-comparison-panel');
-            if (stakingPanel && data.summary_fixed) {
-                stakingPanel.style.display = 'block';
-                const stakingTbody = document.getElementById('staking-comparison-tbody');
-                if (stakingTbody) {
-                    const sf = data.summary_fixed;
-                    const sp = data.summary_proportional;
-                    const sk = data.summary_kelly;
-                    stakingTbody.innerHTML = `
-                        <tr>
-                            <td>Stake Fixa</td>
-                            <td>$${sf.final_bankroll.toFixed(2)}</td>
-                            <td style="color:${sf.net_profit>=0?'var(--success)':'var(--danger)'}">${sf.net_profit>=0?'+':''}$${sf.net_profit.toFixed(2)}</td>
-                            <td>${sf.total_bets}</td>
-                            <td>${sf.win_rate.toFixed(1)}%</td>
-                            <td>${sf.roi.toFixed(2)}%</td>
-                            <td>${sf.max_drawdown.toFixed(2)}%</td>
-                        </tr>
-                        <tr>
-                            <td>Stake Proporcional (2%)</td>
-                            <td>$${sp.final_bankroll.toFixed(2)}</td>
-                            <td style="color:${sp.net_profit>=0?'var(--success)':'var(--danger)'}">${sp.net_profit>=0?'+':''}$${sp.net_profit.toFixed(2)}</td>
-                            <td>${sp.total_bets}</td>
-                            <td>${sp.win_rate.toFixed(1)}%</td>
-                            <td>${sp.roi.toFixed(2)}%</td>
-                            <td>${sp.max_drawdown.toFixed(2)}%</td>
-                        </tr>
-                        <tr>
-                            <td>Kelly Criterion (1/4)</td>
-                            <td>$${sk.final_bankroll.toFixed(2)}</td>
-                            <td style="color:${sk.net_profit>=0?'var(--success)':'var(--danger)'}">${sk.net_profit>=0?'+':''}$${sk.net_profit.toFixed(2)}</td>
-                            <td>${sk.total_bets}</td>
-                            <td>${sk.win_rate.toFixed(1)}%</td>
-                            <td>${sk.roi.toFixed(2)}%</td>
-                            <td>${sk.max_drawdown.toFixed(2)}%</td>
-                        </tr>
-                    `;
-                }
-            }
-
-            if (typeof renderQuartiles === 'function') renderQuartiles(data.quartiles);
 
             if (typeof populateBetsTable === 'function') {
                 allBets = data.bets || [];
                 populateBetsTable(allBets);
-            }
-
-            if (typeof displayPortfolioOptimization === 'function') {
-                displayPortfolioOptimization(data.portfolio_optimization);
             }
 
             if (typeof autoUpdateSchedulerFromBacktest === 'function') {
@@ -8726,6 +8663,93 @@ async function saveClusterAiConfig() {
     }
 }
 
+window.renderLaboratoryPanels = function(data) {
+    const summary = data.summary || {};
+    if(document.getElementById('metric-sharpe')) document.getElementById('metric-sharpe').innerText = (summary.sharpe_ratio || 0).toFixed(2);
+    if(document.getElementById('metric-sortino')) document.getElementById('metric-sortino').innerText = (summary.sortino_ratio || 0).toFixed(2);
+    if(document.getElementById('metric-skewness')) document.getElementById('metric-skewness').innerText = (summary.skewness || 0).toFixed(2);
+    if(document.getElementById('metric-consec-wins')) document.getElementById('metric-consec-wins').innerText = summary.max_consec_wins || 0;
+    if(document.getElementById('metric-consec-losses')) document.getElementById('metric-consec-losses').innerText = summary.max_consec_losses || 0;
+    if(document.getElementById('metric-clv')) document.getElementById('metric-clv').innerText = summary.avg_clv != null ? ((summary.avg_clv >= 0 ? '+' : '') + summary.avg_clv.toFixed(1) + '%') : 'N/A';
+    if(document.getElementById('metric-bcl')) document.getElementById('metric-bcl').innerText = summary.bcl_percent != null ? (summary.bcl_percent.toFixed(1) + '%') : 'N/A';
+
+    if (typeof displayAiAnalysis === 'function') {
+        displayAiAnalysis(data.ai_analysis, data);
+    }
+
+    if (data.ai_analysis && data.ai_analysis.score !== undefined) {
+        const eqsData = {
+            score: data.ai_analysis.score,
+            verdict: data.ai_analysis.verdict || 'Avaliando...',
+            verdict_color: data.ai_analysis.verdict_color || 'warning',
+            risk_recommendation: data.ai_analysis.risk_recommendation || data.ai_analysis.report || '',
+            breakdown: data.ai_analysis.breakdown || []
+        };
+        if (typeof renderEdgeQualityScore === 'function') {
+            renderEdgeQualityScore(eqsData);
+        }
+    }
+
+    if (typeof renderStatValidation === 'function') {
+        renderStatValidation(data.summary);
+    }
+
+    if (typeof renderOosResults === 'function' && data.ai_analysis) {
+        const oosSum = data.ai_analysis.oos_summary || null;
+        renderOosResults(oosSum, data.summary);
+    }
+
+    if (typeof renderRiskManagement === 'function') {
+        renderRiskManagement(data);
+    }
+
+    const stakingPanel = document.getElementById('staking-comparison-panel');
+    if (stakingPanel && data.summary_fixed && data.summary_proportional && data.summary_kelly) {
+        stakingPanel.style.display = 'block';
+        const stakingTbody = document.getElementById('staking-comparison-tbody');
+        if (stakingTbody) {
+            const sf = data.summary_fixed;
+            const sp = data.summary_proportional;
+            const sk = data.summary_kelly;
+            stakingTbody.innerHTML = `
+                <tr>
+                    <td>Stake Fixa</td>
+                    <td>$${sf.final_bankroll.toFixed(2)}</td>
+                    <td style="color:${sf.net_profit>=0?'var(--success)':'var(--danger)'}">${sf.net_profit>=0?'+':''}$${sf.net_profit.toFixed(2)}</td>
+                    <td>${sf.total_bets}</td>
+                    <td>${sf.win_rate.toFixed(1)}%</td>
+                    <td>${sf.roi.toFixed(2)}%</td>
+                    <td>${sf.max_drawdown.toFixed(2)}%</td>
+                </tr>
+                <tr>
+                    <td>Stake Proporcional (2%)</td>
+                    <td>$${sp.final_bankroll.toFixed(2)}</td>
+                    <td style="color:${sp.net_profit>=0?'var(--success)':'var(--danger)'}">${sp.net_profit>=0?'+':''}$${sp.net_profit.toFixed(2)}</td>
+                    <td>${sp.total_bets}</td>
+                    <td>${sp.win_rate.toFixed(1)}%</td>
+                    <td>${sp.roi.toFixed(2)}%</td>
+                    <td>${sp.max_drawdown.toFixed(2)}%</td>
+                </tr>
+                <tr>
+                    <td>Kelly Criterion (1/4)</td>
+                    <td>$${sk.final_bankroll.toFixed(2)}</td>
+                    <td style="color:${sk.net_profit>=0?'var(--success)':'var(--danger)'}">${sk.net_profit>=0?'+':''}$${sk.net_profit.toFixed(2)}</td>
+                    <td>${sk.total_bets}</td>
+                    <td>${sk.win_rate.toFixed(1)}%</td>
+                    <td>${sk.roi.toFixed(2)}%</td>
+                    <td>${sk.max_drawdown.toFixed(2)}%</td>
+                </tr>
+            `;
+        }
+    }
+
+    if (typeof renderQuartiles === 'function') renderQuartiles(data.quartiles);
+
+    if (typeof displayPortfolioOptimization === 'function') {
+        displayPortfolioOptimization(data.portfolio_optimization);
+    }
+};
+
 // Call load config on startup
 setTimeout(loadClusterAiConfig, 2000);
 
@@ -8782,21 +8806,6 @@ async function runPortfolioBacktest() {
         const mainCharts = document.querySelector('.main-charts');
         if (mainCharts) mainCharts.style.display = 'none';
         
-        const stakingPanel = document.getElementById('staking-comparison-panel');
-        if (stakingPanel) stakingPanel.style.display = 'none';
-        
-        const quartilesPanel = document.getElementById('quartiles-panel');
-        if (quartilesPanel) quartilesPanel.style.display = 'none';
-        
-        const resultsTableSection = document.querySelector('.results-table-section');
-        if (resultsTableSection) resultsTableSection.style.display = 'none';
-        
-        // Find other generic grid wrappers around charts
-        const chartsGrid = document.querySelector('.charts-grid');
-        if (chartsGrid) chartsGrid.style.display = 'none';
-        const stakingSection = document.querySelector('.staking-comparison-section');
-        if (stakingSection) stakingSection.style.display = 'none';
-
         // Show Portfolio Panel
         document.getElementById('portfolio-results-panel').style.display = 'block';
         
@@ -8833,6 +8842,29 @@ async function runPortfolioBacktest() {
             `;
             tbody.appendChild(tr);
         });
+        
+        if (typeof window.renderLaboratoryPanels === 'function') {
+            window.renderLaboratoryPanels(data);
+        }
+        
+        const bets = data.bets || [];
+        const dates = bets.map((b, i) => b.date ? b.date.substring(0, 10) : i);
+        const bankrolls = data.equity_curve ? data.equity_curve.map(e => e.bankroll || e.Bankroll || e) : [];
+        const fixedData = data.equity_curve_fixed || [];
+        const propData = data.equity_curve_proportional || [];
+        const kellyData = data.equity_curve_kelly || [];
+        const leagueStats = data.league_stats || [];
+        const monthlyStats = data.monthly_stats || [];
+        const oddsStats = data.odds_stats || [];
+        
+        if(typeof updateCharts === 'function') {
+            updateCharts(dates, bankrolls, fixedData, propData, kellyData, leagueStats, monthlyStats, oddsStats, null);
+        }
+        
+        if (typeof populateBetsTable === 'function') {
+            allBets = bets;
+            populateBetsTable(allBets);
+        }
         
     } catch (e) {
         console.error(e);

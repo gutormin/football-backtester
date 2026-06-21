@@ -480,7 +480,7 @@
                                 <i class="fa-solid fa-layer-group"></i> SUPER SCAN (Ligas + Mercados)
                             </button>
                             <div style="width: 1px; background: rgba(255,255,255,0.1); margin: 0 5px;"></div>
-                            <button type="button" class="btn-scanner" onclick="document.getElementById('global-scanner-results').innerHTML = ''; document.getElementById('scanner-results').style.display = 'none';" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #f87171; font-size: 11px; margin-left: auto;">
+                            <button type="button" class="btn-scanner" onclick="document.getElementById('global-scanner-results').innerHTML = ''; document.getElementById('scanner-results').style.display = 'none'; document.getElementById('eqs-table-container').innerHTML = '';" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #f87171; font-size: 11px; margin-left: auto;">
                                 <i class="fa-solid fa-eraser"></i> Limpar Tela
                             </button>
                         </div>
@@ -2329,7 +2329,6 @@
                 <div class="scanner-title">
                     <h3><i class="fa-solid fa-bookmark text-glow" style="color: var(--warning);"></i> Estratégias Favoritas</h3>
                     <p>Acesse e recarregue backtests que você salvou anteriormente.</p>
-                </div>
                 </div>
                 <div class="scanner-buttons" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <select id="portfolio-risk-method" style="background-color: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 8px; font-size: 13px; height: 38px;">
