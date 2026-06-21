@@ -1345,7 +1345,7 @@ def api_toggle_active_portfolio(strategy_id: str):
         
         # If activating, deactivate all others. If deactivating, just deactivate it.
         for s in history:
-            if s.get('type') == 'portfolio':
+            if s.get('type') == 'portfolio' or 'strategy_ids' in s.get('params', {}):
                 if s.get('id') == strategy_id:
                     s['is_tg_active'] = new_status
                 else:
@@ -1441,7 +1441,7 @@ def get_autopilot_predictions(source: str = 'api'):
         history = load_history()
         
         # Check for active portfolio
-        active_portfolio = next((s for s in history if s.get('type') == 'portfolio' and s.get('is_tg_active')), None)
+        active_portfolio = next((s for s in history if (s.get('type') == 'portfolio' or 'strategy_ids' in s.get('params', {})) and s.get('is_tg_active')), None)
         active_strategy_ids = []
         if active_portfolio:
             active_strategy_ids = active_portfolio.get('params', {}).get('strategy_ids', [])
@@ -1449,7 +1449,7 @@ def get_autopilot_predictions(source: str = 'api'):
         # Filter strategies that have positive net_profit
         valid_strategies = []
         for s in history:
-            if s.get('type') == 'portfolio':
+            if s.get('type') == 'portfolio' or 'strategy_ids' in s.get('params', {}):
                 continue
                 
             net_profit = s.get('summary', {}).get('net_profit', 0)

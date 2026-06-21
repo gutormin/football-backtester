@@ -7171,7 +7171,7 @@ async function loadHistoryTab() {
 
             card.style.justifyContent = 'space-between';
 
-            if (item.type === 'portfolio') {
+            if (item.type === 'portfolio' || (p && p.strategy_ids)) {
                 // Portfolio Card
                 card.style.borderLeft = '4px solid #8b5cf6';
                 const isActive = item.is_tg_active === true;
