@@ -190,5 +190,21 @@
         "profit_margin": 1.18,
         "status": "Pendente",
         "created_at": "2026-06-20 20:35:33"
+    },
+    {
+        "id": "5f589064-9d0c-413a-82c0-5e542b1dc4c1",
+        "match": "Los Angeles Dodgers vs Baltimore Orioles",
+        "date": "21/06/2026 02:11",
+        "profit_margin": 1.7,
+        "status": "Pendente",
+        "created_at": "2026-06-20 22:33:56"
+    },
+    {
+        "id": "4d7785c0-1a50-4d55-bc29-4926bcd05baf",
+        "match": "Ion Cutelaba vs Navajo Stirling",
+        "date": "21/06/2026 01:45",
+        "profit_margin": 6.55,
+        "status": "Pendente",
+        "created_at": "2026-06-20 22:35:37"
     }
 ]
