@@ -954,9 +954,24 @@ function renderProbValue(prob, barType) {
 let currentBetsForPagination = [];
 let currentPage = 1;
 const rowsPerPage = 500;
+let betsAscending = true; // oldest first by default so opening bankroll ($1000) shows at top
 
 function populateBetsTable(bets) {
-    currentBetsForPagination = bets.slice().reverse();
+    // Store bets in chronological order (oldest first). Reverse only if user chose newest-first.
+    const sorted = bets.slice(); // already oldest-first from backend
+    currentBetsForPagination = betsAscending ? sorted : sorted.slice().reverse();
+    currentPage = 1;
+    renderBetsPage();
+}
+
+function toggleBetsSort() {
+    betsAscending = !betsAscending;
+    const btn = document.getElementById('sort-bets-btn');
+    if (btn) btn.innerHTML = betsAscending
+        ? '<i class="fa-solid fa-arrow-up-1-9"></i> Mais Antigo Primeiro'
+        : '<i class="fa-solid fa-arrow-down-9-1"></i> Mais Recente Primeiro';
+    // Re-sort current data without re-fetching
+    currentBetsForPagination = currentBetsForPagination.slice().reverse();
     currentPage = 1;
     renderBetsPage();
 }

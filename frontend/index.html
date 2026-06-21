@@ -1975,8 +1975,11 @@
 <div class="table-card">
 <div class="table-header">
 <h3><i class="fa-solid fa-clipboard-list"></i> Histórico de Apostas Efetuadas</h3>
-<div class="table-actions">
+<div class="table-actions" style="display:flex; gap: 10px; align-items:center;">
 <input id="table-search" onkeyup="filterTable()" placeholder="Filtrar por time..." type="text"/>
+<button id="sort-bets-btn" onclick="toggleBetsSort()" class="secondary-btn" style="white-space:nowrap; padding: 8px 14px; font-size: 12px; height: 38px;">
+    <i class="fa-solid fa-arrow-up-1-9"></i> Mais Antigo Primeiro
+</button>
 </div>
 </div>
 <div class="table-body">
