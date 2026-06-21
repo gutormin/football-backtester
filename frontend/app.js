@@ -2131,7 +2131,7 @@ function applyScannedStrategy(scanType, code) {
 
 
 
-function displayAiAnalysis(aiAnalysis, results) {
+function displayAiAnalysis(aiAnalysis, results, isPortfolio = false) {
 
     const aiPanel = document.getElementById('ai-analytics-panel');
 
@@ -2387,7 +2387,7 @@ function displayAiAnalysis(aiAnalysis, results) {
 
     // Render optimization suggestions
 
-    displayOptimizationSuggestions(aiAnalysis.suggestions);
+    displayOptimizationSuggestions(aiAnalysis.suggestions, isPortfolio);
 
 }
 
@@ -2571,7 +2571,7 @@ function renderChecklist(aiAnalysis, results) {
 
 
 
-function displayOptimizationSuggestions(suggestions) {
+function displayOptimizationSuggestions(suggestions, isPortfolio = false) {
 
     const suggestionsContainer = document.getElementById('ai-optimization-suggestions');
 
@@ -2637,7 +2637,9 @@ function displayOptimizationSuggestions(suggestions) {
 
         
 
-        if (sug.type === 'ev') {
+        if (isPortfolio) {
+            buttonHtml = `<span style="font-size:12px;color:var(--text-muted);"><i class="fa-solid fa-info-circle"></i> Otimização deve ser aplicada na edição individual da estratégia.</span>`;
+        } else if (sug.type === 'ev') {
 
             badgeText = 'Gatilho EV';
 
@@ -8232,7 +8234,7 @@ window.runBacktest = async function() {
             }
 
             if (typeof window.renderLaboratoryPanels === 'function') {
-                window.renderLaboratoryPanels(data);
+                window.renderLaboratoryPanels(data, false);
             }
 
             if (typeof populateBetsTable === 'function') {
@@ -8619,7 +8621,7 @@ async function saveClusterAiConfig() {
     }
 }
 
-window.renderLaboratoryPanels = function(data) {
+window.renderLaboratoryPanels = function(data, isPortfolio = false) {
     const summary = data.summary || {};
     if(document.getElementById('metric-sharpe')) document.getElementById('metric-sharpe').innerText = (summary.sharpe_ratio || 0).toFixed(2);
     if(document.getElementById('metric-sortino')) document.getElementById('metric-sortino').innerText = (summary.sortino_ratio || 0).toFixed(2);
@@ -8630,7 +8632,7 @@ window.renderLaboratoryPanels = function(data) {
     if(document.getElementById('metric-bcl')) document.getElementById('metric-bcl').innerText = summary.bcl_percent != null ? (summary.bcl_percent.toFixed(1) + '%') : 'N/A';
 
     if (typeof displayAiAnalysis === 'function') {
-        displayAiAnalysis(data.ai_analysis, data);
+        displayAiAnalysis(data.ai_analysis, data, isPortfolio);
     }
 
     if (data.ai_analysis && data.ai_analysis.score !== undefined) {
@@ -8848,7 +8850,7 @@ async function runPortfolioBacktest() {
         }
         
         if (typeof window.renderLaboratoryPanels === 'function') {
-            window.renderLaboratoryPanels(data);
+            window.renderLaboratoryPanels(data, true);
         }
         
         const bets = data.bets || [];
