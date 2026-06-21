@@ -26,6 +26,7 @@ def add_strategy(data: dict):
         "id": str(uuid.uuid4()),
         "created_at": datetime.now().isoformat(),
         "name": data.get("name", "Nova Estratégia"),
+        "type": data.get("type", "strategy"),
         "params": data.get("params", {}),
         "summary": data.get("summary", {})
     }
@@ -37,6 +38,10 @@ def add_strategy(data: dict):
         json.dump(history, f, indent=4, ensure_ascii=False)
         
     return entry
+
+def save_history(history: list):
+    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        json.dump(history, f, indent=4, ensure_ascii=False)
 
 def delete_strategy(strategy_id: str):
     history = load_history()
