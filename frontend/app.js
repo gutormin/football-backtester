@@ -8920,9 +8920,17 @@ function renderPortfolioChart(equityCurve) {
 
 async function loadPortfolio(id) {
     try {
-        const res = await fetch(`${API_BASE_URL}/api/history`);
-        const history = await res.json();
-        const portfolio = history.find(h => h.id === id);
+        // Use lsLoadHistory which is guaranteed to have the merged latest data
+        const history = typeof lsLoadHistory === 'function' ? lsLoadHistory() : [];
+        let portfolio = history.find(h => h.id === id);
+        
+        // Fallback to fetch if not found in local (rare edge case)
+        if (!portfolio) {
+            const res = await fetch(`${API_BASE_URL}/api/history`);
+            const serverHistory = await res.json();
+            portfolio = serverHistory.find(h => h.id === id);
+        }
+
         if (!portfolio || (portfolio.type !== 'portfolio' && (!portfolio.params || !portfolio.params.strategy_ids))) {
             showToast('Portfólio não encontrado.', 'error');
             return;
@@ -8964,8 +8972,12 @@ async function loadPortfolio(id) {
             }
             
             showToast(`${foundCount} estratégias do portfólio selecionadas com sucesso.`, 'success');
-            const rm = document.getElementById('portfolio-risk-method');
-            if(rm) rm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Switch to laboratory tab
+            switchTab('tab-laboratory');
+            
+            // Automatically run the portfolio
+            runPortfolioBacktest();
         }
     } catch (e) {
         console.error(e);
