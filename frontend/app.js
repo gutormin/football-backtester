@@ -8896,7 +8896,7 @@ async function savePortfolio() {
     const roiText = document.getElementById('port-metric-roi')?.innerText || '0';
     const winrateText = document.getElementById('port-metric-winrate')?.innerText || '0';
     const betsText = document.getElementById('port-metric-bets')?.innerText || '0';
-    const drawdownText = document.getElementById('port-metric-drawdown')?.innerText || '0';
+    const drawdownText = document.getElementById('port-metric-dd')?.innerText || '0';
     
     const portfolioObj = {
         name: name,
