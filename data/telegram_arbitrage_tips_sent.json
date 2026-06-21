@@ -206,5 +206,29 @@
         "profit_margin": 6.55,
         "status": "Pendente",
         "created_at": "2026-06-20 22:35:37"
+    },
+    {
+        "id": "fb07e36b-9e9a-4daa-b5e6-be8d655a1270",
+        "match": "Tunisia vs Japan",
+        "date": "21/06/2026 04:00",
+        "profit_margin": 1.43,
+        "status": "Pendente",
+        "created_at": "2026-06-20 23:35:39"
+    },
+    {
+        "id": "73b406a8-b3ee-43a4-b840-0ee3f67aefdf",
+        "match": "Yomiuri Giants vs Chunichi Dragons",
+        "date": "21/06/2026 05:00",
+        "profit_margin": 0.67,
+        "status": "Pendente",
+        "created_at": "2026-06-21 01:40:43"
+    },
+    {
+        "id": "fd3934e8-caf0-4489-b94f-5006eb899c51",
+        "match": "NC Dinos vs SSG Landers",
+        "date": "21/06/2026 08:00",
+        "profit_margin": 0.7,
+        "status": "Pendente",
+        "created_at": "2026-06-21 04:35:46"
     }
 ]

@@ -8768,8 +8768,14 @@ async function runPortfolioBacktest() {
     
     const riskMethod = document.getElementById('portfolio-risk-method').value;
     
+    const btn = document.querySelector('button[onclick="runPortfolioBacktest()"]');
+    if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando (Aguarde...)';
+        btn.disabled = true;
+    }
+    
     // Show Loading
-    showToast('Rodando Portfólio. Isso pode levar alguns segundos...', 'info');
+    showToast('Rodando Portfólio. Isso pode levar de 30 a 60 segundos...', 'info', 60000);
     
     try {
         const res = await fetch(`${API_BASE_URL}/api/portfolio_backtest`, {
@@ -8786,15 +8792,18 @@ async function runPortfolioBacktest() {
         
         if (!res.ok) {
             showToast(data.detail || data.error || 'Erro desconhecido do servidor.', 'error');
+            if (btn) { btn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Rodar Portfólio Selecionado'; btn.disabled = false; }
             return;
         }
         
         if (data.error) {
             showToast(data.error, 'error');
+            if (btn) { btn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Rodar Portfólio Selecionado'; btn.disabled = false; }
             return;
         }
         
         showToast('Portfólio calculado com sucesso!', 'success');
+        if (btn) { btn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Rodar Portfólio Selecionado'; btn.disabled = false; }
         
         // Switch to Laboratory Tab
         switchTab('tab-laboratory');
@@ -8869,6 +8878,8 @@ async function runPortfolioBacktest() {
     } catch (e) {
         console.error(e);
         showToast('Erro: ' + e.message, 'error');
+        const btn = document.querySelector('button[onclick="runPortfolioBacktest()"]');
+        if (btn) { btn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Rodar Portfólio Selecionado'; btn.disabled = false; }
     }
 }
 
