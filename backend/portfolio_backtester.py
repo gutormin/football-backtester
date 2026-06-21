@@ -376,7 +376,7 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
             ai_stake_value = 1.0
     elif risk_method == 'kelly_quarter': ai_staking_rule = 'kelly'; ai_stake_value = 0.25
 
-    ai_res = predict_strategy_sustainability(all_bets, initial_bankroll, 1.05, ai_staking_rule, ai_stake_value, run_monte_carlo=False)
+    ai_res = predict_strategy_sustainability(all_bets, initial_bankroll, 1.05, ai_staking_rule, ai_stake_value, run_monte_carlo=True)
     if isinstance(ai_res, dict):
         ai_res['score'] = eqs_data.get('score', 0)
         ai_res['breakdown'] = eqs_data.get('breakdown', [])
