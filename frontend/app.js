@@ -8760,6 +8760,11 @@ async function runPortfolioBacktest() {
         
         const data = await res.json();
         
+        if (!res.ok) {
+            showToast(data.detail || data.error || 'Erro desconhecido do servidor.', 'error');
+            return;
+        }
+        
         if (data.error) {
             showToast(data.error, 'error');
             return;
