@@ -358,7 +358,7 @@ def run_scan(req: ScanRequest):
                 stake_value=req.stakeValue,
                 odds_source=req.oddsSource,
                 min_odds=req.minOdds or 1.0,
-                max_odds=req.maxOdds or 50.0,
+                max_odds=req.maxOdds or 2.50,
                 scan_type='markets',
                 markets_list=market_codes,
                 use_ml=req.use_ml,
@@ -400,7 +400,7 @@ def run_scan(req: ScanRequest):
                 stake_value=req.stakeValue,
                 odds_source=req.oddsSource,
                 min_odds=req.minOdds or 1.0,
-                max_odds=req.maxOdds or 50.0,
+                max_odds=req.maxOdds or 2.50,
                 scan_type='leagues',
                 markets_list=market_list,
                 use_ml=req.use_ml,
@@ -450,7 +450,7 @@ def run_scan(req: ScanRequest):
                 stake_value=req.stakeValue,
                 odds_source=req.oddsSource,
                 min_odds=req.minOdds or 1.0,
-                max_odds=req.maxOdds or 50.0,
+                max_odds=req.maxOdds or 2.50,
                 scan_type='combinations',
                 markets_list=market_codes,
                 use_ml=req.use_ml,
@@ -1534,7 +1534,7 @@ def get_autopilot_predictions(source: str = 'api'):
                     s_markets = ['home']
                 
                 s_min = float(p.get('minOdds', 1.0))
-                s_max = float(p.get('maxOdds', 50.0))
+                s_max = float(p.get('maxOdds', 2.50))
                 s_val = float(p.get('valThreshold', 1.05))
                 
                 strategy_name_prefix = ""
