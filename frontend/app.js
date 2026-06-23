@@ -2141,7 +2141,7 @@ function displayAiAnalysis(aiAnalysis, results, isPortfolio = false) {
 
         aiPanel.style.display = 'none';
 
-        optPanel.style.display = 'none';
+        if (optPanel) optPanel.style.display = 'none';
 
         if (typeof renderOptimizationTab === 'function') {
             renderOptimizationTab([], null);
