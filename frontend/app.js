@@ -7596,7 +7596,7 @@ async function submitSaveStrategy() {
 
         closeSaveStrategyModal();
 
-        loadHistoryTab();
+        await loadHistoryTab();
 
     } catch (err) {
 
@@ -7784,7 +7784,7 @@ async function loadHistoryTab() {
 
                             <div style="font-size: 11px; color: var(--text-muted);">Win Rate</div>
 
-                            <div style="font-size: 14px; font-weight: bold; color: ${s.win_rate >= 50 ? 'var(--success)' : 'var(--warning)'};">${s.win_rate !== undefined ? s.win_rate.toFixed(1) + '%' : '--'}</div>
+                            <div style="font-size: 14px; font-weight: bold; color: ${s.win_rate != null && s.win_rate >= 50 ? 'var(--success)' : 'var(--warning)'};">${s.win_rate != null ? s.win_rate.toFixed(1) + '%' : '--'}</div>
 
                         </div>
 
@@ -7792,7 +7792,7 @@ async function loadHistoryTab() {
 
                             <div style="font-size: 11px; color: var(--text-muted);">Lucro</div>
 
-                            <div style="font-size: 14px; font-weight: bold; color: ${s.net_profit >= 0 ? 'var(--success)' : 'var(--danger)'};">$${s.net_profit !== undefined ? s.net_profit.toFixed(2) : '--'}</div>
+                            <div style="font-size: 14px; font-weight: bold; color: ${s.net_profit != null && s.net_profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${s.net_profit != null ? '$' + s.net_profit.toFixed(2) : '--'}</div>
 
                         </div>
 
@@ -7800,7 +7800,7 @@ async function loadHistoryTab() {
 
                             <div style="font-size: 11px; color: var(--text-muted);">ROI</div>
 
-                            <div style="font-size: 14px; font-weight: bold; color: ${s.roi >= 0 ? 'var(--success)' : 'var(--danger)'};">${s.roi !== undefined ? s.roi.toFixed(2) + '%' : '--'}</div>
+                            <div style="font-size: 14px; font-weight: bold; color: ${s.roi != null && s.roi >= 0 ? 'var(--success)' : 'var(--danger)'};">${s.roi != null ? s.roi.toFixed(2) + '%' : '--'}</div>
 
                         </div>
 
@@ -7808,7 +7808,7 @@ async function loadHistoryTab() {
 
                             <div style="font-size: 11px; color: var(--text-muted);">Sharpe</div>
 
-                            <div style="font-size: 14px; font-weight: bold; color: ${s.sharpe_ratio >= 1 ? 'var(--success)' : 'var(--text-primary)'};">${s.sharpe_ratio !== undefined ? s.sharpe_ratio.toFixed(2) : '--'}</div>
+                            <div style="font-size: 14px; font-weight: bold; color: ${s.sharpe_ratio != null && s.sharpe_ratio >= 1 ? 'var(--success)' : 'var(--text-primary)'};">${s.sharpe_ratio != null ? s.sharpe_ratio.toFixed(2) : '--'}</div>
 
                         </div>
 
