@@ -367,16 +367,22 @@ class ChronologicalBacktester:
             avg_h_goals = np.mean(leg_h_goals) if leg_h_goals else 1.35
             avg_a_goals = np.mean(leg_a_goals) if leg_a_goals else 1.05
             
-            h_att = (weighted_mean(h_scored, 0.06) / avg_h_goals) if h_scored else 1.0
-            h_def = (weighted_mean(h_conceded, 0.06) / avg_a_goals) if h_conceded else 1.0
-            a_att = (weighted_mean(a_scored, 0.06) / avg_a_goals) if a_scored else 1.0
-            a_def = (weighted_mean(a_conceded, 0.06) / avg_h_goals) if a_conceded else 1.0
+            h_att_raw = (weighted_mean(h_scored, 0.06) / avg_h_goals) if h_scored else 1.0
+            h_def_raw = (weighted_mean(h_conceded, 0.06) / avg_a_goals) if h_conceded else 1.0
+            a_att_raw = (weighted_mean(a_scored, 0.06) / avg_a_goals) if a_scored else 1.0
+            a_def_raw = (weighted_mean(a_conceded, 0.06) / avg_h_goals) if a_conceded else 1.0
             
-            # Verify and cap
-            h_att = 1.0 if pd.isna(h_att) else max(0.2, min(4.0, h_att))
-            h_def = 1.0 if pd.isna(h_def) else max(0.2, min(4.0, h_def))
-            a_att = 1.0 if pd.isna(a_att) else max(0.2, min(4.0, a_att))
-            a_def = 1.0 if pd.isna(a_def) else max(0.2, min(4.0, a_def))
+            # Regression to the mean (Shrinkage) to prevent overfitting
+            h_att = 0.70 * h_att_raw + 0.30 * 1.0
+            h_def = 0.70 * h_def_raw + 0.30 * 1.0
+            a_att = 0.70 * a_att_raw + 0.30 * 1.0
+            a_def = 0.70 * a_def_raw + 0.30 * 1.0
+            
+            # Verify and cap (tighter bounds than 0.2 - 4.0)
+            h_att = 1.0 if pd.isna(h_att) else max(0.4, min(2.5, h_att))
+            h_def = 1.0 if pd.isna(h_def) else max(0.4, min(2.5, h_def))
+            a_att = 1.0 if pd.isna(a_att) else max(0.4, min(2.5, a_att))
+            a_def = 1.0 if pd.isna(a_def) else max(0.4, min(2.5, a_def))
             
             lambda_goals_home = avg_h_goals * h_att * a_def
             lambda_goals_away = avg_a_goals * a_att * h_def
@@ -396,15 +402,22 @@ class ChronologicalBacktester:
             if avg_h_goals_ht == 0: avg_h_goals_ht = 0.6
             if avg_a_goals_ht == 0: avg_a_goals_ht = 0.45
             
-            h_att_ht = (weighted_mean(h_scored_ht, 0.06) / avg_h_goals_ht) if h_scored_ht else 1.0
-            h_def_ht = (weighted_mean(h_conceded_ht, 0.06) / avg_a_goals_ht) if h_conceded_ht else 1.0
-            a_att_ht = (weighted_mean(a_scored_ht, 0.06) / avg_a_goals_ht) if a_scored_ht else 1.0
-            a_def_ht = (weighted_mean(a_conceded_ht, 0.06) / avg_h_goals_ht) if a_conceded_ht else 1.0
+            h_att_ht_raw = (weighted_mean(h_scored_ht, 0.06) / avg_h_goals_ht) if h_scored_ht else 1.0
+            h_def_ht_raw = (weighted_mean(h_conceded_ht, 0.06) / avg_a_goals_ht) if h_conceded_ht else 1.0
+            a_att_ht_raw = (weighted_mean(a_scored_ht, 0.06) / avg_a_goals_ht) if a_scored_ht else 1.0
+            a_def_ht_raw = (weighted_mean(a_conceded_ht, 0.06) / avg_h_goals_ht) if a_conceded_ht else 1.0
             
-            h_att_ht = 1.0 if pd.isna(h_att_ht) else max(0.2, min(4.0, h_att_ht))
-            h_def_ht = 1.0 if pd.isna(h_def_ht) else max(0.2, min(4.0, h_def_ht))
-            a_att_ht = 1.0 if pd.isna(a_att_ht) else max(0.2, min(4.0, a_att_ht))
-            a_def_ht = 1.0 if pd.isna(a_def_ht) else max(0.2, min(4.0, a_def_ht))
+            # Stronger regression to the mean for HT because data is noisier (lots of 0s)
+            h_att_ht = 0.60 * h_att_ht_raw + 0.40 * 1.0
+            h_def_ht = 0.60 * h_def_ht_raw + 0.40 * 1.0
+            a_att_ht = 0.60 * a_att_ht_raw + 0.40 * 1.0
+            a_def_ht = 0.60 * a_def_ht_raw + 0.40 * 1.0
+            
+            # Tighter caps for HT to prevent extreme probabilities like 99.9%
+            h_att_ht = 1.0 if pd.isna(h_att_ht) else max(0.5, min(2.0, h_att_ht))
+            h_def_ht = 1.0 if pd.isna(h_def_ht) else max(0.5, min(2.0, h_def_ht))
+            a_att_ht = 1.0 if pd.isna(a_att_ht) else max(0.5, min(2.0, a_att_ht))
+            a_def_ht = 1.0 if pd.isna(a_def_ht) else max(0.5, min(2.0, a_def_ht))
             
             lambda_home_ht = avg_h_goals_ht * h_att_ht * a_def_ht
             lambda_away_ht = avg_a_goals_ht * a_att_ht * h_def_ht
