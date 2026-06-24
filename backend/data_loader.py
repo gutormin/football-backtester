@@ -743,6 +743,29 @@ def fetch_futpython_data(league_code, start_date, api_key):
                 if res.text.strip().startswith("{"):
                     continue # JSON error like Dataset não encontrado
                 df = pd.read_csv(io.StringIO(res.text))
+                
+                # Check and fix swapped HT odds columns (dataset-specific errors in FutPythonTrader)
+                for line in ['0_5', '1_5', '2_5']:
+                    over_col = f'Over_HT_{line}'
+                    under_col = f'Under_HT_{line}'
+                    if over_col in df.columns and under_col in df.columns:
+                        # Convert to numeric to ensure correct comparison (some columns might load as object type due to commas)
+                        df[over_col] = pd.to_numeric(df[over_col].astype(str).str.replace(',', '.'), errors='coerce')
+                        df[under_col] = pd.to_numeric(df[under_col].astype(str).str.replace(',', '.'), errors='coerce')
+                        
+                        valid_odds = df[(df[over_col] > 1.0) & (df[under_col] > 1.0)]
+                        if len(valid_odds) > 0:
+                            if line == '0_5':
+                                swapped_count = len(valid_odds[valid_odds[over_col] > valid_odds[under_col]])
+                            else:
+                                swapped_count = len(valid_odds[valid_odds[under_col] > valid_odds[over_col]])
+                            
+                            if swapped_count > len(valid_odds) * 0.5:
+                                # Swap values of the columns
+                                temp_over = df[over_col].copy()
+                                df[over_col] = df[under_col]
+                                df[under_col] = temp_over
+
                 # Rename columns to match standard backtester format
                 df = df.rename(columns={
                     'Home': 'HomeTeam',
