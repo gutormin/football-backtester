@@ -75,8 +75,6 @@ class ChronologicalBacktester:
         for league_code in leagues:
             df = load_league_data(league_code, start_date='2020-08-01', data_source=data_source, api_key=futpython_api_key) # Load from 2020 to populate form
             if not df.empty:
-                with open('C:\\Users\\Gustavo\\.gemini\\antigravity\\scratch\\columns.txt', 'w') as f:
-                    f.write(','.join(df.columns.tolist()))
                 all_matches.append(df)
                 
         if not all_matches:
