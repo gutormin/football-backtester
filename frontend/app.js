@@ -7662,7 +7662,8 @@ async function loadHistoryTab() {
         history.forEach(item => {
             // Guarantee correct timezone parsing if it comes from the python backend without Z
             let dtStr = item.created_at;
-            if (dtStr && dtStr.length === 19 && !dtStr.endsWith('Z')) {
+            if (dtStr && !dtStr.endsWith('Z') && !dtStr.includes('+')) {
+                // If it contains a timezone-naive ISO string from Python, append 'Z' to treat as UTC
                 dtStr += 'Z';
             }
             const dateStr = new Date(dtStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -9625,6 +9626,7 @@ async function savePortfolio() {
     const portfolioObj = {
         name: name,
         type: 'portfolio',
+        created_at: new Date().toISOString(),
         params: {
             strategy_ids: strategyIds,
             risk_method: document.getElementById('portfolio-risk-method')?.value || 'kelly_quarter',

@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 HISTORY_FILE = "data/history_strategies.json"
 
@@ -26,7 +26,7 @@ def add_strategy(data: dict):
     entry = {
         # Respect client-provided ID so localStorage sync works correctly
         "id": provided_id if provided_id else str(uuid.uuid4()),
-        "created_at": data.get("created_at") or datetime.now().isoformat(),
+        "created_at": data.get("created_at") or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "name": data.get("name", "Nova Estratégia"),
         "type": data.get("type", "strategy"),
         "params": data.get("params", {}),
