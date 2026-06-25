@@ -9795,15 +9795,6 @@ async function toggleActivePortfolio(id) {
                 const newStatus = !!data.is_tg_active;
                 target.is_tg_active = newStatus;
                 
-                // Only one portfolio can be active at a time, deactivate all other portfolios
-                if (newStatus) {
-                    history.forEach(x => {
-                        if (x.id !== id && (x.type === 'portfolio' || (x.params && x.params.strategy_ids))) {
-                            x.is_tg_active = false;
-                        }
-                    });
-                }
-                
                 lsSaveHistory(history);
                 window.loadedHistoryStrategies = history;
             }

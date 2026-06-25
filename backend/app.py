@@ -1343,14 +1343,10 @@ def api_toggle_active_portfolio(strategy_id: str):
             
         new_status = not target.get('is_tg_active', False)
         
-        # If activating, deactivate all others. If deactivating, just deactivate it.
+        # Toggle target portfolio status only. Do NOT deactivate other portfolios.
         for s in history:
-            if s.get('type') == 'portfolio' or 'strategy_ids' in s.get('params', {}):
-                if s.get('id') == strategy_id:
-                    s['is_tg_active'] = new_status
-                else:
-                    if new_status: # Only deactivate others if we are activating one
-                        s['is_tg_active'] = False
+            if s.get('id') == strategy_id:
+                s['is_tg_active'] = new_status
                         
         save_history(history)
         return {"status": "ok", "is_tg_active": new_status}
@@ -1441,10 +1437,12 @@ def get_autopilot_predictions(source: str = 'api'):
         history = load_history()
         
         # Check for active portfolio
-        active_portfolio = next((s for s in history if (s.get('type') == 'portfolio' or 'strategy_ids' in s.get('params', {})) and s.get('is_tg_active')), None)
-        active_strategy_ids = []
-        if active_portfolio:
-            active_strategy_ids = active_portfolio.get('params', {}).get('strategy_ids', [])
+        # Check for active portfolios
+        active_portfolios = [s for s in history if (s.get('type') == 'portfolio' or 'strategy_ids' in s.get('params', {})) and s.get('is_tg_active')]
+        active_strategy_ids = set()
+        for p_item in active_portfolios:
+            ids = p_item.get('params', {}).get('strategy_ids', [])
+            active_strategy_ids.update(ids)
             
         # Filter strategies that have positive net_profit
         valid_strategies = []
@@ -1542,8 +1540,10 @@ def get_autopilot_predictions(source: str = 'api'):
                 stakeValue = float(p.get('stakeValue', 10.0))
                 initialBankroll = float(p.get('initialBankroll', 1000.0))
                 
-                if active_portfolio and strategy.get('id') in active_strategy_ids:
-                    port_params = active_portfolio.get('params', {})
+                containing_portfolio = next((p_item for p_item in active_portfolios if strategy.get('id') in p_item.get('params', {}).get('strategy_ids', [])), None) if active_portfolios else None
+                
+                if containing_portfolio:
+                    port_params = containing_portfolio.get('params', {})
                     port_rm = port_params.get('risk_method', 'kelly_quarter')
                     if port_rm == 'kelly_quarter':
                         stakingRule = 'kelly_quarter'
@@ -1559,7 +1559,7 @@ def get_autopilot_predictions(source: str = 'api'):
                         stakeValue = 0.0
                         
                     initialBankroll = float(port_params.get('initial_bankroll', 1000.0))
-                    strategy_name_prefix = "[Portfólio] "
+                    strategy_name_prefix = f"[Portfólio: {containing_portfolio.get('name')}] "
                 
                 for s_m in s_markets:
                     market_prob = 0.0

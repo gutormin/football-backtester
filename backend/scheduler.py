@@ -135,11 +135,14 @@ async def run_automatic_tips_scan():
                 print("[Scheduler Saved Strategies] Nenhuma estratégia salva encontrada para monitoramento.")
                 return {"status": "skipped", "message": "Nenhuma estratégia salva no histórico."}
                 
-            # Check for active portfolio
-            active_portfolio = next((s for s in saved_strategies if (s.get('type') == 'portfolio' or 'strategy_ids' in s.get('params', {})) and s.get('is_tg_active')), None)
+            # Check for active portfolios
+            active_portfolios = [s for s in saved_strategies if (s.get('type') == 'portfolio' or 'strategy_ids' in s.get('params', {})) and s.get('is_tg_active')]
             
-            if active_portfolio:
-                active_strategy_ids = active_portfolio.get('params', {}).get('strategy_ids', [])
+            if active_portfolios:
+                active_strategy_ids = set()
+                for p_item in active_portfolios:
+                    ids = p_item.get('params', {}).get('strategy_ids', [])
+                    active_strategy_ids.update(ids)
                 strategies_to_process = [s for s in saved_strategies if s.get('id') in active_strategy_ids]
             else:
                 # If no portfolio is active, process all individual strategies
@@ -218,8 +221,10 @@ async def run_automatic_tips_scan():
                     max_odds = float(params.get('maxOdds', 50.0))
                     
                     # Override management if active portfolio is present
-                    if active_portfolio:
-                        port_params = active_portfolio.get('params', {})
+                    containing_portfolio = next((p_item for p_item in active_portfolios if strategy.get('id') in p_item.get('params', {}).get('strategy_ids', [])), None) if active_portfolios else None
+                    
+                    if containing_portfolio:
+                        port_params = containing_portfolio.get('params', {})
                         portfolio_risk = port_params.get('risk_method', 'fixed_2.0')
                         portfolio_bankroll = float(port_params.get('initial_bankroll', 1000.0))
                         
@@ -349,13 +354,18 @@ async def run_automatic_tips_scan():
                         league_name = code_to_name.get(league_code, league_code)
                         time_str = str(row.get('Time')) if not pd.isna(row.get('Time')) else '00:00'
                         
+                        if containing_portfolio:
+                            market_label_text = f"{market_label} (Portfólio: {containing_portfolio.get('name')} | Estratégia: {strategy_name})"
+                        else:
+                            market_label_text = f"{market_label} (Estratégia: {strategy_name})"
+                            
                         tips_to_send.append({
                             'league_name': league_name,
                             'date_str': date_str,
                             'time_str': time_str,
                             'home_team': home_team,
                             'away_team': away_team,
-                            'market_label': f"{market_label} (Estratégia: {strategy_name})",
+                            'market_label': market_label_text,
                             'prob': market_prob * 100.0,
                             'fair_odds': 1.0 / market_prob if market_prob > 0 else 99.0,
                             'bookie_odds': bookie_odds,
