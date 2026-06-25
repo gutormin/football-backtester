@@ -7639,12 +7639,33 @@ async function loadHistoryTab() {
         const serverIds = new Set(serverHistory.map(x => x.id));
         const localOnly = localHistory.filter(x => !serverIds.has(x.id));
 
+        // For items that exist on both sides, check if is_tg_active status differs.
+        // If they differ, the local state (user setting stored in browser) wins, and we update/sync it to the server.
+        const serverMap = new Map(serverHistory.map(x => [x.id, x]));
+        const itemsToUpdateOnServer = [];
+        for (const localItem of localHistory) {
+            const serverItem = serverMap.get(localItem.id);
+            if (serverItem) {
+                const localActive = !!localItem.is_tg_active;
+                const serverActive = !!serverItem.is_tg_active;
+                if (localActive !== serverActive) {
+                    serverItem.is_tg_active = localActive;
+                    itemsToUpdateOnServer.push(serverItem);
+                }
+            }
+        }
+
         // Sync missing items back to server silently
         if (localOnly.length > 0) {
             await lsSyncToServer(localOnly);
         }
 
-        // Merge: localOnly items + server items (server is authoritative for existing ones)
+        // Sync active state mismatches back to server silently
+        if (itemsToUpdateOnServer.length > 0) {
+            await lsSyncToServer(itemsToUpdateOnServer);
+        }
+
+        // Merge: localOnly items + server items
         const history = [...localOnly, ...serverHistory];
 
         // Keep localStorage up-to-date with the merged set
