@@ -86,16 +86,16 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
                 staking_rule='fixed',
                 stake_value=10.0,
                 odds_source=p.get('oddsSource', p.get('odds_source', 'B365')),
-                min_odds=p.get('minOdds', 1.0),
-                max_odds=2.50, # Força máximo de 2.50 mesmo se a estratégia foi salva com valor maior
+                min_odds=p.get('minOdds', p.get('min_odds', 1.0)),
+                max_odds=p.get('maxOdds', p.get('max_odds', 50.0)),
                 data_source=p.get('data_source', 'football-data'),
                 use_ml=p.get('use_ml', False),
                 futpython_api_key=p.get('futpython_api_key', ''),
-                min_odds_h=p.get('minOddsH'), max_odds_h=p.get('maxOddsH'),
-                min_odds_d=p.get('minOddsD'), max_odds_d=p.get('maxOddsD'),
-                min_odds_a=p.get('minOddsA'), max_odds_a=p.get('maxOddsA'),
-                min_odds_over25=p.get('minOddsOver25'), max_odds_over25=p.get('maxOddsOver25'),
-                min_odds_under25=p.get('minOddsUnder25'), max_odds_under25=p.get('maxOddsUnder25')
+                min_odds_h=p.get('minOddsH', p.get('min_odds_h')), max_odds_h=p.get('maxOddsH', p.get('max_odds_h')),
+                min_odds_d=p.get('minOddsD', p.get('min_odds_d')), max_odds_d=p.get('maxOddsD', p.get('max_odds_d')),
+                min_odds_a=p.get('minOddsA', p.get('min_odds_a')), max_odds_a=p.get('maxOddsA', p.get('max_odds_a')),
+                min_odds_over25=p.get('minOddsOver25', p.get('min_odds_over25')), max_odds_over25=p.get('maxOddsOver25', p.get('max_odds_over25')),
+                min_odds_under25=p.get('minOddsUnder25', p.get('min_odds_under25')), max_odds_under25=p.get('maxOddsUnder25', p.get('max_odds_under25'))
             )
             if "error" not in res and "bets" in res:
                 for b in res['bets']:
