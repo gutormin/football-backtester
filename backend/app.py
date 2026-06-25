@@ -1351,14 +1351,14 @@ def api_toggle_active_portfolio(strategy_id: str):
         from .history_manager import load_history, save_history
         history = load_history()
         
-        # Find the portfolio and its current status
+        # Find the strategy or portfolio
         target = next((s for s in history if s.get('id') == strategy_id), None)
-        if not target or (target.get('type') != 'portfolio' and 'strategy_ids' not in target.get('params', {})):
-            raise HTTPException(status_code=404, detail="Portfólio não encontrado.")
+        if not target:
+            raise HTTPException(status_code=404, detail="Estratégia ou portfólio não encontrado.")
             
         new_status = not target.get('is_tg_active', False)
         
-        # Toggle target portfolio status only. Do NOT deactivate other portfolios.
+        # Toggle target status only.
         for s in history:
             if s.get('id') == strategy_id:
                 s['is_tg_active'] = new_status

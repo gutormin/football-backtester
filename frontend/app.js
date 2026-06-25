@@ -7897,12 +7897,21 @@ function renderHistoryGrid(history) {
             sourceText = "Futpython API";
         }
 
+        const isActive = item.is_tg_active === true;
+        const activeBadge = isActive ? `<span style="font-size: 11px; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 3px 6px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.3);"><i class="fa-brands fa-telegram"></i> Ativo no Robô</span>` : '';
+        const btnActiveHtml = isActive ? 
+            `<button class="btn-clear" onclick="toggleActivePortfolio('${item.id}')" style="flex: 1; padding: 6px; font-size: 13px; color: var(--text-primary); background: rgba(255,255,255,0.05);"><i class="fa-solid fa-bell-slash"></i> Desativar</button>` :
+            `<button class="btn-scanner" onclick="toggleActivePortfolio('${item.id}')" style="flex: 1; padding: 6px; font-size: 13px; margin: 0; background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981;"><i class="fa-brands fa-telegram"></i> Ativar no Robô</button>`;
+
         card.innerHTML = `
             <div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <input type="checkbox" class="portfolio-checkbox" value="${item.id}" style="width: 18px; height: 18px; cursor: pointer;">
-                        <h4 style="margin: 0; color: var(--text-primary); font-size: 16px;">${item.name}</h4>
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" class="portfolio-checkbox" value="${item.id}" style="width: 18px; height: 18px; cursor: pointer;">
+                            <h4 style="margin: 0; color: var(--text-primary); font-size: 16px;">${item.name}</h4>
+                        </div>
+                        <div>${activeBadge}</div>
                     </div>
                     <span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px;">${dateStr}</span>
                 </div>
@@ -7943,9 +7952,10 @@ function renderHistoryGrid(history) {
                 </div>
             </div>
             
-            <div style="display: flex; gap: 10px; margin-top: auto;">
-                <button class="btn-clear" onclick="deleteHistoryStrategy('${item.id}')" style="flex: 1; justify-content: center; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);"><i class="fa-solid fa-trash-can"></i> Excluir</button>
-                <button class="btn-scanner" onclick="reloadStrategyById('${item.id}')" style="flex: 1; justify-content: center;"><i class="fa-solid fa-play"></i> Carregar</button>
+            <div style="display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap;">
+                <button class="btn-clear" onclick="deleteHistoryStrategy('${item.id}')" style="flex: 1; justify-content: center; color: var(--danger); border-color: rgba(239, 68, 68, 0.2); padding: 6px; font-size: 13px;"><i class="fa-solid fa-trash-can"></i> Excluir</button>
+                <button class="btn-scanner" onclick="reloadStrategyById('${item.id}')" style="flex: 1; justify-content: center; padding: 6px; font-size: 13px;"><i class="fa-solid fa-play"></i> Carregar</button>
+                ${btnActiveHtml}
             </div>
         `;
         grid.appendChild(card);
@@ -9791,24 +9801,31 @@ async function toggleActivePortfolio(id) {
             // Synchronize local state and localStorage directly to avoid any caching/timing issues
             const history = lsLoadHistory();
             const target = history.find(x => x.id === id);
+            let isPortfolio = true;
             if (target) {
                 const newStatus = !!data.is_tg_active;
                 target.is_tg_active = newStatus;
+                
+                isPortfolio = target.type === 'portfolio' || (target.params && !!target.params.strategy_ids);
                 
                 lsSaveHistory(history);
                 window.loadedHistoryStrategies = history;
             }
             
             if (data.is_tg_active) {
-                showToast('Portfólio ativado! O robô do Telegram usará a banca e gestão deste portfólio.', 'success');
+                if (isPortfolio) {
+                    showToast('Portfólio ativado! O robô do Telegram usará a banca e gestão deste portfólio.', 'success');
+                } else {
+                    showToast('Estratégia ativada! O robô do Telegram enviará alertas para esta estratégia.', 'success');
+                }
             } else {
-                showToast('Portfólio desativado.', 'success');
+                showToast(isPortfolio ? 'Portfólio desativado.' : 'Estratégia desativada.', 'success');
             }
             
             // Re-render the grid immediately with the updated local state
             applyHistoryFilters();
         } else {
-            showToast('Falha ao alterar o status do portfólio.', 'error');
+            showToast('Falha ao alterar o status.', 'error');
         }
     } catch (e) {
         console.error(e);
