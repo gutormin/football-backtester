@@ -1,5 +1,357 @@
 [
     {
+        "id": "ukraine-serbia-portfolio",
+        "created_at": "2026-06-24T23:02:00.000000Z",
+        "name": "Ukraine - Persha liga + Serbia - Mozzart bet prva liga - HT EMPATE",
+        "type": "portfolio",
+        "is_tg_active": true,
+        "params": {
+            "strategy_ids": [
+                "ukraine-persha-ht-empate",
+                "serbia-mozzart-ht-empate"
+            ],
+            "risk_method": "fixed",
+            "initial_bankroll": 1000
+        },
+        "summary": {
+            "win_rate": 47.8,
+            "net_profit": 4065.5,
+            "roi": 66.38,
+            "max_drawdown": 10.35,
+            "total_bets": 245
+        }
+    },
+    {
+        "id": "ukraine-south-africa-portfolio",
+        "created_at": "2026-06-24T21:58:00.000000Z",
+        "name": "Ukraine - Persha liga + South-africa - premiership - HT UNDER 1.5",
+        "type": "portfolio",
+        "is_tg_active": false,
+        "params": {
+            "strategy_ids": [
+                "ukraine-persha-ht-under",
+                "south-africa-betway-ht-under"
+            ],
+            "risk_method": "fixed",
+            "initial_bankroll": 1000
+        },
+        "summary": {
+            "win_rate": 74.6,
+            "net_profit": 596.25,
+            "roi": 13.18,
+            "max_drawdown": 9.06,
+            "total_bets": 271
+        }
+    },
+    {
+        "id": "greece-usa-portfolio",
+        "created_at": "2026-06-24T21:55:00.000000Z",
+        "name": "Greece - Super league 2 + Usa - Usl championship - HT UNDER 1.5",
+        "type": "portfolio",
+        "is_tg_active": false,
+        "params": {
+            "strategy_ids": [
+                "greece-super2-ht-under",
+                "usa-usl-ht-under"
+            ],
+            "risk_method": "fixed",
+            "initial_bankroll": 1000
+        },
+        "summary": {
+            "win_rate": 67.5,
+            "net_profit": 603.0,
+            "roi": 11.38,
+            "max_drawdown": 13.29,
+            "total_bets": 300
+        }
+    },
+    {
+        "id": "usa-usl-ht-under",
+        "created_at": "2026-06-24T20:06:00.000000Z",
+        "name": "Usa - Usl championship - Otimizada (EV: 1.19 | Odds: 1.00-5.00) - HT UNDER 1.5",
+        "type": "strategy",
+        "is_tg_active": false,
+        "params": {
+            "leagues": [
+                "usa/usl-championship"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "ht_under15"
+            ],
+            "valueThreshold": 1.19,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 1,
+            "maxOdds": 5,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython"
+        },
+        "summary": {
+            "win_rate": 60.1,
+            "net_profit": 1919.05,
+            "roi": 99.43,
+            "max_drawdown": 10.9,
+            "total_bets": 193
+        }
+    },
+    {
+        "id": "ukraine-persha-ht-under",
+        "created_at": "2026-06-24T18:42:00.000000Z",
+        "name": "Ukraine - Persha liga - Otimizada (EV: 1.05 | Odds: 2.00-4.00) - HT UNDER 1.5",
+        "type": "strategy",
+        "is_tg_active": false,
+        "params": {
+            "leagues": [
+                "ukraine/persha-liga"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "ht_under15"
+            ],
+            "valueThreshold": 1.05,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 2,
+            "maxOdds": 4,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython"
+        },
+        "summary": {
+            "win_rate": 71.9,
+            "net_profit": 735.1,
+            "roi": 128.96,
+            "max_drawdown": 1.9,
+            "sharpe_ratio": 14.16,
+            "total_bets": 57
+        }
+    },
+    {
+        "id": "ukraine-persha-ht-empate",
+        "created_at": "2026-06-24T18:38:00.000000Z",
+        "name": "Ukraine - Persha liga - Otimizada (EV: 1.25 | Odds: 1.00-5.00) - HT EMPATE",
+        "type": "strategy",
+        "is_tg_active": false,
+        "params": {
+            "leagues": [
+                "ukraine/persha-liga"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "ht_draw"
+            ],
+            "valueThreshold": 1.25,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 1,
+            "maxOdds": 5,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython"
+        },
+        "summary": {
+            "win_rate": 48.6,
+            "net_profit": 700.7,
+            "roi": 63.13,
+            "max_drawdown": 4.2,
+            "sharpe_ratio": 7.27,
+            "total_bets": 111
+        }
+    },
+    {
+        "id": "south-africa-betway-ht-under",
+        "created_at": "2026-06-24T18:09:00.000000Z",
+        "name": "South-africa - Betway premiership - Otimizada (EV: 1.05 | Odds: 1.00-5.00) - HT UNDER 1.5",
+        "type": "strategy",
+        "is_tg_active": false,
+        "params": {
+            "leagues": [
+                "south-africa/betway-premiership"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "ht_under15"
+            ],
+            "valueThreshold": 1.05,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 1,
+            "maxOdds": 5,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython"
+        },
+        "summary": {
+            "win_rate": 75.2,
+            "net_profit": 865.1,
+            "roi": 40.43,
+            "max_drawdown": 3.0,
+            "sharpe_ratio": 6.04,
+            "total_bets": 214
+        }
+    },
+    {
+        "id": "serbia-mozzart-ht-empate",
+        "created_at": "2026-06-24T18:00:00.000000Z",
+        "name": "Serbia - Mozzart bet prva liga - Otimizada (EV: 1.15 | Odds: 3.00-50.00) - HT EMPATE",
+        "type": "strategy",
+        "is_tg_active": false,
+        "params": {
+            "leagues": [
+                "serbia/mozzart-bet-prva-liga"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "ht_draw"
+            ],
+            "valueThreshold": 1.15,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 3,
+            "maxOdds": 50,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython"
+        },
+        "summary": {
+            "win_rate": 47.0,
+            "net_profit": 925.5,
+            "roi": 69.07,
+            "max_drawdown": 6.1,
+            "sharpe_ratio": 9.21,
+            "total_bets": 134
+        }
+    },
+    {
+        "id": "greece-super2-ht-under",
+        "created_at": "2026-06-24T21:50:00.000000Z",
+        "name": "Greece - Super league 2 - Otimizada (EV: 1.05 | Odds: 1.00-5.00) - HT UNDER 1.5",
+        "type": "strategy",
+        "is_tg_active": false,
+        "params": {
+            "leagues": [
+                "greece/super-league-2"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "ht_under15"
+            ],
+            "valueThreshold": 1.05,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 1,
+            "maxOdds": 5,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython"
+        },
+        "summary": {
+            "win_rate": 65.0,
+            "net_profit": 500.0,
+            "roi": 20.0,
+            "max_drawdown": 5.0,
+            "total_bets": 100
+        }
+    },
+    {
+        "id": "saudi-div1-ht-empate",
+        "created_at": "2026-06-24T16:20:00.000000Z",
+        "name": "Saudi-arabia - Division 1 - Otimizada (EV: 1.31 | Odds: 1.00-5.00) - HT EMPATE",
+        "type": "strategy",
+        "is_tg_active": false,
+        "params": {
+            "leagues": [
+                "saudi-arabia/division-1"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "ht_draw"
+            ],
+            "valueThreshold": 1.31,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 1,
+            "maxOdds": 5,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython"
+        },
+        "summary": {
+            "win_rate": 51.3,
+            "net_profit": 1519.3,
+            "roi": 57.33,
+            "max_drawdown": 4.8,
+            "sharpe_ratio": 9.0,
+            "total_bets": 265
+        }
+    },
+    {
+        "id": "paraguay-intermedia-ht-under",
+        "created_at": "2026-06-24T15:22:00.000000Z",
+        "name": "Paraguay - Division intermedia - Otimizada (EV: 1.05 | Odds: 1.00-5.00) - HT UNDER 1.5",
+        "type": "strategy",
+        "is_tg_active": false,
+        "params": {
+            "leagues": [
+                "paraguay/division-intermedia"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "ht_under15"
+            ],
+            "valueThreshold": 1.05,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 1,
+            "maxOdds": 5,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython"
+        },
+        "summary": {
+            "win_rate": 68.1,
+            "net_profit": 546.4,
+            "roi": 60.04,
+            "max_drawdown": 2.2,
+            "sharpe_ratio": 7.52,
+            "total_bets": 91
+        }
+    },
+    {
         "id": "9e08bc39-8c42-44ee-a4cd-81b9333658dd",
         "created_at": "2026-06-17T11:07:18.445455",
         "name": "China Chinese Super League - BTTS - Otimizada (EV: 1.05 | Odds: 1.00-50.00) - PADRÃO",
