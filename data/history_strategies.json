@@ -90,7 +90,8 @@
             "exchange_commission": 5,
             "out_of_sample": true,
             "use_ml": false,
-            "data_source": "futpython"
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
             "win_rate": 60.1,
@@ -125,7 +126,8 @@
             "exchange_commission": 5,
             "out_of_sample": true,
             "use_ml": false,
-            "data_source": "futpython"
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
             "win_rate": 71.9,
@@ -161,7 +163,8 @@
             "exchange_commission": 5,
             "out_of_sample": true,
             "use_ml": false,
-            "data_source": "futpython"
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
             "win_rate": 48.6,
@@ -197,7 +200,8 @@
             "exchange_commission": 5,
             "out_of_sample": true,
             "use_ml": false,
-            "data_source": "futpython"
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
             "win_rate": 75.2,
@@ -233,7 +237,8 @@
             "exchange_commission": 5,
             "out_of_sample": true,
             "use_ml": false,
-            "data_source": "futpython"
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
             "win_rate": 47.0,
@@ -269,7 +274,8 @@
             "exchange_commission": 5,
             "out_of_sample": true,
             "use_ml": false,
-            "data_source": "futpython"
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
             "win_rate": 65.0,
@@ -304,7 +310,8 @@
             "exchange_commission": 5,
             "out_of_sample": true,
             "use_ml": false,
-            "data_source": "futpython"
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
             "win_rate": 51.3,
@@ -340,7 +347,8 @@
             "exchange_commission": 5,
             "out_of_sample": true,
             "use_ml": false,
-            "data_source": "futpython"
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
             "win_rate": 68.1,
