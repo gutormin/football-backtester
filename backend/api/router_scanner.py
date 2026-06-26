@@ -30,6 +30,7 @@ from ..ml_clustering import extract_league_features, cluster_leagues
 from ..history_manager import load_history
 from ..models import PoissonModel, estimate_bookmaker_odds
 from ..elo_model import build_elo_tracker_from_history
+from ..ai_predictor import compute_edge_quality_score, apply_fdr_correction
 
 router = APIRouter()
 
@@ -292,71 +293,161 @@ def run_scan(req: ScanRequest):
                 markets_to_scan = [m for m in all_markets_def if m['code'] in user_markets or m['code'].replace('home', '1x2_home').replace('away', '1x2_away').replace('draw', '1x2_draw') in user_markets]
                 
             market_codes = [m['code'] for m in markets_to_scan]
-
+            parallel_results = backtester.run_parallel_scan(
+                leagues=req.leagues,
+                start_date=req.startDate,
+                end_date=req.endDate,
+                value_threshold=req.valueThreshold,
+                initial_bankroll=req.initialBankroll,
+                staking_rule=req.stakingRule,
+                stake_value=req.stakeValue,
+                odds_source=req.oddsSource,
+                min_odds=req.minOdds or 1.0,
+                max_odds=req.maxOdds or 2.50,
+                scan_type='markets',
+                markets_list=market_codes,
+                use_ml=req.use_ml,
+                data_source=req.data_source,
+                futpython_api_key=req.futpython_api_key
+            )
             for m in markets_to_scan:
-                try:
-                    res = backtester.run(
-                        leagues=req.leagues,
-                        start_date=req.startDate,
-                        end_date=req.endDate,
-                        market=m['code'],
-                        value_threshold=req.valueThreshold,
-                        initial_bankroll=req.initialBankroll,
-                        staking_rule=req.stakingRule,
-                        stake_value=req.stakeValue,
-                        odds_source=req.oddsSource,
-                        min_odds=req.minOdds,
-                        max_odds=req.maxOdds,
-                        data_source=req.data_source,
-                        futpython_api_key=req.futpython_api_key
-                    )
+                m_code = m['code']
+                if m_code in parallel_results:
+                    summary = parallel_results[m_code]
+                    eqs_data = compute_edge_quality_score(summary, summary.get('oos_summary'))
+                    v_color = eqs_data.get('verdict_color', '')
+                    hex_color = '#34d399' if v_color == 'success' else '#f59e0b' if v_color == 'warning' else '#ef4444' if v_color == 'danger' else '#888888'
+                    scan_results.append({
+                        'code': m_code,
+                        'name': m['name'],
+                        'net_profit': summary['net_profit'],
+                        'roi': summary['roi'],
+                        'win_rate': summary['win_rate'],
+                        'total_bets': summary['total_bets'],
+                        'ai_score': summary.get('ai_score', 0.0),
+                        'p_value': summary.get('p_value', None),
+                        'eqs_score': eqs_data.get('score', 0),
+                        'eqs_verdict': eqs_data.get('verdict', 'N/A'),
+                        'eqs_color': hex_color,
+                        'avg_clv': summary.get('avg_clv', 0.0),
+                        'opt_range': summary.get('optimized_odds_range'),
+                        'opt_eqs': summary.get('optimized_eqs_score')
+                    })
+        elif req.scanType == 'leagues':
+            market_list = [req.market] if isinstance(req.market, str) else req.market
+            parallel_results = backtester.run_parallel_scan(
+                leagues=req.leagues,
+                start_date=req.startDate,
+                end_date=req.endDate,
+                value_threshold=req.valueThreshold,
+                initial_bankroll=req.initialBankroll,
+                staking_rule=req.stakingRule,
+                stake_value=req.stakeValue,
+                odds_source=req.oddsSource,
+                min_odds=req.minOdds or 1.0,
+                max_odds=req.maxOdds or 2.50,
+                scan_type='leagues',
+                markets_list=market_list,
+                use_ml=req.use_ml,
+                data_source=req.data_source,
+                futpython_api_key=req.futpython_api_key
+            )
+            all_leagues = get_all_available_leagues()
+            for league_code in req.leagues:
+                if league_code in parallel_results:
+                    summary = parallel_results[league_code]
+                    league_name = next((l['name'] for l in all_leagues if l['code'] == league_code), league_code)
+                    eqs_data = compute_edge_quality_score(summary, summary.get('oos_summary'))
+                    v_color = eqs_data.get('verdict_color', '')
+                    hex_color = '#34d399' if v_color == 'success' else '#f59e0b' if v_color == 'warning' else '#ef4444' if v_color == 'danger' else '#888888'
+                    scan_results.append({
+                        'code': league_code,
+                        'name': league_name,
+                        'net_profit': summary['net_profit'],
+                        'roi': summary['roi'],
+                        'win_rate': summary['win_rate'],
+                        'total_bets': summary['total_bets'],
+                        'ai_score': summary.get('ai_score', 0.0),
+                        'p_value': summary.get('p_value', None),
+                        'eqs_score': eqs_data.get('score', 0),
+                        'eqs_verdict': eqs_data.get('verdict', 'N/A'),
+                        'eqs_color': hex_color,
+                        'avg_clv': summary.get('avg_clv', 0.0),
+                        'opt_range': summary.get('optimized_odds_range'),
+                        'opt_eqs': summary.get('optimized_eqs_score')
+                    })
                     
-                    if "error" not in res and res.get('summary', {}).get('total_bets', 0) > 0:
-                        sum_data = res['summary']
-                        scan_results.append({
-                            'parameter': m['name'],
-                            'total_bets': sum_data.get('total_bets', 0),
-                            'win_rate': f"{sum_data.get('win_rate', 0):.1f}%",
-                            'net_profit': f"${sum_data.get('net_profit', 0):.2f}",
-                            'roi': f"{sum_data.get('roi', 0):.2f}%",
-                            'payload': {**req.dict(), 'market': m['code']}
-                        })
-                except Exception:
-                    continue
-        else:
-            for l in req.leagues:
-                try:
-                    res = backtester.run(
-                        leagues=[l],
-                        start_date=req.startDate,
-                        end_date=req.endDate,
-                        market=req.market,
-                        value_threshold=req.valueThreshold,
-                        initial_bankroll=req.initialBankroll,
-                        staking_rule=req.stakingRule,
-                        stake_value=req.stakeValue,
-                        odds_source=req.oddsSource,
-                        min_odds=req.minOdds,
-                        max_odds=req.maxOdds,
-                        data_source=req.data_source,
-                        futpython_api_key=req.futpython_api_key
-                    )
+        elif req.scanType == 'combinations':
+            user_markets = req.market if isinstance(req.market, list) else [req.market]
+            if not user_markets or len(user_markets) == 0:
+                markets_to_scan = all_markets_def
+            else:
+                markets_to_scan = [m for m in all_markets_def if m['code'] in user_markets or m['code'].replace('home', '1x2_home').replace('away', '1x2_away').replace('draw', '1x2_draw') in user_markets]
+                
+            market_codes = [m['code'] for m in markets_to_scan]
+            parallel_results = backtester.run_parallel_scan(
+                leagues=req.leagues,
+                start_date=req.startDate,
+                end_date=req.endDate,
+                value_threshold=req.valueThreshold,
+                initial_bankroll=req.initialBankroll,
+                staking_rule=req.stakingRule,
+                stake_value=req.stakeValue,
+                odds_source=req.oddsSource,
+                min_odds=req.minOdds or 1.0,
+                max_odds=req.maxOdds or 2.50,
+                scan_type='combinations',
+                markets_list=market_codes,
+                use_ml=req.use_ml,
+                data_source=req.data_source,
+                futpython_api_key=req.futpython_api_key
+            )
+            all_leagues = get_all_available_leagues()
+            for key, summary in parallel_results.items():
+                parts = key.split('|', 1)
+                if len(parts) == 2:
+                    league_code, m_code = parts
+                    league_name = next((l['name'] for l in all_leagues if l['code'] == league_code), league_code)
+                    market_name = next((m['name'] for m in all_markets_def if m['code'] == m_code), m_code)
+                    eqs_data = compute_edge_quality_score(summary, summary.get('oos_summary'))
+                    v_color = eqs_data.get('verdict_color', '')
+                    hex_color = '#34d399' if v_color == 'success' else '#f59e0b' if v_color == 'warning' else '#ef4444' if v_color == 'danger' else '#888888'
+                    scan_results.append({
+                        'code': f"{league_code}|{m_code}",
+                        'name': f"{league_name} / {market_name}",
+                        'net_profit': summary['net_profit'],
+                        'roi': summary['roi'],
+                        'win_rate': summary['win_rate'],
+                        'total_bets': summary['total_bets'],
+                        'ai_score': summary.get('ai_score', 0.0),
+                        'p_value': summary.get('p_value', None),
+                        'eqs_score': eqs_data.get('score', 0),
+                        'eqs_verdict': eqs_data.get('verdict', 'N/A'),
+                        'eqs_color': hex_color,
+                        'avg_clv': summary.get('avg_clv', 0.0),
+                        'opt_range': summary.get('optimized_odds_range'),
+                        'opt_eqs': summary.get('optimized_eqs_score')
+                    })
                     
-                    if "error" not in res and res.get('summary', {}).get('total_bets', 0) > 0:
-                        sum_data = res['summary']
-                        scan_results.append({
-                            'parameter': l,
-                            'total_bets': sum_data.get('total_bets', 0),
-                            'win_rate': f"{sum_data.get('win_rate', 0):.1f}%",
-                            'net_profit': f"${sum_data.get('net_profit', 0):.2f}",
-                            'roi': f"{sum_data.get('roi', 0):.2f}%",
-                            'payload': {**req.dict(), 'leagues': [l]}
-                        })
-                except Exception:
-                    continue
-                    
-        return {"status": "success", "scan_results": scan_results, "results": scan_results}
+        # Aplica correção FDR (Benjamini-Hochberg) aos p-values do scanner
+        if scan_results:
+            p_values_raw = [r.get('p_value', 1.0) for r in scan_results]
+            if any(p is not None for p in p_values_raw):
+                p_values_clean = [p if p is not None else 1.0 for p in p_values_raw]
+                adjusted = apply_fdr_correction(p_values_clean)
+                for i, r in enumerate(scan_results):
+                    r['p_value_adjusted'] = adjusted[i]
+                    r['significant'] = adjusted[i] < 0.05
+
+        return {
+            "status": "success",
+            "scan_type": req.scanType,
+            "results": scan_results,
+            "scan_results": scan_results
+        }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/telegram/config")
