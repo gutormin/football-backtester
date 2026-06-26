@@ -1,5 +1,104 @@
 [
     {
+        "id": "a945cb2d-eaae-4e4d-bf06-7b89b8041b03",
+        "created_at": "2026-06-25T13:55:18.052Z",
+        "name": "Chile - Copa chile - Otimizada (EV: 1.05 | Odds: 2.00-3.00)  -MANDANTE 1",
+        "type": "strategy",
+        "is_tg_active": false,
+        "params": {
+            "leagues": [
+                "chile/copa-chile"
+            ],
+            "startDate": "2021-01-01",
+            "endDate": "2026-06-01",
+            "market": [
+                "home"
+            ],
+            "valueThreshold": 1.05,
+            "initialBankroll": 1000,
+            "stakingRule": "fixed",
+            "stakeValue": 10,
+            "oddsSource": "B365",
+            "minOdds": 2,
+            "maxOdds": 3,
+            "exchange_commission": 5,
+            "out_of_sample": true,
+            "use_ml": false,
+            "data_source": "futpython",
+            "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd",
+            "minOddsH": null,
+            "maxOddsH": null,
+            "minOddsD": null,
+            "maxOddsD": null,
+            "minOddsA": null,
+            "maxOddsA": null,
+            "minOddsOver25": null,
+            "maxOddsOver25": null,
+            "minOddsUnder25": null,
+            "maxOddsUnder25": null
+        },
+        "summary": {
+            "initial_bankroll": 1000,
+            "final_bankroll": 1179.8,
+            "net_profit": 179.8,
+            "profit_in_stakes": 17.98,
+            "total_bets": 40,
+            "wins": 23,
+            "losses": 17,
+            "win_rate": 57.5,
+            "roi": 44.95,
+            "max_drawdown": 3.36,
+            "max_dd_duration": 6,
+            "total_staked": 400,
+            "avg_odds": 2.56,
+            "sharpe_ratio": 6.49,
+            "sortino_ratio": 30.37,
+            "skewness": -0.25,
+            "max_consec_wins": 7,
+            "max_consec_losses": 4,
+            "avg_clv": null,
+            "bcl_percent": null,
+            "p_value": 0.008423,
+            "brier_score": 0.2553,
+            "brier_score_market": 0.2723,
+            "brier_improvement": 6.24,
+            "bootstrap_roi_ci_lower": 6,
+            "bootstrap_roi_ci_upper": 83.68,
+            "bootstrap_roi_median": 44.91,
+            "prob_positive_roi": 0.9876,
+            "min_sample_size": 100,
+            "sample_sufficient": false,
+            "power_ratio": 0.4,
+            "rolling_roi": [],
+            "edge_decay_pct": null,
+            "edge_decay_alert": null
+        }
+    },
+    {
+        "id": "05dff705-368e-47bb-81e6-86c562eb4e84",
+        "created_at": "2026-06-25T14:20:42.143Z",
+        "name": "Usa - Usl championship+Ukraine - Persha liga +South-africa - Betway premiership - HT UNDER 1.5",
+        "type": "portfolio",
+        "is_tg_active": true,
+        "params": {
+            "strategy_ids": [
+                "usa-usl-ht-under",
+                "ukraine-persha-ht-under",
+                "south-africa-betway-ht-under",
+                "paraguay-intermedia-ht-under"
+            ],
+            "risk_method": "fixed_2.5",
+            "initial_bankroll": 1000
+        },
+        "summary": {
+            "net_profit": 10164,
+            "roi": 73.25,
+            "win_rate": 68.5,
+            "total_bets": 555,
+            "max_drawdown": 7.24
+        }
+    },
+    {
         "id": "ukraine-serbia-portfolio",
         "created_at": "2026-06-24T23:02:00.000000Z",
         "name": "Ukraine - Persha liga + Serbia - Mozzart bet prva liga - HT EMPATE",
@@ -26,7 +125,7 @@
         "created_at": "2026-06-24T21:58:00.000000Z",
         "name": "Ukraine - Persha liga + South-africa - premiership - HT UNDER 1.5",
         "type": "portfolio",
-        "is_tg_active": false,
+        "is_tg_active": true,
         "params": {
             "strategy_ids": [
                 "ukraine-persha-ht-under",
@@ -48,7 +147,7 @@
         "created_at": "2026-06-24T21:55:00.000000Z",
         "name": "Greece - Super league 2 + Usa - Usl championship - HT UNDER 1.5",
         "type": "portfolio",
-        "is_tg_active": false,
+        "is_tg_active": true,
         "params": {
             "strategy_ids": [
                 "greece-super2-ht-under",
@@ -59,7 +158,7 @@
         },
         "summary": {
             "win_rate": 67.5,
-            "net_profit": 603.0,
+            "net_profit": 603,
             "roi": 11.38,
             "max_drawdown": 13.29,
             "total_bets": 300
@@ -207,7 +306,7 @@
             "win_rate": 75.2,
             "net_profit": 865.1,
             "roi": 40.43,
-            "max_drawdown": 3.0,
+            "max_drawdown": 3,
             "sharpe_ratio": 6.04,
             "total_bets": 214
         }
@@ -241,7 +340,7 @@
             "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
-            "win_rate": 47.0,
+            "win_rate": 47,
             "net_profit": 925.5,
             "roi": 69.07,
             "max_drawdown": 6.1,
@@ -278,10 +377,10 @@
             "futpython_api_key": "cmqa6oz0p01i1wq6lzxknltmd"
         },
         "summary": {
-            "win_rate": 65.0,
-            "net_profit": 500.0,
-            "roi": 20.0,
-            "max_drawdown": 5.0,
+            "win_rate": 65,
+            "net_profit": 500,
+            "roi": 20,
+            "max_drawdown": 5,
             "total_bets": 100
         }
     },
@@ -318,7 +417,7 @@
             "net_profit": 1519.3,
             "roi": 57.33,
             "max_drawdown": 4.8,
-            "sharpe_ratio": 9.0,
+            "sharpe_ratio": 9,
             "total_bets": 265
         }
     },
