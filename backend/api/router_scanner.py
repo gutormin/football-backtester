@@ -202,7 +202,7 @@ def run_steam_moves_scan(req: SteamMovesRequest):
             )
             all_results.extend(results)
             
-        return {"status": "success", "scan_results": all_results}
+        return {"status": "success", "scan_results": all_results, "results": all_results}
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -355,7 +355,7 @@ def run_scan(req: ScanRequest):
                 except Exception:
                     continue
                     
-        return {"status": "success", "scan_results": scan_results}
+        return {"status": "success", "scan_results": scan_results, "results": scan_results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -495,7 +495,7 @@ async def run_tg_scheduler_now():
 def get_live_steam_moves(req: LiveSteamRequest):
     tracker_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'live_odds_tracker.json')
     if not os.path.exists(tracker_file):
-        return {"status": "success", "scan_results": []}
+        return {"status": "success", "scan_results": [], "results": []}
         
     try:
         with open(tracker_file, 'r', encoding='utf-8') as f:
@@ -541,7 +541,7 @@ def get_live_steam_moves(req: LiveSteamRequest):
                             })
                             
         results = sorted(results, key=lambda x: x['drop_pct'], reverse=True)
-        return {"status": "success", "scan_results": results}
+        return {"status": "success", "scan_results": results, "results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
