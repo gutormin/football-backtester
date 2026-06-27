@@ -3,15 +3,15 @@
     "mode": "manual",
     "check_interval_hours": 6,
     "leagues": [
-        "E2"
+        "austria/bundesliga"
     ],
     "market": [
-        "btts_yes"
+        "draw"
     ],
-    "value_threshold": 1.15,
+    "value_threshold": 1.05,
     "min_odds": 1.0,
-    "max_odds": 50.0,
-    "staking_rule": "kelly_quarter",
+    "max_odds": 9.5,
+    "staking_rule": "fixed",
     "stake_value": 10.0,
     "initial_bankroll": 1000.0,
     "upcoming_source": "api"

@@ -9113,6 +9113,15 @@ window.reloadStrategyById = reloadStrategyById;
 window.reloadStrategy = reloadStrategy;
 window.toggleActivePortfolio = toggleActivePortfolio;
 window.onCalculatorLeagueChange = onCalculatorLeagueChange;
+window.applyEvSuggestion = applyEvSuggestion;
+window.applyLeagueSuggestion = applyLeagueSuggestion;
+window.applyOddsSuggestion = applyOddsSuggestion;
+window.applyScannedStrategy = applyScannedStrategy;
+window.copyClusterLeagues = copyClusterLeagues;
+window.loadPortfolio = loadPortfolio;
+window.sendIndividualTip = sendIndividualTip;
+window.simulateSelectedScannerItems = simulateSelectedScannerItems;
+window.updateTipStatus = updateTipStatus;
 
 // Expose missing UI event handlers to global scope
 window.clearDashboard = clearDashboard;
