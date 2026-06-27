@@ -29,14 +29,16 @@ export function showToast(message, type = 'info') {
 // Navigation Tab Switching
 export function switchTab(tabId) {
     // Esconder todos os painéis de abas
-    document.querySelectorAll('.tab-content-panel').forEach(panel => {
+    document.querySelectorAll('.tab-pane').forEach(panel => {
         panel.classList.remove('active');
         panel.style.display = 'none';
     });
     
-    // Remover classe ativa dos botões do menu lateral
-    document.querySelectorAll('.sidebar-nav-btn').forEach(btn => {
+    // Remover classe ativa de todos os botões de aba
+    document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
+        btn.style.color = 'var(--text-muted)';
+        btn.style.borderBottomColor = 'transparent';
     });
     
     // Mostrar o painel selecionado
@@ -46,10 +48,12 @@ export function switchTab(tabId) {
         activePanel.style.display = 'block';
     }
     
-    // Marcar botão correspondente no menu
-    const correspondingBtn = document.querySelector(`.sidebar-nav-btn[onclick*="${tabId}"]`);
+    // Marcar botão correspondente como ativo
+    const correspondingBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
     if (correspondingBtn) {
         correspondingBtn.classList.add('active');
+        correspondingBtn.style.color = 'var(--text-primary)';
+        correspondingBtn.style.borderBottomColor = 'var(--primary)';
     }
 }
 

@@ -1,10 +1,10 @@
-const CACHE_NAME = 'backtester-pro-v39';
+const CACHE_NAME = 'backtester-pro-v40';
 const ASSETS = [
   '/',
   '/index.html',
-  '/styles.css?v=7',
-  '/app.js?v=57',
-  '/js/utils.js',
+  '/styles.css?v=8',
+  '/app.js?v=58',
+  '/js/utils.js?v=2',
   '/js/api.js',
   '/manifest.json'
 ];
