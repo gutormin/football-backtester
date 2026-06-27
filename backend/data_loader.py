@@ -815,6 +815,56 @@ def fetch_futpython_data(league_code, start_date, api_key):
                             df[col] = df[col].astype(str).str.replace(',', '.')
                             df[col] = pd.to_numeric(df[col], errors='ignore')
                             
+                # Validate and correct Double Chance odds (corrupted or missing)
+                dc_cols = ['DC_1X', 'DC_X2', 'DC_12']
+                one_x_two = ['B365H', 'B365D', 'B365A']
+                
+                # Make sure 1X2 and DC columns are clean float types
+                for col in dc_cols + one_x_two:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce')
+                
+                if all(col in df.columns for col in one_x_two):
+                    # Calculate unnormalized synthetic odds as fallback
+                    h_prob = 1.0 / df['B365H']
+                    d_prob = 1.0 / df['B365D']
+                    a_prob = 1.0 / df['B365A']
+                    
+                    synth_1X = 1.0 / (h_prob + d_prob)
+                    synth_X2 = 1.0 / (a_prob + d_prob)
+                    synth_12 = 1.0 / (h_prob + a_prob)
+                    
+                    # Fill missing/corrupt values
+                    for col, synth_val in [('DC_1X', synth_1X), ('DC_X2', synth_X2), ('DC_12', synth_12)]:
+                        if col not in df.columns:
+                            df[col] = synth_val
+                        else:
+                            # 1. Null, zero or <= 1.0 odds
+                            is_invalid = df[col].isna() | (df[col] <= 1.0)
+                            
+                            # 2. Mathematical corruption or API bug (copy-paste signature)
+                            if col == 'DC_12':
+                                is_corrupt = (
+                                    (df[col] == df['B365D']) | # copied Draw odd
+                                    (df[col] >= df['B365H']) | # combined odd >= home odd
+                                    (df[col] >= df['B365A']) | # combined odd >= away odd
+                                    ((df[col] - synth_val).abs() > 0.25) # large math discrepancy
+                                )
+                            elif col == 'DC_1X':
+                                is_corrupt = (
+                                    (df[col] == df['B365H']) | # copied Home odd
+                                    ((df[col] - synth_val).abs() > 0.25)
+                                )
+                            else: # DC_X2
+                                is_corrupt = (
+                                    (df[col] == df['B365A']) | # copied Away odd
+                                    ((df[col] - synth_val).abs() > 0.25)
+                                )
+                            
+                            # Replace invalid or corrupt values with synthetic fallback
+                            df[col] = df[col].where(~(is_invalid | is_corrupt), synth_val)
+                            
+                            
                 # Derive HTHG and HTAG from Min_Goals_Home and Min_Goals_Away if they exist
                 import numpy as np
                 def parse_ht_goals_robust(row, min_col, ft_col):
