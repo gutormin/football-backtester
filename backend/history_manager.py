@@ -1,37 +1,128 @@
 import json
 import os
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 
+DB_FILE = "data/backtester.db"
 HISTORY_FILE = "data/history_strategies.json"
 
-def ensure_history_dir():
-    os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
-    if not os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-            json.dump([], f)
+def get_db_connection():
+    os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS strategies (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                is_tg_active INTEGER DEFAULT 0,
+                parameters TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+        
+        # Check for legacy migration
+        if os.path.exists(HISTORY_FILE):
+            try:
+                with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                    history = json.load(f)
+                
+                if isinstance(history, list) and len(history) > 0:
+                    print(f"Migrando {len(history)} estratégias legadas de {HISTORY_FILE} para o SQLite...")
+                    with conn:
+                        for s in history:
+                            provided_id = s.get("id") or str(uuid.uuid4())
+                            name = s.get("name", "Nova Estratégia")
+                            stype = s.get("type", "strategy")
+                            # Retrospective migration
+                            if stype != 'portfolio' and 'strategy_ids' in s.get('params', {}):
+                                stype = 'portfolio'
+                            created_at = s.get("created_at") or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                            is_tg_active = 1 if s.get("is_tg_active", False) else 0
+                            
+                            parameters_blob = json.dumps({
+                                "params": s.get("params", {}),
+                                "summary": s.get("summary", {})
+                            }, ensure_ascii=False)
+                            
+                            conn.execute("""
+                                INSERT OR IGNORE INTO strategies (id, name, type, created_at, is_tg_active, parameters)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (provided_id, name, stype, created_at, is_tg_active, parameters_blob))
+                    print("Migração concluída com sucesso no SQLite.")
+                
+                # Rename legacy file to avoid migrating again
+                bak_file = HISTORY_FILE + ".bak"
+                if os.path.exists(bak_file):
+                    try:
+                        os.remove(bak_file)
+                    except Exception:
+                        pass
+                os.rename(HISTORY_FILE, bak_file)
+                print(f"Arquivo legado renomeado para {bak_file}")
+                
+            except Exception as e:
+                print(f"Erro durante a migração do histórico legado: {e}")
+    finally:
+        conn.close()
+
+# Initialize DB on import
+init_db()
 
 def load_history():
-    ensure_history_dir()
+    init_db()
+    conn = get_db_connection()
     try:
-        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-            history = json.load(f)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, type, created_at, is_tg_active, parameters FROM strategies ORDER BY created_at DESC")
+        rows = cursor.fetchall()
         
-        # Retrospective migration: ensure portfolios have type = 'portfolio'
+        history = []
         modified = False
-        for s in history:
-            if s.get('type') != 'portfolio' and 'strategy_ids' in s.get('params', {}):
-                s['type'] = 'portfolio'
+        
+        for row in rows:
+            try:
+                params_dict = json.loads(row['parameters'])
+            except Exception:
+                params_dict = {}
+            
+            entry = {
+                "id": row['id'],
+                "name": row['name'],
+                "type": row['type'],
+                "created_at": row['created_at'],
+                "is_tg_active": bool(row['is_tg_active']),
+                "params": params_dict.get("params", {}),
+                "summary": params_dict.get("summary", {})
+            }
+            
+            # Retrospective migration: ensure portfolios have type = 'portfolio'
+            if entry['type'] != 'portfolio' and 'strategy_ids' in entry.get('params', {}):
+                entry['type'] = 'portfolio'
                 modified = True
+                conn.execute("UPDATE strategies SET type = ? WHERE id = ?", ("portfolio", entry['id']))
+                
+            history.append(entry)
+            
         if modified:
-            save_history(history)
+            conn.commit()
             
         return history
-    except Exception:
+    except Exception as e:
+        print(f"Erro ao carregar histórico: {e}")
         return []
+    finally:
+        conn.close()
 
 def add_strategy(data: dict):
-    history = load_history()
+    init_db()
     
     provided_id = data.get("id")
     inferred_type = data.get("type", "strategy")
@@ -48,7 +139,6 @@ def add_strategy(data: dict):
                 params["futpython_api_key"] = "cmqa6oz0p01i1wq6lzxknltmd"
 
     entry = {
-        # Respect client-provided ID so localStorage sync works correctly
         "id": provided_id if provided_id else str(uuid.uuid4()),
         "created_at": data.get("created_at") or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "name": data.get("name", "Nova Estratégia"),
@@ -58,27 +148,61 @@ def add_strategy(data: dict):
         "summary": data.get("summary", {})
     }
     
-    # Upsert: replace if same ID already exists, else insert at beginning
-    existing_idx = next((i for i, h in enumerate(history) if h.get("id") == entry["id"]), None)
-    if existing_idx is not None:
-        history[existing_idx] = entry
-    else:
-        history.insert(0, entry)
+    parameters_blob = json.dumps({
+        "params": entry["params"],
+        "summary": entry["summary"]
+    }, ensure_ascii=False)
     
-    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-        json.dump(history, f, indent=4, ensure_ascii=False)
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            INSERT OR REPLACE INTO strategies (id, name, type, created_at, is_tg_active, parameters)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            entry["id"],
+            entry["name"],
+            entry["type"],
+            entry["created_at"],
+            1 if entry["is_tg_active"] else 0,
+            parameters_blob
+        ))
+        conn.commit()
+    finally:
+        conn.close()
         
     return entry
 
 def save_history(history: list):
-    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-        json.dump(history, f, indent=4, ensure_ascii=False)
+    init_db()
+    conn = get_db_connection()
+    try:
+        with conn:
+            conn.execute("DELETE FROM strategies")
+            for s in history:
+                provided_id = s.get("id") or str(uuid.uuid4())
+                name = s.get("name", "Nova Estratégia")
+                stype = s.get("type", "strategy")
+                created_at = s.get("created_at") or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                is_tg_active = 1 if s.get("is_tg_active", False) else 0
+                
+                parameters_blob = json.dumps({
+                    "params": s.get("params", {}),
+                    "summary": s.get("summary", {})
+                }, ensure_ascii=False)
+                
+                conn.execute("""
+                    INSERT INTO strategies (id, name, type, created_at, is_tg_active, parameters)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (provided_id, name, stype, created_at, is_tg_active, parameters_blob))
+    finally:
+        conn.close()
 
 def delete_strategy(strategy_id: str):
-    history = load_history()
-    new_history = [s for s in history if s.get("id") != strategy_id]
-    
-    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-        json.dump(new_history, f, indent=4, ensure_ascii=False)
-        
+    init_db()
+    conn = get_db_connection()
+    try:
+        conn.execute("DELETE FROM strategies WHERE id = ?", (strategy_id,))
+        conn.commit()
+    finally:
+        conn.close()
     return True
