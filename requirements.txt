@@ -5,4 +5,5 @@ uvicorn
 requests
 xgboost
 scikit-learn
+psycopg2-binary
 

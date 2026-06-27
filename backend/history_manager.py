@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 DB_FILE = "data/backtester.db"
 HISTORY_FILE = "data/history_strategies.json"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_db_connection():
     os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
@@ -13,7 +14,35 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def get_pg_connection():
+    url = DATABASE_URL
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    import psycopg2
+    return psycopg2.connect(url)
+
 def init_db():
+    if DATABASE_URL:
+        conn = get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS strategies (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        is_tg_active INTEGER DEFAULT 0,
+                        parameters TEXT NOT NULL
+                    )
+                """)
+                conn.commit()
+        except Exception as e:
+            print(f"Erro ao inicializar banco PostgreSQL: {e}")
+        finally:
+            conn.close()
+        return
+
     conn = get_db_connection()
     try:
         conn.execute("""
@@ -78,6 +107,35 @@ init_db()
 
 def load_history():
     init_db()
+    if DATABASE_URL:
+        conn = get_pg_connection()
+        from psycopg2.extras import RealDictCursor
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT id, name, type, created_at, is_tg_active, parameters FROM strategies ORDER BY created_at DESC")
+                rows = cur.fetchall()
+                history = []
+                for row in rows:
+                    try:
+                        params_dict = json.loads(row['parameters'])
+                    except Exception:
+                        params_dict = {}
+                    history.append({
+                        "id": row['id'],
+                        "name": row['name'],
+                        "type": row['type'],
+                        "created_at": row['created_at'],
+                        "is_tg_active": bool(row['is_tg_active']),
+                        "params": params_dict.get("params", {}),
+                        "summary": params_dict.get("summary", {})
+                    })
+                return history
+        except Exception as e:
+            print(f"Erro ao carregar histórico do PostgreSQL: {e}")
+            return []
+        finally:
+            conn.close()
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -103,7 +161,6 @@ def load_history():
                 "summary": params_dict.get("summary", {})
             }
             
-            # Retrospective migration: ensure portfolios have type = 'portfolio'
             if entry['type'] != 'portfolio' and 'strategy_ids' in entry.get('params', {}):
                 entry['type'] = 'portfolio'
                 modified = True
@@ -123,7 +180,6 @@ def load_history():
 
 def add_strategy(data: dict):
     init_db()
-    
     provided_id = data.get("id")
     inferred_type = data.get("type", "strategy")
     if 'strategy_ids' in data.get("params", {}):
@@ -152,6 +208,34 @@ def add_strategy(data: dict):
         "params": entry["params"],
         "summary": entry["summary"]
     }, ensure_ascii=False)
+
+    if DATABASE_URL:
+        conn = get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO strategies (id, name, type, created_at, is_tg_active, parameters)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        type = EXCLUDED.type,
+                        created_at = EXCLUDED.created_at,
+                        is_tg_active = EXCLUDED.is_tg_active,
+                        parameters = EXCLUDED.parameters
+                """, (
+                    entry["id"],
+                    entry["name"],
+                    entry["type"],
+                    entry["created_at"],
+                    1 if entry["is_tg_active"] else 0,
+                    parameters_blob
+                ))
+                conn.commit()
+        except Exception as e:
+            print(f"Erro ao salvar estratégia no PostgreSQL: {e}")
+        finally:
+            conn.close()
+        return entry
     
     conn = get_db_connection()
     try:
@@ -174,6 +258,34 @@ def add_strategy(data: dict):
 
 def save_history(history: list):
     init_db()
+    if DATABASE_URL:
+        conn = get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM strategies")
+                for s in history:
+                    provided_id = s.get("id") or str(uuid.uuid4())
+                    name = s.get("name", "Nova Estratégia")
+                    stype = s.get("type", "strategy")
+                    created_at = s.get("created_at") or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                    is_tg_active = 1 if s.get("is_tg_active", False) else 0
+                    
+                    parameters_blob = json.dumps({
+                        "params": s.get("params", {}),
+                        "summary": s.get("summary", {})
+                    }, ensure_ascii=False)
+                    
+                    cur.execute("""
+                        INSERT INTO strategies (id, name, type, created_at, is_tg_active, parameters)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (provided_id, name, stype, created_at, is_tg_active, parameters_blob))
+                conn.commit()
+        except Exception as e:
+            print(f"Erro ao re-salvar histórico no PostgreSQL: {e}")
+        finally:
+            conn.close()
+        return
+
     conn = get_db_connection()
     try:
         with conn:
@@ -199,6 +311,18 @@ def save_history(history: list):
 
 def delete_strategy(strategy_id: str):
     init_db()
+    if DATABASE_URL:
+        conn = get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM strategies WHERE id = %s", (strategy_id,))
+                conn.commit()
+        except Exception as e:
+            print(f"Erro ao deletar estratégia no PostgreSQL: {e}")
+        finally:
+            conn.close()
+        return True
+
     conn = get_db_connection()
     try:
         conn.execute("DELETE FROM strategies WHERE id = ?", (strategy_id,))
