@@ -101,6 +101,161 @@ async function handleDataSourceChange() {
     updateMarketBadgesUI();
 }
 
+const MARKET_COLUMN_MAP = {
+    'footballdata': {
+        'home': 'odds_ft_1',
+        'away': 'odds_ft_2',
+        'draw': 'odds_ft_x',
+        'lay_home': 'odds_doublechance_x2',
+        'lay_away': 'odds_doublechance_1x',
+        'lay_draw': 'odds_doublechance_12',
+        'over15': 'odds_ft_over15',
+        'over25': 'odds_ft_over25',
+        'under25': 'odds_ft_under25',
+        'over35': 'odds_ft_over35',
+        'under35': 'odds_ft_under35',
+        'over45': 'odds_ft_over45',
+        'under45': 'odds_ft_under45',
+        'over55': 'Poisson (Estimado)',
+        'under55': 'Poisson (Estimado)',
+        'btts_yes': 'odds_btts_yes',
+        'btts_no': 'odds_btts_no',
+        'dnb_h': 'odds_dnb_1',
+        'dnb_a': 'odds_dnb_2',
+        'ah_home': 'Poisson (Estimado)',
+        'ah_away': 'Poisson (Estimado)',
+        'ht_home': 'odds_1st_half_result_1',
+        'ht_draw': 'odds_1st_half_result_x',
+        'ht_away': 'odds_1st_half_result_2',
+        'ht_over05': 'odds_1st_half_over05',
+        'ht_under05': 'odds_1st_half_under05',
+        'ht_over15': 'odds_1st_half_over15',
+        'ht_under15': 'odds_1st_half_under15',
+        'ht_over25': 'odds_1st_half_over25',
+        'ht_under25': 'odds_1st_half_under25',
+        'ht_over35': 'odds_1st_half_over35',
+        'ht_under35': 'odds_1st_half_under35',
+        'sh_home': 'odds_2nd_half_result_1',
+        'sh_draw': 'odds_2nd_half_result_x',
+        'sh_away': 'odds_2nd_half_result_2',
+        'sh_over05': 'odds_2nd_half_over05',
+        'sh_under05': 'odds_2nd_half_under05',
+        'sh_over15': 'odds_2nd_half_over15',
+        'sh_under15': 'odds_2nd_half_under15',
+        'sh_over25': 'odds_2nd_half_over25',
+        'sh_under25': 'odds_2nd_half_under25',
+        'sh_over35': 'odds_2nd_half_over35',
+        'sh_under35': 'odds_2nd_half_under35',
+        'win_to_nil_home': 'odds_win_to_nil_1',
+        'win_to_nil_away': 'odds_win_to_nil_2',
+        'corners_1': 'odds_corners_1',
+        'corners_x': 'odds_corners_x',
+        'corners_2': 'odds_corners_2',
+        'corners_over_75': 'odds_corners_over_75',
+        'corners_under_75': 'odds_corners_under_75',
+        'corners_over_85': 'odds_corners_over_85',
+        'corners_under_85': 'odds_corners_under_85',
+        'corners_over_95': 'odds_corners_over_95',
+        'corners_under_95': 'odds_corners_under_95',
+        'corners_over_105': 'odds_corners_over_105',
+        'corners_under_105': 'odds_corners_under_105',
+        'corners_over_115': 'odds_corners_over_115',
+        'corners_under_115': 'odds_corners_under_115',
+        'cs_10': 'Poisson (Estimado)',
+        'cs_20': 'Poisson (Estimado)',
+        'cs_21': 'Poisson (Estimado)',
+        'cs_00': 'Poisson (Estimado)',
+        'cs_11': 'Poisson (Estimado)',
+        'cs_01': 'Poisson (Estimado)',
+        'cs_02': 'Poisson (Estimado)',
+        'cs_12': 'Poisson (Estimado)',
+        'lay_cs_10': 'Poisson (Estimado)',
+        'lay_cs_20': 'Poisson (Estimado)',
+        'lay_cs_21': 'Poisson (Estimado)',
+        'lay_cs_00': 'Poisson (Estimado)',
+        'lay_cs_11': 'Poisson (Estimado)',
+        'lay_cs_01': 'Poisson (Estimado)',
+        'lay_cs_02': 'Poisson (Estimado)',
+        'lay_cs_12': 'Poisson (Estimado)'
+    },
+    'futpython': {
+        'home': 'Odd_1_FT',
+        'away': 'Odd_2_FT',
+        'draw': 'Odd_X_FT',
+        'lay_home': 'DC_X2',
+        'lay_away': 'DC_1X',
+        'lay_draw': 'DC_12',
+        'over15': 'Over_FT_1_5',
+        'over25': 'Over_FT_2_5',
+        'under25': 'Under_FT_2_5',
+        'over35': 'Over_FT_3_5',
+        'under35': 'Under_FT_3_5',
+        'over45': 'Over_FT_4_5',
+        'under45': 'Under_FT_4_5',
+        'over55': 'Poisson (Estimado)',
+        'under55': 'Poisson (Estimado)',
+        'btts_yes': 'BTTS_Yes',
+        'btts_no': 'BTTS_No',
+        'dnb_h': 'Indisponível',
+        'dnb_a': 'Indisponível',
+        'ah_home': 'AH_Home_neg/pos_*',
+        'ah_away': 'AH_Away_neg/pos_*',
+        'ht_home': 'Odd_1_HT',
+        'ht_draw': 'Odd_X_HT',
+        'ht_away': 'Odd_2_HT',
+        'ht_over05': 'Over_HT_0_5',
+        'ht_under05': 'Under_HT_0_5',
+        'ht_over15': 'Over_HT_1_5',
+        'ht_under15': 'Under_HT_1_5',
+        'ht_over25': 'Over_HT_2_5',
+        'ht_under25': 'Under_HT_2_5',
+        'ht_over35': 'Indisponível',
+        'ht_under35': 'Indisponível',
+        'sh_home': 'Indisponível',
+        'sh_draw': 'Indisponível',
+        'sh_away': 'Indisponível',
+        'sh_over05': 'Indisponível',
+        'sh_under05': 'Indisponível',
+        'sh_over15': 'Indisponível',
+        'sh_under15': 'Indisponível',
+        'sh_over25': 'Indisponível',
+        'sh_under25': 'Indisponível',
+        'sh_over35': 'Indisponível',
+        'sh_under35': 'Indisponível',
+        'win_to_nil_home': 'Indisponível',
+        'win_to_nil_away': 'Indisponível',
+        'corners_1': 'Indisponível',
+        'corners_x': 'Indisponível',
+        'corners_2': 'Indisponível',
+        'corners_over_75': 'Indisponível',
+        'corners_under_75': 'Indisponível',
+        'corners_over_85': 'Indisponível',
+        'corners_under_85': 'Indisponível',
+        'corners_over_95': 'Indisponível',
+        'corners_under_95': 'Indisponível',
+        'corners_over_105': 'Indisponível',
+        'corners_under_105': 'Indisponível',
+        'corners_over_115': 'Indisponível',
+        'corners_under_115': 'Indisponível',
+        'cs_10': 'CS_1_0',
+        'cs_20': 'CS_2_0',
+        'cs_21': 'CS_2_1',
+        'cs_00': 'CS_0_0',
+        'cs_11': 'CS_1_1',
+        'cs_01': 'CS_0_1',
+        'cs_02': 'CS_0_2',
+        'cs_12': 'CS_1_2',
+        'lay_cs_10': 'CS_1_0 (Lay)',
+        'lay_cs_20': 'CS_2_0 (Lay)',
+        'lay_cs_21': 'CS_2_1 (Lay)',
+        'lay_cs_00': 'CS_0_0 (Lay)',
+        'lay_cs_11': 'CS_1_1 (Lay)',
+        'lay_cs_01': 'CS_0_1 (Lay)',
+        'lay_cs_02': 'CS_0_2 (Lay)',
+        'lay_cs_12': 'CS_1_2 (Lay)'
+    }
+};
+
 function updateMarketBadgesUI() {
     const activeSource = window.currentDataSource;
     const badgesFd = document.querySelectorAll('.mkt-badge-fd');
@@ -116,6 +271,30 @@ function updateMarketBadgesUI() {
         badgesFd.forEach(b => b.classList.remove('mkt-badge-dimmed'));
         badgesFp.forEach(b => b.classList.remove('mkt-badge-dimmed'));
     }
+    
+    // Update dynamic column name display next to each market option
+    const options = document.querySelectorAll('.multiselect-option-item');
+    options.forEach(opt => {
+        const checkbox = opt.querySelector('input[type="checkbox"]');
+        if (!checkbox) return;
+        const val = checkbox.value;
+        const colSpan = opt.querySelector('.mkt-col-name');
+        if (!colSpan) return;
+        
+        const sourceMap = MARKET_COLUMN_MAP[activeSource];
+        if (sourceMap && sourceMap[val]) {
+            const colName = sourceMap[val];
+            if (colName === 'Indisponível') {
+                colSpan.textContent = ' (Indisponível)';
+                colSpan.style.color = '#ff4a4a';
+            } else {
+                colSpan.textContent = ` (${colName})`;
+                colSpan.style.color = 'var(--text-secondary)';
+            }
+        } else {
+            colSpan.textContent = '';
+        }
+    });
 }
 
 

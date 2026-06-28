@@ -17,6 +17,27 @@ from .metrics import compile_backtest_summary, compile_parallel_scan_summary
 
 _FACTORIALS = [math.factorial(i) for i in range(16)]
 
+def get_futpython_ah_odd(row, line, side="Home"):
+    if pd.isna(line):
+        return np.nan
+    sign = "neg" if line < 0 else "pos"
+    abs_line = abs(line)
+    if abs_line == int(abs_line):
+        line_str = str(int(abs_line))
+    else:
+        line_str = str(abs_line).replace('.', '_')
+    col_name = f"AH_{side}_{sign}_{line_str}"
+    
+    val = row.get(col_name)
+    if val is not None and not pd.isna(val):
+        try:
+            v = float(str(val).replace(',', '.'))
+            if v > 1.0:
+                return v
+        except Exception:
+            pass
+    return np.nan
+
 class ChronologicalBacktester:
     def __init__(self, rolling_games=15):
         self.rolling_games = rolling_games
@@ -991,6 +1012,10 @@ class ChronologicalBacktester:
                         if odds_source == 'B365':
                             odds_ah_h = row.get('B365AHH')
                             odds_ah_a = row.get('B365AHA')
+                            if pd.isna(odds_ah_h) or odds_ah_h <= 1.0:
+                                odds_ah_h = get_futpython_ah_odd(row, line, "Home")
+                            if pd.isna(odds_ah_a) or odds_ah_a <= 1.0:
+                                odds_ah_a = get_futpython_ah_odd(row, -line, "Away")
                         elif odds_source == 'Avg':
                             odds_ah_h = row.get('AvgAHH')
                             odds_ah_a = row.get('AvgAHA')
@@ -1050,6 +1075,10 @@ class ChronologicalBacktester:
                         if odds_source == 'B365':
                             odds_ah_h = row.get('B365AHH')
                             odds_ah_a = row.get('B365AHA')
+                            if pd.isna(odds_ah_h) or odds_ah_h <= 1.0:
+                                odds_ah_h = get_futpython_ah_odd(row, -line, "Home")
+                            if pd.isna(odds_ah_a) or odds_ah_a <= 1.0:
+                                odds_ah_a = get_futpython_ah_odd(row, line, "Away")
                         elif odds_source == 'Avg':
                             odds_ah_h = row.get('AvgAHH')
                             odds_ah_a = row.get('AvgAHA')
@@ -1752,8 +1781,16 @@ class ChronologicalBacktester:
             
             # Asian Handicap (Main Spread)
             ahh_line = row.get('AHh')
-            odds_ahh = row.get('B365AHH') if odds_source == 'B365' else (row.get('AvgAHH') if odds_source == 'Avg' else row.get('MaxAHH'))
-            odds_aha = row.get('B365AHA') if odds_source == 'B365' else (row.get('AvgAHA') if odds_source == 'Avg' else row.get('MaxAHA'))
+            if odds_source == 'B365':
+                odds_ahh = row.get('B365AHH')
+                odds_aha = row.get('B365AHA')
+                if (odds_ahh is None or pd.isna(odds_ahh)) and ahh_line is not None and not pd.isna(ahh_line):
+                    odds_ahh = get_futpython_ah_odd(row, ahh_line, "Home")
+                if (odds_aha is None or pd.isna(odds_aha)) and ahh_line is not None and not pd.isna(ahh_line):
+                    odds_aha = get_futpython_ah_odd(row, -ahh_line, "Away")
+            else:
+                odds_ahh = row.get('AvgAHH') if odds_source == 'Avg' else row.get('MaxAHH')
+                odds_aha = row.get('AvgAHA') if odds_source == 'Avg' else row.get('MaxAHA')
             
             closing_odds_h = row.get('PSCH', row.get('PSH', row.get('MaxCH')))
             closing_odds_d = row.get('PSCD', row.get('PSD', row.get('MaxCD')))
