@@ -841,6 +841,39 @@ class ChronologicalBacktester:
                         bookie_odds = np.nan
                     bet_won = (ftr != 'D')
                     market_label = "Contra Empate (12)"
+                elif mkt == 'lay_home_ex':
+                    model_prob = prob_d + prob_a
+                    try:
+                        _dc = float(str(odds_dc_x2).replace(',', '.')) if odds_dc_x2 is not None and not pd.isna(odds_dc_x2) else np.nan
+                        if pd.isna(_dc) or _dc <= 1.0:
+                            _dc = 1.0 / (1.0/odds_d + 1.0/odds_a) if (odds_d > 1.0 and odds_a > 1.0) else np.nan
+                        bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
+                    except Exception:
+                        bookie_odds = np.nan
+                    bet_won = (ftr != 'H')
+                    market_label = "Lay Mandante"
+                elif mkt == 'lay_away_ex':
+                    model_prob = prob_h + prob_d
+                    try:
+                        _dc = float(str(odds_dc_1x).replace(',', '.')) if odds_dc_1x is not None and not pd.isna(odds_dc_1x) else np.nan
+                        if pd.isna(_dc) or _dc <= 1.0:
+                            _dc = 1.0 / (1.0/odds_h + 1.0/odds_d) if (odds_h > 1.0 and odds_d > 1.0) else np.nan
+                        bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
+                    except Exception:
+                        bookie_odds = np.nan
+                    bet_won = (ftr != 'A')
+                    market_label = "Lay Visitante"
+                elif mkt == 'lay_draw_ex':
+                    model_prob = prob_h + prob_a
+                    try:
+                        _dc = float(str(odds_dc_12).replace(',', '.')) if odds_dc_12 is not None and not pd.isna(odds_dc_12) else np.nan
+                        if pd.isna(_dc) or _dc <= 1.0:
+                            _dc = 1.0 / (1.0/odds_h + 1.0/odds_a) if (odds_h > 1.0 and odds_a > 1.0) else np.nan
+                        bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
+                    except Exception:
+                        bookie_odds = np.nan
+                    bet_won = (ftr != 'D')
+                    market_label = "Lay Empate"
                 elif mkt == 'btts_yes':
                     model_prob = prob_btts_yes
                     try:
@@ -1326,9 +1359,12 @@ class ChronologicalBacktester:
                                 total_staked += stake
 
                                 if bet_won:
-                                    profit = stake * (bookie_odds - 1.0)
+                                    if mkt.endswith('_ex'):
+                                        profit = stake / (bookie_odds - 1.0) if bookie_odds > 1.001 else 0.0
+                                    else:
+                                        profit = stake * (bookie_odds - 1.0)
                                     # Aplicar comissão de exchange em apostas Lay ganhas
-                                    if exchange_commission > 0 and mkt.startswith('lay'):
+                                    if exchange_commission > 0 and (mkt.startswith('lay') or mkt.endswith('_ex')):
                                         profit = profit * (1 - exchange_commission / 100)
                                     bankroll += profit
                                 else:
@@ -1354,7 +1390,10 @@ class ChronologicalBacktester:
                                     bets_fixed += 1
                                     staked_fixed += st_fixed
                                     if bet_won:
-                                        bankroll_fixed += st_fixed * (bookie_odds - 1.0)
+                                        if mkt.endswith('_ex'):
+                                            bankroll_fixed += st_fixed / (bookie_odds - 1.0) if bookie_odds > 1.001 else 0.0
+                                        else:
+                                            bankroll_fixed += st_fixed * (bookie_odds - 1.0)
                                         wins_fixed += 1
                                     else:
                                         bankroll_fixed -= st_fixed
@@ -1379,7 +1418,10 @@ class ChronologicalBacktester:
                                     bets_prop += 1
                                     staked_prop += st_prop
                                     if bet_won:
-                                        bankroll_proportional += st_prop * (bookie_odds - 1.0)
+                                        if mkt.endswith('_ex'):
+                                            bankroll_proportional += st_prop / (bookie_odds - 1.0) if bookie_odds > 1.001 else 0.0
+                                        else:
+                                            bankroll_proportional += st_prop * (bookie_odds - 1.0)
                                         wins_prop += 1
                                     else:
                                         bankroll_proportional -= st_prop
@@ -1402,7 +1444,10 @@ class ChronologicalBacktester:
                                 if staking_rule == 'kelly': mult_k = stake_value
 
                                 if bookie_odds > 1.0:
-                                    f_star = (model_prob * bookie_odds - 1.0) / (bookie_odds - 1.0)
+                                    if mkt.endswith('_ex'):
+                                        f_star = model_prob - (1.0 - model_prob) / (bookie_odds - 1.0)
+                                    else:
+                                        f_star = (model_prob * bookie_odds - 1.0) / (bookie_odds - 1.0)
                                     f_star = max(0.0, f_star)
                                     st_kelly = bankroll_kelly * f_star * mult_k
                                     st_kelly = min(st_kelly, bankroll_kelly * 0.05)
@@ -1413,7 +1458,10 @@ class ChronologicalBacktester:
                                     bets_kelly += 1
                                     staked_kelly += st_kelly
                                     if bet_won:
-                                        bankroll_kelly += st_kelly * (bookie_odds - 1.0)
+                                        if mkt.endswith('_ex'):
+                                            bankroll_kelly += st_kelly / (bookie_odds - 1.0) if bookie_odds > 1.001 else 0.0
+                                        else:
+                                            bankroll_kelly += st_kelly * (bookie_odds - 1.0)
                                         wins_kelly += 1
                                     else:
                                         bankroll_kelly -= st_kelly
@@ -2187,6 +2235,36 @@ class ChronologicalBacktester:
                         except Exception:
                             bookie_odds = np.nan
                         bet_won = (ftr != 'D')
+                    elif mkt == 'lay_home_ex':
+                        model_prob = prob_d + prob_a
+                        try:
+                            _dc = float(str(odds_dc_x2).replace(',', '.')) if odds_dc_x2 is not None and not pd.isna(odds_dc_x2) else np.nan
+                            if pd.isna(_dc) or _dc <= 1.0:
+                                _dc = 1.0 / (1.0/odds_d + 1.0/odds_a) if (odds_d > 1.0 and odds_a > 1.0) else np.nan
+                            bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
+                        except Exception:
+                            bookie_odds = np.nan
+                        bet_won = (ftr != 'H')
+                    elif mkt == 'lay_away_ex':
+                        model_prob = prob_h + prob_d
+                        try:
+                            _dc = float(str(odds_dc_1x).replace(',', '.')) if odds_dc_1x is not None and not pd.isna(odds_dc_1x) else np.nan
+                            if pd.isna(_dc) or _dc <= 1.0:
+                                _dc = 1.0 / (1.0/odds_h + 1.0/odds_d) if (odds_h > 1.0 and odds_d > 1.0) else np.nan
+                            bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
+                        except Exception:
+                            bookie_odds = np.nan
+                        bet_won = (ftr != 'A')
+                    elif mkt == 'lay_draw_ex':
+                        model_prob = prob_h + prob_a
+                        try:
+                            _dc = float(str(odds_dc_12).replace(',', '.')) if odds_dc_12 is not None and not pd.isna(odds_dc_12) else np.nan
+                            if pd.isna(_dc) or _dc <= 1.0:
+                                _dc = 1.0 / (1.0/odds_h + 1.0/odds_a) if (odds_h > 1.0 and odds_a > 1.0) else np.nan
+                            bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
+                        except Exception:
+                            bookie_odds = np.nan
+                        bet_won = (ftr != 'D')
                     elif mkt == 'btts_yes':
                         model_prob = prob_btts_yes
                         try:
@@ -2420,7 +2498,10 @@ class ChronologicalBacktester:
                 elif staking_rule == 'proportional':
                     p_stake = state_ref['bankroll'] * (stake_value / 100.0)
                 elif staking_rule == 'kelly':
-                    p_f_star = (p_prob * p_odds - 1.0) / (p_odds - 1.0)
+                    if p_mkt.endswith('_ex'):
+                        p_f_star = p_prob - (1.0 - p_prob) / (p_odds - 1.0) if p_odds > 1.001 else 0.0
+                    else:
+                        p_f_star = (p_prob * p_odds - 1.0) / (p_odds - 1.0)
                     p_f_star = max(0.0, p_f_star)
                     p_stake = state_ref['bankroll'] * p_f_star * stake_value
                     p_stake = min(p_stake, state_ref['bankroll'] * 0.10)
@@ -2445,7 +2526,10 @@ class ChronologicalBacktester:
                         multiplier = float(p_won)
 
                     if multiplier > 0:
-                        p_profit = p_stake * (p_odds - 1.0) * multiplier
+                        if p_mkt.endswith('_ex'):
+                            p_profit = (p_stake / (p_odds - 1.0)) * multiplier if p_odds > 1.001 else 0.0
+                        else:
+                            p_profit = p_stake * (p_odds - 1.0) * multiplier
                         state_ref['bankroll'] += p_profit
                         if multiplier == 1.0:
                             state_ref['wins'] += 1

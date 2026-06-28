@@ -365,6 +365,9 @@ def run_scan(req: ScanRequest):
             {'code': 'lay_home', 'name': 'Contra Mandante (X2)'},
             {'code': 'lay_away', 'name': 'Contra Visitante (1X)'},
             {'code': 'lay_draw', 'name': 'Contra Empate (12)'},
+            {'code': 'lay_home_ex', 'name': 'Lay Mandante'},
+            {'code': 'lay_away_ex', 'name': 'Lay Visitante'},
+            {'code': 'lay_draw_ex', 'name': 'Lay Empate'},
             {'code': 'btts_yes', 'name': 'Ambas Marcam Sim'},
             {'code': 'btts_no', 'name': 'Ambas Marcam Não'},
             {'code': 'cs_10', 'name': 'Placar Exato 1-0'},
@@ -877,6 +880,36 @@ def get_autopilot_predictions(source: str = 'api'):
                     elif s_m == 'lay_home': market_prob = pred['prob_draw'] + pred['prob_away']; bookie_odds = 1.0 / (1.0/odds_d + 1.0/odds_a) if (odds_d > 1.0 and odds_a > 1.0) else np.nan; market_label = "Contra Mandante (X2)"
                     elif s_m == 'lay_away': market_prob = pred['prob_home'] + pred['prob_draw']; bookie_odds = 1.0 / (1.0/odds_h + 1.0/odds_d) if (odds_h > 1.0 and odds_d > 1.0) else np.nan; market_label = "Contra Visitante (1X)"
                     elif s_m == 'lay_draw': market_prob = pred['prob_home'] + pred['prob_away']; bookie_odds = 1.0 / (1.0/odds_h + 1.0/odds_a) if (odds_h > 1.0 and odds_a > 1.0) else np.nan; market_label = "Contra Empate (12)"
+                    elif s_m == 'lay_home_ex':
+                        market_prob = pred['prob_draw'] + pred['prob_away']
+                        try:
+                            _dc = float(row.get('DC_X2')) if not pd.isna(row.get('DC_X2')) else np.nan
+                            if pd.isna(_dc) or _dc <= 1.0:
+                                _dc = 1.0 / (1.0/odds_d + 1.0/odds_a) if (odds_d > 1.0 and odds_a > 1.0) else np.nan
+                            bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
+                        except Exception:
+                            bookie_odds = np.nan
+                        market_label = "Lay Mandante"
+                    elif s_m == 'lay_away_ex':
+                        market_prob = pred['prob_home'] + pred['prob_draw']
+                        try:
+                            _dc = float(row.get('DC_1X')) if not pd.isna(row.get('DC_1X')) else np.nan
+                            if pd.isna(_dc) or _dc <= 1.0:
+                                _dc = 1.0 / (1.0/odds_h + 1.0/odds_d) if (odds_h > 1.0 and odds_d > 1.0) else np.nan
+                            bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
+                        except Exception:
+                            bookie_odds = np.nan
+                        market_label = "Lay Visitante"
+                    elif s_m == 'lay_draw_ex':
+                        market_prob = pred['prob_home'] + pred['prob_away']
+                        try:
+                            _dc = float(row.get('DC_12')) if not pd.isna(row.get('DC_12')) else np.nan
+                            if pd.isna(_dc) or _dc <= 1.0:
+                                _dc = 1.0 / (1.0/odds_h + 1.0/odds_a) if (odds_h > 1.0 and odds_a > 1.0) else np.nan
+                            bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
+                        except Exception:
+                            bookie_odds = np.nan
+                        market_label = "Lay Empate"
                     elif s_m == 'dnb_h': market_prob = pred['prob_home'] / (pred['prob_home'] + pred['prob_away']) if (pred['prob_home'] + pred['prob_away']) > 0 else 0.5; bookie_odds = odds_h * (odds_d - 1.0) / odds_d if (odds_h and odds_d and odds_d > 1.0) else np.nan; market_label = "DNB Mandante"
                     elif s_m == 'dnb_a': market_prob = pred['prob_away'] / (pred['prob_home'] + pred['prob_away']) if (pred['prob_home'] + pred['prob_away']) > 0 else 0.5; bookie_odds = odds_a * (odds_d - 1.0) / odds_d if (odds_a and odds_d and odds_d > 1.0) else np.nan; market_label = "DNB Visitante"
 
