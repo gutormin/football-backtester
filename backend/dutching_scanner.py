@@ -195,7 +195,11 @@ def fetch_dutching_opportunities(api_key='75d5d936cc573c75bacf71e12b5de769', sou
                         outcomes_to_cover, prob_combined, odds_keys, market_label = get_strategy_layout(pred, is_home_fav, current_strat)
                         odds_to_cover = [est_odds.get(key, np.nan) for key in odds_keys]
                         
-                        sum_prob_implied = sum(1.0 / odd for odd in odds_to_cover if odd > 1.0)
+                        # Evita falha de serialização JSON pulando se houver odds NaN ou inválidas
+                        if any(pd.isna(odd) or odd <= 1.001 or np.isnan(odd) for odd in odds_to_cover):
+                            continue
+                            
+                        sum_prob_implied = sum(1.0 / odd for odd in odds_to_cover)
                         if sum_prob_implied > 0:
                             dutching_odd = 1.0 / sum_prob_implied
                             edge = prob_combined * dutching_odd - 1.0
@@ -289,8 +293,12 @@ def fetch_dutching_opportunities(api_key='75d5d936cc573c75bacf71e12b5de769', sou
             outcomes_to_cover, prob_combined, odds_keys, market_label = get_strategy_layout(pred, is_home_fav, current_strat)
             odds_b365 = [est_odds_b365.get(key, np.nan) for key in odds_keys]
             
+            # Evita falha de serialização JSON pulando se houver odds NaN ou inválidas
+            if any(pd.isna(odd) or odd <= 1.001 or np.isnan(odd) for odd in odds_b365):
+                continue
+                
             # 2.1 ESTRATÉGIA PARA BET365 (Física)
-            sum_prob_b365 = sum(1.0 / odd for odd in odds_b365 if odd > 1.0)
+            sum_prob_b365 = sum(1.0 / odd for odd in odds_b365)
             if sum_prob_b365 > 0:
                 dutching_odd = 1.0 / sum_prob_b365
                 edge = prob_combined * dutching_odd - 1.0
