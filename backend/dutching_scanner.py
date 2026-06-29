@@ -13,7 +13,9 @@ SPORT_LEAGUE_MAP = {
     'soccer_italy_serie_a': 'I1',
     'soccer_germany_bundesliga': 'D1',
     'soccer_france_ligue_one': 'F1',
-    'soccer_brazil_campeonato': 'BRA'
+    'soccer_brazil_campeonato': 'BRA',
+    'soccer_usa_mls': 'USA',
+    'soccer_japan_j_league': 'JPN'
 }
 
 def fetch_dutching_opportunities(api_key='75d5d936cc573c75bacf71e12b5de769', source='odds_api', strategy='auto_ia'):
