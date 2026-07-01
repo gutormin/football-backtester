@@ -307,31 +307,9 @@ class PoissonModel:
                 lambda_shots_home = max(0.1, min(5.0, lambda_shots_home))
                 lambda_shots_away = max(0.1, min(5.0, lambda_shots_away))
                 
-                # Try xG blend
-                xg_ratings = None
-                if xg_ratings:
-                    h_xg_att = xg_ratings['home_xg_att'].get(matched_home, 1.0)
-                    h_xg_def = xg_ratings['home_xg_def'].get(matched_home, 1.0)
-                    a_xg_att = xg_ratings['away_xg_att'].get(matched_away, 1.0)
-                    a_xg_def = xg_ratings['away_xg_def'].get(matched_away, 1.0)
-                    
-                    if np.isnan(h_xg_att): h_xg_att = 1.0
-                    if np.isnan(h_xg_def): h_xg_def = 1.0
-                    if np.isnan(a_xg_att): a_xg_att = 1.0
-                    if np.isnan(a_xg_def): a_xg_def = 1.0
-                    
-                    lambda_xg_home = xg_ratings['avg_home_xg'] * h_xg_att * a_xg_def
-                    lambda_xg_away = xg_ratings['avg_away_xg'] * a_xg_att * h_xg_def
-                    
-                    lambda_xg_home = max(0.1, min(5.0, lambda_xg_home))
-                    lambda_xg_away = max(0.1, min(5.0, lambda_xg_away))
-                    
-                    lambda_home = 0.50 * lambda_xg_home + 0.30 * lambda_shots_home + 0.20 * lambda_home
-                    lambda_away = 0.50 * lambda_xg_away + 0.30 * lambda_shots_away + 0.20 * lambda_away
-                else:
-                    # Blend (60% Goals, 40% Shots)
-                    lambda_home = 0.60 * lambda_home + 0.40 * lambda_shots_home
-                    lambda_away = 0.60 * lambda_away + 0.40 * lambda_shots_away
+                # Blend (60% Goals, 40% Shots)
+                lambda_home = 0.60 * lambda_home + 0.40 * lambda_shots_home
+                lambda_away = 0.60 * lambda_away + 0.40 * lambda_shots_away
                 
             if elo_tracker:
                 elo_factor_h = elo_tracker.get_elo_factor(home_team, away_team)
