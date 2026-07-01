@@ -8232,7 +8232,7 @@ window.runBacktest = async function(overrideParams) {
         btn = document.getElementById('btn-run-backtest');
         if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Rodando...';
 
-        let leagues, startDate, endDate, markets, valThreshold, initialBankroll, stakeRule, stakeValue, oddsSource, minOdds, maxOdds, exchangeCommission, oos, useMl;
+        let leagues, startDate, endDate, markets, valThreshold, initialBankroll, stakeRule, stakeValue, oddsSource, oddsTiming, minOdds, maxOdds, exchangeCommission, oos, useMl;
         let minOddsH, maxOddsH, minOddsD, maxOddsD, minOddsA, maxOddsA, minOddsOver25, maxOddsOver25, minOddsUnder25, maxOddsUnder25;
         let dataSource, API_key;
 
@@ -8254,6 +8254,7 @@ window.runBacktest = async function(overrideParams) {
                 else if (origRule === 'kelly_sixteenth') stakeValue = 0.0625;
             }
             oddsSource = overrideParams.oddsSource || 'B365';
+            oddsTiming = overrideParams.odds_timing || 'closing';
             minOdds = overrideParams.minOdds !== undefined ? overrideParams.minOdds : 1.0;
             maxOdds = overrideParams.maxOdds !== undefined ? overrideParams.maxOdds : 2.50;
             exchangeCommission = overrideParams.exchange_commission !== undefined ? overrideParams.exchange_commission : 0.0;
