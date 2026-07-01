@@ -181,6 +181,11 @@ class ChronologicalBacktester:
         season_games = defaultdict(lambda: defaultdict(int))
         
         # 3. Chronological iteration
+        # Initialize Phase 1 warning counters
+        games_evaluated_total = 0
+        games_skipped_nan = 0
+        games_skipped_filter = 0
+
         for row in combined_df.to_dict('records'):
             match_date = row['Date']
             league_code = row['LeagueCode']
@@ -672,6 +677,8 @@ class ChronologicalBacktester:
                 bet_won = False
                 market_label = ""
                 result_factor = -1.0
+                is_synthetic = False
+                ml_applied = False
 
                 if mkt.startswith('ht_') and (pd.isna(hthg) or pd.isna(htag)):
                     continue
@@ -1265,6 +1272,34 @@ class ChronologicalBacktester:
                 if mkt not in ('dnb_h', 'dnb_a', 'ah_home', 'ah_away'):
                     result_factor = 1.0 if bet_won else -1.0
 
+                # Determine if odds were synthetic (Phase 1 Transparency)
+                if est_odds is not None:
+                    is_synthetic = True
+                elif mkt.startswith('lay_cs_'):
+                    is_synthetic = True
+                elif mkt == 'dnb_h' and ('odds_dnb_h_real' in locals() and pd.isna(odds_dnb_h_real)):
+                    is_synthetic = True
+                elif mkt == 'dnb_a' and ('odds_dnb_a_real' in locals() and pd.isna(odds_dnb_a_real)):
+                    is_synthetic = True
+                elif mkt == 'ah_home' and ('odds_ah_h' in locals() and (pd.isna(odds_ah_h) or odds_ah_h <= 1.0)):
+                    is_synthetic = True
+                elif mkt == 'ah_away' and ('odds_ah_a' in locals() and (pd.isna(odds_ah_a) or odds_ah_a <= 1.0)):
+                    is_synthetic = True
+                elif mkt in ('lay_home_ex', 'lay_away_ex', 'lay_draw_ex'):
+                    dc_col = 'DC_X2' if mkt == 'lay_home_ex' else ('DC_1X' if mkt == 'lay_away_ex' else 'DC_12')
+                    _dc_val = row.get(dc_col)
+                    if pd.isna(_dc_val) or float(str(_dc_val).replace(',', '.')) <= 1.0:
+                        is_synthetic = True
+                elif mkt.startswith('cs_'):
+                    api_col_map = {
+                        'cs_10': 'CS_1_0', 'cs_20': 'CS_2_0', 'cs_21': 'CS_2_1',
+                        'cs_00': 'CS_0_0', 'cs_11': 'CS_1_1', 'cs_01': 'CS_0_1',
+                        'cs_02': 'CS_0_2', 'cs_12': 'CS_1_2'
+                    }
+                    col = api_col_map.get(mkt)
+                    if col and (col not in row or pd.isna(row[col]) or float(str(row[col]).replace(',', '.')) <= 1.0):
+                        is_synthetic = True
+
                 model_prob = float(model_prob)
                 
                 # Assemble ML Features
@@ -1283,6 +1318,7 @@ class ChronologicalBacktester:
                     ml_prob = self.ml_ensembles[mkt].predict_proba(features)
                     if ml_prob is not None:
                         model_prob = (model_prob + ml_prob) / 2.0
+                        ml_applied = True
                         
                 raw_prob = model_prob
 
@@ -1300,6 +1336,28 @@ class ChronologicalBacktester:
 
                 # If match date is within our backtest active window, evaluate betting
                 if start_dt <= match_date <= end_dt:
+                    games_evaluated_total += 1
+                    
+                    is_filtered = False
+                    if pd.isna(bookie_odds) or bookie_odds <= 1.0:
+                        games_skipped_nan += 1
+                    else:
+                        is_filtered = (
+                            (min_odds_h is not None and not pd.isna(odds_h) and odds_h < min_odds_h) or
+                            (max_odds_h is not None and not pd.isna(odds_h) and odds_h > max_odds_h) or
+                            (min_odds_d is not None and not pd.isna(odds_d) and odds_d < min_odds_d) or
+                            (max_odds_d is not None and not pd.isna(odds_d) and odds_d > max_odds_d) or
+                            (min_odds_a is not None and not pd.isna(odds_a) and odds_a < min_odds_a) or
+                            (max_odds_a is not None and not pd.isna(odds_a) and odds_a > max_odds_a) or
+                            (min_odds_over25 is not None and not pd.isna(odds_over25) and odds_over25 < min_odds_over25) or
+                            (max_odds_over25 is not None and not pd.isna(odds_over25) and odds_over25 > max_odds_over25) or
+                            (min_odds_under25 is not None and not pd.isna(odds_under25) and odds_under25 < min_odds_under25) or
+                            (max_odds_under25 is not None and not pd.isna(odds_under25) and odds_under25 > max_odds_under25) or
+                            (bookie_odds < min_odds or bookie_odds > max_odds)
+                        )
+                        if is_filtered:
+                            games_skipped_filter += 1
+
                     # We can place a bet if odds are valid and we have a "+EV" (positive expected value) edge
                     if not pd.isna(bookie_odds) and bookie_odds > 1.0:
                         # Cross-market odds filtering
@@ -1518,7 +1576,9 @@ class ChronologicalBacktester:
                                     'odds_d': round(odds_d, 2) if (odds_d and not pd.isna(odds_d)) else None,
                                     'odds_a': round(odds_a, 2) if (odds_a and not pd.isna(odds_a)) else None,
                                     'odds_over25': round(odds_over25, 2) if (odds_over25 and not pd.isna(odds_over25)) else None,
-                                    'odds_under25': round(odds_under25, 2) if (odds_under25 and not pd.isna(odds_under25)) else None
+                                    'odds_under25': round(odds_under25, 2) if (odds_under25 and not pd.isna(odds_under25)) else None,
+                                    'is_synthetic': is_synthetic,
+                                    'ml_applied': ml_applied
                                 })
                             
             # Fit Calibration Periodically
@@ -1574,7 +1634,7 @@ class ChronologicalBacktester:
                 league_rho_cache.pop(league_code, None)
 
         # Compile performance results
-        return compile_backtest_summary(
+        summary_dict = compile_backtest_summary(
             bets_record, initial_bankroll, bankroll, total_staked, staking_rule, stake_value, value_threshold,
             run_monte_carlo, min_odds, max_odds, start_date, end_date,
             bankroll_fixed, bankroll_proportional, bankroll_kelly,
@@ -1586,6 +1646,24 @@ class ChronologicalBacktester:
             equity_curve_fixed, equity_curve_proportional, equity_curve_kelly,
             max_drawdown
         )
+        
+        # Inject Phase 1 warnings and stats directly into the returned payload
+        summary_dict['summary']['games_evaluated_total'] = games_evaluated_total
+        summary_dict['summary']['games_skipped_nan'] = games_skipped_nan
+        summary_dict['summary']['games_skipped_filter'] = games_skipped_filter
+        
+        nan_pct = (games_skipped_nan / games_evaluated_total * 100) if games_evaluated_total > 0 else 0.0
+        summary_dict['summary']['nan_skipped_pct'] = round(nan_pct, 1)
+        
+        synthetic_bets_count = sum(1 for b in bets_record if b.get('is_synthetic', False))
+        summary_dict['summary']['synthetic_bets_count'] = synthetic_bets_count
+        summary_dict['summary']['synthetic_bets_pct'] = round((synthetic_bets_count / len(bets_record) * 100) if bets_record else 0.0, 1)
+
+        ml_applied_count = sum(1 for b in bets_record if b.get('ml_applied', False))
+        summary_dict['summary']['ml_applied_count'] = ml_applied_count
+        summary_dict['summary']['ml_applied_pct'] = round((ml_applied_count / len(bets_record) * 100) if bets_record else 0.0, 1)
+        
+        return summary_dict
 
     def run_parallel_scan(self, leagues, start_date, end_date, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', min_odds=1.0, max_odds=2.50, scan_type='markets', markets_list=None, use_ml=False, data_source='football-data', futpython_api_key=''):
         """

@@ -8379,6 +8379,56 @@ window.runBacktest = async function(overrideParams) {
             if(document.getElementById('metric-clv')) document.getElementById('metric-clv').innerText = summary.avg_clv != null ? ((summary.avg_clv >= 0 ? '+' : '') + summary.avg_clv.toFixed(1) + '%') : 'N/A';
             if(document.getElementById('metric-bcl')) document.getElementById('metric-bcl').innerText = summary.bcl_percent != null ? (summary.bcl_percent.toFixed(1) + '%') : 'N/A';
             
+            // Populate Transparency Panel (Phase 1)
+            const transPanel = document.getElementById('transparency-panel');
+            if (transPanel) {
+                transPanel.style.display = 'block';
+                
+                const skippedOddsVal = summary.games_skipped_nan || 0;
+                const evaluatedVal = summary.games_evaluated_total || 0;
+                const skippedFilterVal = summary.games_skipped_filter || 0;
+                const nanPctVal = summary.nan_skipped_pct || 0;
+                
+                const skippedOddsText = document.getElementById('transparency-skipped-odds');
+                if (skippedOddsText) {
+                    skippedOddsText.innerText = `${skippedOddsVal} de ${evaluatedVal} (${nanPctVal}%)`;
+                    // Highlight red/amber if high selection bias
+                    if (nanPctVal > 25) {
+                        skippedOddsText.style.color = '#ef4444';
+                    } else if (nanPctVal > 10) {
+                        skippedOddsText.style.color = '#f59e0b';
+                    } else {
+                        skippedOddsText.style.color = '#10b981';
+                    }
+                }
+                
+                const synthBetsVal = summary.synthetic_bets_count || 0;
+                const synthPctVal = summary.synthetic_bets_pct || 0;
+                const synthBetsText = document.getElementById('transparency-synthetic-bets');
+                const synthPctText = document.getElementById('transparency-synthetic-pct');
+                if (synthBetsText) synthBetsText.innerText = synthBetsVal;
+                if (synthPctText) {
+                    synthPctText.innerText = synthPctVal + '%';
+                    if (synthPctVal > 40) {
+                        synthPctText.style.color = '#ef4444';
+                        if (synthBetsText) synthBetsText.style.color = '#ef4444';
+                    } else if (synthPctVal > 15) {
+                        synthPctText.style.color = '#f59e0b';
+                        if (synthBetsText) synthBetsText.style.color = '#f59e0b';
+                    } else {
+                        synthPctText.style.color = '#10b981';
+                        if (synthBetsText) synthBetsText.style.color = '#10b981';
+                    }
+                }
+                
+                const mlAppliedVal = summary.ml_applied_count || 0;
+                const mlPctVal = summary.ml_applied_pct || 0;
+                const mlAppliedText = document.getElementById('transparency-ml-applied');
+                const mlPctText = document.getElementById('transparency-ml-pct');
+                if (mlAppliedText) mlAppliedText.innerText = mlAppliedVal;
+                if (mlPctText) mlPctText.innerText = mlPctVal + '%';
+            }
+            
             const bets = data.bets || [];
             const dates = bets.map((b, i) => b.date ? b.date.substring(0, 10) : i);
             const bankrolls = data.equity_curve ? data.equity_curve.map(e => e.bankroll || e.Bankroll || e) : [];

@@ -1691,6 +1691,33 @@
 </div>
 </div>
 
+            <!-- Transparency and Data Quality Warnings (Phase 1) -->
+            <div class="oos-results-panel" id="transparency-panel" style="display: none; margin-bottom: 20px; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.15); border-left: 4px solid #f59e0b; padding: 15px 20px; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="color: #f59e0b; font-family: var(--font-heading); font-size: 15px; margin: 0; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Alertas de Qualidade de Dados e Viés
+                    </h3>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+                    <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                        <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">🎯 Viés de Seleção (Odds Faltantes)</strong>
+                        <span id="transparency-skipped-odds" style="color: #f59e0b; font-weight: bold;">N/A</span> dos jogos analisados foram excluídos silenciosamente do backtest por não possuírem odds no CSV da casa de apostas selecionada.
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                        <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">🧪 Apostas com Odds Sintéticas</strong>
+                        <span id="transparency-synthetic-bets" style="color: var(--text-main); font-weight: bold;">N/A</span> (<span id="transparency-synthetic-pct">0%</span>) das entradas simularam odds estimadas por fórmula matemática (Lay/Handicap sem odd real no CSV).
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                        <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">🕒 Odds de Fechamento (Closing Odds)</strong>
+                        O backtest utiliza odds de fechamento (momento do início da partida). Na prática, o drift de mercado pode reduzir o ROI real do modelo.
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                        <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">🤖 Correção por Machine Learning</strong>
+                        O filtro de ML (XGBoost) foi ativado e corrigiu efetivamente <span id="transparency-ml-applied" style="color: var(--text-main); font-weight: bold;">N/A</span> (<span id="transparency-ml-pct">0%</span>) das apostas analisadas.
+                    </div>
+                </div>
+            </div>
+
             <!-- EQS Single Strategy Analysis -->
             <section class="risk-analysis-section" style="margin-bottom: 24px;">
                 <div class="risk-card glassmorphism">
@@ -3007,7 +3034,7 @@
     </div>
 
     <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
-    <script type="module" src="app.js?v=62"></script>
+    <script type="module" src="app.js?v=63"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
