@@ -939,13 +939,23 @@ def compute_power_analysis(roi_pct, odds_mean, n_bets):
     }
 
 
-def compute_rolling_roi(bets_history, window=100):
+def compute_rolling_roi(bets_history, window=None):
     """
-    Calcula o ROI em janelas deslizantes de `window` apostas.
+    Calcula o ROI em janelas deslizantes proporcionais ao tamanho da liga (20% do histórico).
     Detecta decaimento de edge comparando a última janela com a média geral.
     """
-    if not bets_history or len(bets_history) < window:
-        # Se não há apostas suficientes para uma janela, retornar lista vazia
+    if not bets_history:
+        return {
+            'rolling_roi': [],
+            'edge_decay_pct': None,
+            'edge_decay_alert': None
+        }
+        
+    if window is None:
+        # Janela dinâmica: 20% do tamanho da amostra, fixando entre 10 e 100
+        window = max(10, min(100, int(len(bets_history) * 0.2)))
+
+    if len(bets_history) < window:
         return {
             'rolling_roi': [],
             'edge_decay_pct': None,
