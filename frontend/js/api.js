@@ -37,7 +37,8 @@ export async function syncDatabase() {
     btn.classList.add('spinning');
     btn.disabled = true;
     
-    const source = document.getElementById('db-sync-source').value || 'csv';
+    const mainSelector = document.getElementById('data-source-select');
+    const source = (mainSelector && mainSelector.value === 'futpython') ? 'api' : 'csv';
     showToast(`Baixando odds e resultados históricos via ${source === 'api' ? 'API DataFootball' : 'Football-Data'}... Isso pode levar de 1 a 2 minutos.`, "info");
     
     try {

@@ -545,10 +545,6 @@
 <span id="db-update-time">Último Sync: N/A</span>
 </div>
 </div>
-<select id="db-sync-source" style="background: rgba(10, 11, 16, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); padding: 6px 8px; font-size: 11px; outline: none; cursor: pointer; height: 32px; font-family: inherit;">
-<option value="csv">Football-Data CSV</option>
-<option value="api">API DataFootball</option>
-</select>
 <button class="btn-sync" id="btn-sync-db" onclick="syncDatabase()">
 <i class="fa-solid fa-arrows-rotate"></i> Sincronizar
                     </button>
@@ -577,6 +573,57 @@
     <button class="tab-btn" id="tab-btn-gr" onclick="switchTab('tab-gr')" style="background: none; border: none; color: var(--text-muted); font-family: var(--font-heading); font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-bottom: 2px solid transparent; transition: all 0.3s ease;"><i class="fa-solid fa-shield-halved"></i> Gestão de Risco</button>
     <button class="tab-btn" id="tab-btn-history" onclick="switchTab('tab-history')" style="background: none; border: none; color: var(--text-muted); font-family: var(--font-heading); font-size: 15px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-bottom: 2px solid transparent; transition: all 0.3s ease;"><i class="fa-solid fa-bookmark"></i> Histórico</button>
 </div>
+<script>
+/* FIX ESTRUTURAL: o HTML baguncado deixou 8 dos 10 tab-pane aninhados
+   dentro de #tab-radar. Como #tab-radar tem display:none, os outros
+   nunca aparecem mesmo apos switchTab(). Esta rotina move os tab-pane
+   para serem filhos diretos de <main class="main-dashboard">,
+   preservando a ordem original do HTML. Tambem instala um
+   MutationObserver para RE-APLICAR o fix caso o app.js mova
+   os tab-pane de volta durante a inicializacao. */
+(function () {
+    try {
+        var TAB_IDS = [
+            'tab-scanner','tab-laboratory','tab-optimization',
+            'tab-clustering','tab-radar','tab-arbitrage',
+            'tab-dutching','tab-operations','tab-gr','tab-history'
+        ];
+        function fixTabPanes() {
+            var main = document.querySelector('main.main-dashboard');
+            if (!main) return;
+            TAB_IDS.forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el && el.parentElement !== main) {
+                    main.appendChild(el);
+                }
+            });
+        }
+        // Aplica imediatamente
+        fixTabPanes();
+        // Re-aplica em micro-tarefas (apos cada tick)
+        if (typeof MutationObserver !== 'undefined') {
+            var observer = new MutationObserver(function () {
+                fixTabPanes();
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+            // Para de observar depois de 10s (a inicializacao do app termina)
+            setTimeout(function () { observer.disconnect(); }, 10000);
+        }
+        // Re-aplica tambem em marcos de inicializacao comuns
+        document.addEventListener('DOMContentLoaded', fixTabPanes);
+        window.addEventListener('load', fixTabPanes);
+        // E re-aplica varias vezes nos primeiros 5s para garantir
+        var t = 0;
+        var interval = setInterval(function () {
+            fixTabPanes();
+            t += 200;
+            if (t > 5000) clearInterval(interval);
+        }, 200);
+    } catch (err) {
+        console.error('[fix tab-pane] erro:', err);
+    }
+})();
+</script>
             <!-- Tab: Scanner -->
             <div id="tab-scanner" class="tab-pane active" style="display: block;">
             <!-- Strategy Scanner Section -->
@@ -2961,6 +3008,43 @@
 
     <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
     <script type="module" src="app.js?v=58"></script>
+
+<script>
+// Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
+// antes do módulo app.js terminar de carregar. Se o módulo falhar,
+// os menus continuam funcionando. O módulo, quando carregar,
+// sobrescreve esta versão com a versão completa que importa ./js/utils.js.
+(function () {
+    if (typeof window.switchTab !== 'function') {
+        window.switchTab = function (tabId) {
+            try {
+                document.querySelectorAll('.tab-pane').forEach(function (panel) {
+                    panel.classList.remove('active');
+                    panel.style.display = 'none';
+                });
+                document.querySelectorAll('.tab-btn').forEach(function (btn) {
+                    btn.classList.remove('active');
+                    btn.style.color = 'var(--text-muted)';
+                    btn.style.borderBottomColor = 'transparent';
+                });
+                var activePanel = document.getElementById(tabId);
+                if (activePanel) {
+                    activePanel.classList.add('active');
+                    activePanel.style.display = 'block';
+                }
+                var correspondingBtn = document.querySelector('.tab-btn[onclick*="' + tabId + '"]');
+                if (correspondingBtn) {
+                    correspondingBtn.classList.add('active');
+                    correspondingBtn.style.color = 'var(--text-primary)';
+                    correspondingBtn.style.borderBottomColor = 'var(--primary)';
+                }
+            } catch (err) {
+                console.error('[switchTab fallback] erro:', err);
+            }
+        };
+    }
+})();
+</script>
 
 <script>
 window.toggleGroup = function(groupEl, event) {
