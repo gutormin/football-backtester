@@ -1685,10 +1685,17 @@ class ChronologicalBacktester:
         summary_dict['summary']['ml_applied_pct'] = round((ml_applied_count / len(bets_record) * 100) if bets_record else 0.0, 1)
         
         # Check if calibration was skipped due to insufficient samples (< 200) - Phase 3 Fix
-        cal_history = self.calibration_history.get(market, {'probs': []})
-        cal_samples = len(cal_history['probs'])
+        cal_samples = 0
+        cal_skipped = False
+        for m in markets_list:
+            cal_history = self.calibration_history.get(m, {'probs': []})
+            m_samples = len(cal_history['probs'])
+            cal_samples += m_samples
+            if m_samples < 200:
+                cal_skipped = True
+                
         summary_dict['summary']['calibration_samples'] = cal_samples
-        summary_dict['summary']['calibration_skipped'] = cal_samples < 200
+        summary_dict['summary']['calibration_skipped'] = cal_skipped
         
         return summary_dict
 
