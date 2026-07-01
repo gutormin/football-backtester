@@ -8523,6 +8523,36 @@ window.runBacktest = async function(overrideParams) {
                 const mlPctText = document.getElementById('transparency-ml-pct');
                 if (mlAppliedText) mlAppliedText.innerText = mlAppliedVal;
                 if (mlPctText) mlPctText.innerText = mlPctVal + '%';
+
+                // === ML ACTIVE WARNING BANNER ===
+                let mlBanner = document.getElementById('ml-active-warning-banner');
+                if (!mlBanner) {
+                    mlBanner = document.createElement('div');
+                    mlBanner.id = 'ml-active-warning-banner';
+                    mlBanner.style.cssText = 'margin:10px 0; padding:10px 14px; border-radius:8px; font-size:12px; line-height:1.5;';
+                    const transPanel = document.getElementById('transparency-panel');
+                    if (transPanel) transPanel.appendChild(mlBanner);
+                }
+                if (mlBanner) {
+                    const useMlEnabled = payload.use_ml || false;
+                    if (useMlEnabled) {
+                        if (mlAppliedVal === 0) {
+                            mlBanner.style.display = 'block';
+                            mlBanner.style.background = 'rgba(245, 158, 11, 0.06)';
+                            mlBanner.style.border = '1px solid rgba(245, 158, 11, 0.2)';
+                            mlBanner.style.color = '#fcd34d';
+                            mlBanner.innerHTML = `<i class="fa-solid fa-brain" style="color:#f59e0b;"></i> <strong>ML Inativo (Sem amostras):</strong> O XGBoost foi ativado nas configurações, mas nenhuma aposta pôde ser recalibrada por falta de histórico de dados (requer pelo menos 100 jogos para treinar o ensemble). O sistema usou o Poisson clássico.`;
+                        } else {
+                            mlBanner.style.display = 'block';
+                            mlBanner.style.background = 'rgba(139, 92, 246, 0.05)';
+                            mlBanner.style.border = '1px solid rgba(139, 92, 246, 0.15)';
+                            mlBanner.style.color = '#c4b5fd';
+                            mlBanner.innerHTML = `<i class="fa-solid fa-brain" style="color:#8b5cf6;"></i> <strong>XGBoost Ensemble Ativo:</strong> ${mlAppliedVal} apostas (${mlPctVal}%) foram recalibradas com sucesso usando o modelo híbrido de Machine Learning.`;
+                        }
+                    } else {
+                        mlBanner.style.display = 'none';
+                    }
+                }
                 
                 const timingText = document.getElementById('transparency-odds-timing-text');
                 const timingWarning = document.getElementById('transparency-odds-timing-warning');
