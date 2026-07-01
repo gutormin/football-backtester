@@ -10059,4 +10059,4 @@ window.addEventListener('DOMContentLoaded', () => {
     if (typeof window.updateCacheStatus === 'function') {
         window.updateCacheStatus();
     }
-}
+});

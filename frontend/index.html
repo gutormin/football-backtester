@@ -3047,6 +3047,29 @@
 </script>
 
 <script>
+/* Fallback inline para handlers que estao em app.js mas, por algum
+   motivo, nao foram expostos em window (problema de carga parcial do
+   modulo). Estes fallbacks NAO conflitam com app.js - se o modulo
+   definir a funcao, ela sera usada; senao, o fallback assume. */
+window.toggleMarketDropdown = window.toggleMarketDropdown || function (event) {
+    if (event) event.stopPropagation();
+    var dd = document.getElementById('market-dropdown');
+    if (!dd) return;
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+};
+window.selectAllMarkets = window.selectAllMarkets || function (val, event) {
+    if (event) event.stopPropagation();
+    var checkboxes = document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]');
+    checkboxes.forEach(function (cb) { cb.checked = val; });
+    if (typeof window.onMarketSelectionChange === 'function') {
+        window.onMarketSelectionChange();
+    } else if (typeof onMarketSelectionChange === 'function') {
+        onMarketSelectionChange();
+    }
+};
+</script>
+
+<script>
 window.toggleGroup = function(groupEl, event) {
     if (event) {
         event.stopPropagation();

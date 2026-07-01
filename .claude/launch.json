@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "football-backtester",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["run.py"],
+      "port": 8000
+    }
+  ]
+}

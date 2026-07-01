@@ -286,5 +286,13 @@
         "profit_margin": 0.7,
         "status": "Pendente",
         "created_at": "2026-06-30 22:36:34"
+    },
+    {
+        "id": "1aa4b6b3-87c5-43ae-9c02-57aee9dfb2fe",
+        "match": "Hokkaido Nippon-Ham Fighters vs Orix Buffaloes",
+        "date": "01/07/2026 09:00",
+        "profit_margin": 0.61,
+        "status": "Pendente",
+        "created_at": "2026-07-01 01:57:58"
     }
 ]
