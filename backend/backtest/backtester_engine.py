@@ -186,6 +186,12 @@ class ChronologicalBacktester:
         games_skipped_nan = 0
         games_skipped_filter = 0
 
+        # Slippage simulation for closing odds:
+        # When using closing odds, we apply a 2% penalty to simulate the real-world
+        # drift between when the model fires a signal and the actual closing line.
+        # This prevents the backtest from using "perfect hindsight" closing prices.
+        SLIPPAGE_FACTOR = 0.98 if odds_timing == 'closing' else 1.0
+
         for row in combined_df.to_dict('records'):
             match_date = row['Date']
             league_code = row['LeagueCode']
@@ -1397,7 +1403,10 @@ class ChronologicalBacktester:
                         # Filter by odds range
                         if bookie_odds < min_odds or bookie_odds > max_odds:
                             continue
-                        expected_value = model_prob * bookie_odds
+
+                        # Apply slippage to simulate real execution price
+                        effective_odds = bookie_odds * SLIPPAGE_FACTOR
+                        expected_value = model_prob * effective_odds
 
                         if expected_value >= value_threshold:
                             # Intra-day correlation: limit daily exposure
@@ -1684,6 +1693,8 @@ class ChronologicalBacktester:
         synthetic_bets_count = sum(1 for b in bets_record if b.get('is_synthetic', False))
         summary_dict['summary']['synthetic_bets_count'] = synthetic_bets_count
         summary_dict['summary']['synthetic_bets_pct'] = round((synthetic_bets_count / len(bets_record) * 100) if bets_record else 0.0, 1)
+        summary_dict['summary']['slippage_applied'] = odds_timing == 'closing'
+        summary_dict['summary']['slippage_pct'] = 2.0 if odds_timing == 'closing' else 0.0
 
         ml_applied_count = sum(1 for b in bets_record if b.get('ml_applied', False))
         summary_dict['summary']['ml_applied_count'] = ml_applied_count
@@ -1807,6 +1818,9 @@ class ChronologicalBacktester:
         start_dt = pd.to_datetime(start_date)
         end_dt = pd.to_datetime(end_date)
         
+        # Slippage simulation for closing odds (same as run() method)
+        SLIPPAGE_FACTOR = 0.98 if odds_timing == 'closing' else 1.0
+
         # 4. Simulation loop
         for row in combined_df.to_dict('records'):
             match_date = row['Date']
@@ -2623,7 +2637,8 @@ class ChronologicalBacktester:
 
                 if not pd.isna(bookie_odds) and bookie_odds > 1.0:
                     if min_odds <= bookie_odds <= max_odds:
-                        expected_value = model_prob * bookie_odds
+                        effective_odds = bookie_odds * SLIPPAGE_FACTOR
+                        expected_value = model_prob * effective_odds
                         if expected_value >= value_threshold:
                             return bookie_odds, model_prob, expected_value, bet_won
                 # 3b. NOW store calibration history (after betting decision)

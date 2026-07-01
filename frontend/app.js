@@ -8467,6 +8467,55 @@ window.runBacktest = async function(overrideParams) {
                         if (synthBetsText) synthBetsText.style.color = '#10b981';
                     }
                 }
+
+                // === SYNTHETIC ODDS WARNING BANNER ===
+                let synthBanner = document.getElementById('synthetic-odds-banner');
+                if (!synthBanner) {
+                    synthBanner = document.createElement('div');
+                    synthBanner.id = 'synthetic-odds-banner';
+                    synthBanner.style.cssText = 'margin:10px 0; padding:10px 14px; border-radius:8px; font-size:12px; line-height:1.5;';
+                    const transPanel = document.getElementById('transparency-panel');
+                    if (transPanel) transPanel.appendChild(synthBanner);
+                }
+                if (synthBanner) {
+                    if (synthPctVal > 0) {
+                        synthBanner.style.display = 'block';
+                        const severity = synthPctVal > 40 ? 'ef4444' : (synthPctVal > 15 ? 'f59e0b' : '10b981');
+                        synthBanner.style.background = `rgba(${severity === 'ef4444' ? '239,68,68' : severity === 'f59e0b' ? '245,158,11' : '16,185,129'}, 0.06)`;
+                        synthBanner.style.border = `1px solid rgba(${severity === 'ef4444' ? '239,68,68' : severity === 'f59e0b' ? '245,158,11' : '16,185,129'}, 0.2)`;
+                        synthBanner.style.color = `#${severity === 'ef4444' ? 'fca5a5' : severity === 'f59e0b' ? 'fcd34d' : '6ee7b7'}`;
+                        synthBanner.innerHTML = `<i class="fa-solid fa-calculator" style="color:#${severity};"></i> <strong style="color:#${severity};">Odds Simuladas (${synthPctVal}%):</strong> ${synthBetsVal} apostas usaram odds calculadas matematicamente (Dupla Chance, Handicap Asiático, Lay, Placar Exato) em vez de odds reais do mercado. O ROI desses mercados derivados pode divergir da realidade. Mercados com odds reais (1X2, Over/Under) são mais confiáveis.`;
+                    } else {
+                        synthBanner.style.display = 'none';
+                    }
+                }
+
+                // === SLIPPAGE INDICATOR ===
+                let slippageBanner = document.getElementById('slippage-banner');
+                if (!slippageBanner) {
+                    slippageBanner = document.createElement('div');
+                    slippageBanner.id = 'slippage-banner';
+                    slippageBanner.style.cssText = 'margin:10px 0; padding:10px 14px; border-radius:8px; font-size:12px; line-height:1.5;';
+                    const transPanel = document.getElementById('transparency-panel');
+                    if (transPanel) transPanel.appendChild(slippageBanner);
+                }
+                if (slippageBanner) {
+                    const slippageApplied = summary.slippage_applied || false;
+                    const slippagePct = summary.slippage_pct || 0;
+                    if (slippageApplied) {
+                        slippageBanner.style.display = 'block';
+                        slippageBanner.style.background = 'rgba(139, 92, 246, 0.06)';
+                        slippageBanner.style.border = '1px solid rgba(139, 92, 246, 0.2)';
+                        slippageBanner.style.color = '#c4b5fd';
+                        slippageBanner.innerHTML = `<i class="fa-solid fa-chart-line" style="color:#8b5cf6;"></i> <strong style="color:#8b5cf6;">Slippage Ativo (-${slippagePct}%):</strong> A simulação penaliza as odds de fechamento em ${slippagePct}% para modelar o drift real entre o momento do sinal e o preço de fechamento do mercado. Isso torna o backtest mais conservador e realista.`;
+                    } else {
+                        slippageBanner.style.display = 'block';
+                        slippageBanner.style.background = 'rgba(16, 185, 129, 0.04)';
+                        slippageBanner.style.border = '1px solid rgba(16, 185, 129, 0.12)';
+                        slippageBanner.style.color = '#6ee7b7';
+                        slippageBanner.innerHTML = `<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> <strong style="color:#10b981;">Slippage Não Aplicado:</strong> Usando odds de abertura. Nenhuma penalidade de drift necessária.`;
+                    }
+                }
                 
                 const mlAppliedVal = summary.ml_applied_count || 0;
                 const mlPctVal = summary.ml_applied_pct || 0;
