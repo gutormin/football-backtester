@@ -8,9 +8,19 @@ de Dixon-Coles via Máxima Verossimilhança.
 
 from __future__ import annotations
 
-import math
-from collections import defaultdict
-from typing import List
+import os
+import pickle
+import hashlib
+
+class EloRatingsDict(dict):
+    """Pickle-serializable dict subclass that mimics defaultdict(lambda: initial_rating)"""
+    def __init__(self, initial_rating: float):
+        super().__init__()
+        self.initial_rating = initial_rating
+
+    def __missing__(self, key):
+        self[key] = self.initial_rating
+        return self.initial_rating
 
 
 class EloTracker:
@@ -42,9 +52,7 @@ class EloTracker:
         self.k_factor = k_factor
         self.home_advantage = home_advantage
         self.initial_rating = initial_rating
-        self.ratings: defaultdict[str, float] = defaultdict(
-            lambda: self.initial_rating
-        )
+        self.ratings = EloRatingsDict(self.initial_rating)
 
     def get_rating(self, team: str) -> float:
         """Retorna o rating Elo atual de um time.
@@ -212,10 +220,22 @@ def estimate_dynamic_rho(
 
 import pandas as pd
 
+CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'elo_cache')
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+def get_df_cache_key(df: pd.DataFrame) -> str:
+    if df.empty:
+        return "empty"
+    max_date = str(df['Date'].max())
+    first_home = str(df['HomeTeam'].iloc[0]) if 'HomeTeam' in df.columns else ""
+    raw_key = f"{len(df)}_{max_date}_{first_home}"
+    return hashlib.md5(raw_key.encode('utf-8')).hexdigest()
+
 def build_elo_tracker_from_history(df: pd.DataFrame) -> EloTracker:
     """Constrói e cálcula o estado final do Elo Tracker a partir de uma base histórica.
 
     Processa todos os jogos na base fornecida em ordem cronológica.
+    Utiliza cache em disco para evitar reprocessamentos repetitivos de ligas estáticas.
 
     Args:
         df: DataFrame contendo o histórico de partidas ('Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG').
@@ -223,10 +243,22 @@ def build_elo_tracker_from_history(df: pd.DataFrame) -> EloTracker:
     Returns:
         Um objeto EloTracker com as pontuações atualizadas.
     """
-    tracker = EloTracker(k_factor=20, home_advantage=65)
     if df.empty or 'FTHG' not in df.columns or 'FTAG' not in df.columns:
-        return tracker
+        return EloTracker(k_factor=20, home_advantage=65)
         
+    cache_key = get_df_cache_key(df)
+    cache_file = os.path.join(CACHE_DIR, f"{cache_key}.pkl")
+    
+    # Try reading cache
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'rb') as f:
+                tracker = pickle.load(f)
+                return tracker
+        except Exception:
+            pass # fallback to rebuild if pickling fails
+            
+    tracker = EloTracker(k_factor=20, home_advantage=65)
     try:
         # Tenta ordenar. Assumindo que Date já pode ser datetime ou string.
         # Se 'Time' estiver disponível, deveríamos ordenar também por Time, mas Date basta para Elo diário.
@@ -240,6 +272,13 @@ def build_elo_tracker_from_history(df: pd.DataFrame) -> EloTracker:
             tracker.update(row['HomeTeam'], row['AwayTeam'], int(row['FTHG']), int(row['FTAG']))
         except ValueError:
             continue
+            
+    # Try saving to cache
+    try:
+        with open(cache_file, 'wb') as f:
+            pickle.dump(tracker, f)
+    except Exception:
+        pass
             
     return tracker
 

@@ -1,9 +1,10 @@
 import os
 import asyncio
 import mimetypes
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 # Force correct MIME type mapping for .js files on Windows
 mimetypes.add_type('application/javascript', '.js')
@@ -18,6 +19,9 @@ from .cluster_ai_tracker import run_cluster_ai_alerts_loop
 
 app = FastAPI(title="Sports Betting Backtester API")
 
+# Enable Gzip compression for API responses (saves bandwidth on large payloads)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # Restrict CORS to safe development origins and production domains
 app.add_middleware(
     CORSMiddleware,
@@ -26,6 +30,11 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Serves a 204 No Content for favicon to prevent 404 logs in browsers
+@app.get('/favicon.ico', include_in_schema=False)
+async def favicon():
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.on_event("startup")
 async def startup_event():
