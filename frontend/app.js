@@ -6907,17 +6907,30 @@ function openSaveStrategyModal() {
 
     
 
-    // Auto-fill a suggested name with current parameters
+    // Auto-fill strategy name using the live banner displayed in the header
+    const leagueText  = (document.getElementById('active-leagues-text') || {}).innerText || '';
+    const marketText  = (document.getElementById('active-market-text')  || {}).innerText || '';
+    const oddsText    = (document.getElementById('active-odds-text')    || {}).innerText || '';
+    const evText      = (document.getElementById('active-ev-text')      || {}).innerText || '';
 
+    // Build a clean name from the visible pieces, skipping empty parts
+    const nameParts = [];
+    if (leagueText && leagueText !== 'N/A') nameParts.push(leagueText.trim());
+    if (marketText && marketText !== 'N/A') {
+        // Strip internal codes like "(odds_ft_under45)FD √FP" — keep only human label
+        const cleanMarket = marketText.split('(')[0].trim();
+        if (cleanMarket) nameParts.push(cleanMarket);
+    }
+    if (oddsText) nameParts.push('Odds: ' + oddsText.trim());
+    if (evText)   nameParts.push('EV: '   + evText.trim());
+
+    // Fallback to parameter-based name if banner is empty
     const evVal = lastBacktestParams.valueThreshold || '1.05';
-
-    const minO = lastBacktestParams.minOdds || 1.0;
-
-    const maxO = lastBacktestParams.maxOdds || 2.50;
-
-    const suggestedName = `Otimizada (EV: ${evVal} | Odds: ${minO.toFixed(2)}-${maxO.toFixed(2)})`;
-
-    
+    const minO  = lastBacktestParams.minOdds || 1.0;
+    const maxO  = lastBacktestParams.maxOdds || 2.50;
+    const suggestedName = nameParts.length > 0
+        ? nameParts.join(' | ')
+        : `Estratégia (EV: ${evVal} | Odds: ${minO.toFixed(2)}-${maxO.toFixed(2)})`;
 
     document.getElementById('save-strategy-name').value = suggestedName;
 
