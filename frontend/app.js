@@ -9489,7 +9489,6 @@ window.runClustering = runClustering;
 window.saveClusterAiConfig = saveClusterAiConfig;
 window.loadClusterAiConfig = loadClusterAiConfig;
 window.deleteHistoryStrategy = deleteHistoryStrategy;
-window.switchRadarTab = switchRadarTab;
 window.toggleSteamMode = toggleSteamMode;
 window.showRadarInsights = showRadarInsights;
 window.reloadStrategyById = reloadStrategyById;
@@ -9519,8 +9518,8 @@ window.toggleMarketDropdown = toggleMarketDropdown;
 // ==========================================================================
 // Dutching Pro Module Logic
 // ==========================================================================
-let dutchingChartInstance = null;
-let dutchingRadarAllOpps = [];
+var dutchingChartInstance = null;
+var dutchingRadarAllOpps = [];
 
 function updateDutchingChart(labels, data) {
     const ctx = document.getElementById('dutching-pie-chart');
