@@ -1684,6 +1684,12 @@ class ChronologicalBacktester:
         summary_dict['summary']['ml_applied_count'] = ml_applied_count
         summary_dict['summary']['ml_applied_pct'] = round((ml_applied_count / len(bets_record) * 100) if bets_record else 0.0, 1)
         
+        # Check if calibration was skipped due to insufficient samples (< 200) - Phase 3 Fix
+        cal_history = self.calibration_history.get(market, {'probs': []})
+        cal_samples = len(cal_history['probs'])
+        summary_dict['summary']['calibration_samples'] = cal_samples
+        summary_dict['summary']['calibration_skipped'] = cal_samples < 200
+        
         return summary_dict
 
     def run_parallel_scan(self, leagues, start_date, end_date, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', odds_timing='closing', min_odds=1.0, max_odds=2.50, scan_type='markets', markets_list=None, use_ml=False, data_source='football-data', futpython_api_key=''):

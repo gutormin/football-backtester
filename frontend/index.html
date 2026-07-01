@@ -1715,12 +1715,16 @@
                         <span id="transparency-synthetic-bets" style="color: var(--text-main); font-weight: bold;">N/A</span> (<span id="transparency-synthetic-pct">0%</span>) das entradas simularam odds estimadas por fórmula matemática (Lay/Handicap sem odd real no CSV).
                     </div>
                     <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
-                        <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">🕒 Odds de Fechamento (Closing Odds)</strong>
-                        O backtest utiliza odds de fechamento (momento do início da partida). Na prática, o drift de mercado pode reduzir o ROI real do modelo.
+                        <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">🕒 Timing das Odds Simuladas</strong>
+                        Simulando com odds de <span id="transparency-odds-timing-text" style="color: var(--text-main); font-weight: bold;">Fechamento</span>. <span id="transparency-odds-timing-warning" style="opacity: 0.8; font-size: 11px; display: block; margin-top: 4px;">Drift de mercado pode reduzir o ROI real na prática.</span>
                     </div>
                     <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
                         <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">🤖 Correção por Machine Learning</strong>
                         O filtro de ML (XGBoost) foi ativado e corrigiu efetivamente <span id="transparency-ml-applied" style="color: var(--text-main); font-weight: bold;">N/A</span> (<span id="transparency-ml-pct">0%</span>) das apostas analisadas.
+                    </div>
+                    <div id="transparency-calibration-card" style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                        <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">⚖️ Calibração Platt (Poisson)</strong>
+                        <span id="transparency-calibration" style="color: var(--text-main); font-weight: bold;">N/A</span>
                     </div>
                 </div>
             </div>
@@ -3041,7 +3045,7 @@
     </div>
 
     <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
-    <script type="module" src="app.js?v=64"></script>
+    <script type="module" src="app.js?v=65"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,

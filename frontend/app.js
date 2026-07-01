@@ -8426,6 +8426,35 @@ window.runBacktest = async function(overrideParams) {
                 const mlPctText = document.getElementById('transparency-ml-pct');
                 if (mlAppliedText) mlAppliedText.innerText = mlAppliedVal;
                 if (mlPctText) mlPctText.innerText = mlPctVal + '%';
+                
+                const timingText = document.getElementById('transparency-odds-timing-text');
+                const timingWarning = document.getElementById('transparency-odds-timing-warning');
+                if (timingText) {
+                    const isClosing = (payload.odds_timing === 'closing');
+                    timingText.innerText = isClosing ? 'Fechamento (Closing)' : 'Abertura (Opening)';
+                    timingText.style.color = isClosing ? '#f59e0b' : '#10b981';
+                    if (timingWarning) {
+                        timingWarning.innerText = isClosing 
+                            ? 'Aviso: O drift de mercado (queda de odd) pode reduzir o ROI simulado na vida real.'
+                            : 'Excelente: Simulando com a odd de abertura inicial do mercado.';
+                    }
+                }
+                
+                const calibText = document.getElementById('transparency-calibration');
+                const calibCard = document.getElementById('transparency-calibration-card');
+                if (calibText) {
+                    const calibSkipped = summary.calibration_skipped;
+                    const calibSamples = summary.calibration_samples || 0;
+                    if (calibSkipped) {
+                        calibText.innerText = `Inativa (${calibSamples} jogos)`;
+                        calibText.style.color = '#f59e0b';
+                        if (calibCard) calibCard.style.background = 'rgba(245, 158, 11, 0.02)';
+                    } else {
+                        calibText.innerText = `Ativa (${calibSamples} jogos)`;
+                        calibText.style.color = '#10b981';
+                        if (calibCard) calibCard.style.background = 'rgba(16, 185, 129, 0.02)';
+                    }
+                }
             }
             
             const bets = data.bets || [];
