@@ -616,7 +616,8 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
         if market_type == "ht_1x2":
             juice = max(1.12, total_implied + 0.06)
         elif market_type == "cs":
-            juice = max(1.20, total_implied + 0.15)
+            # Patamares empíricos mais realistas (margem típica de CS fica entre 15% e 25%)
+            juice = max(1.25, total_implied + 0.20)
             
         val = 1.0 / (prob * juice)
         return float(round(max(1.01, min(99.0, val)), 3))
