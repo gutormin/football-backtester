@@ -18,12 +18,12 @@ from .cluster_ai_tracker import run_cluster_ai_alerts_loop
 
 app = FastAPI(title="Sports Betting Backtester API")
 
-# Enable CORS for local development
+# Restrict CORS to safe development origins and production domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "https://backtest.pgjs.onrender.com"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
