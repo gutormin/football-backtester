@@ -3021,6 +3021,9 @@ function clearDashboard() {
         safeSetDisplay('btn-export-backtest', 'none');
         safeSetHTML('scanner-results', '');
         safeSetDisplay('scanner-results', 'none');
+        safeSetHTML('global-scanner-results', '');
+        safeSetHTML('eqs-table-container', '');
+        safeSetDisplay('transparency-panel', 'none');
 
         // Clear Calculator results
         safeSetDisplay('calc-results', 'none');
@@ -3037,6 +3040,46 @@ function clearDashboard() {
         showToast("Dashboard parcialmente limpo.", "warning");
     }
 }
+
+function clearScannerResults() {
+    try {
+        const safeSetHTML = (id, val) => { const el = document.getElementById(id); if (el) el.innerHTML = val; };
+        const safeSetDisplay = (id, val) => { const el = document.getElementById(id); if (el) el.style.display = val; };
+        
+        safeSetHTML('global-scanner-results', '');
+        safeSetHTML('eqs-table-container', '');
+        safeSetDisplay('scanner-results', 'none');
+        
+        if (typeof lastScanResults !== 'undefined') { lastScanResults = null; }
+        if (typeof lastScanParams !== 'undefined') { lastScanParams = null; }
+        
+        showToast("Resultados do scanner limpos!", "info");
+    } catch (err) {
+        console.error("Erro ao limpar scanner:", err);
+    }
+}
+
+function clearClusterResults() {
+    try {
+        document.getElementById("clustering-loading").style.display = "none";
+        document.getElementById("clustering-results").style.display = "none";
+        const canvas = document.getElementById('clusterChart');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        const clusterList = document.getElementById('cluster-groups-container');
+        if (clusterList) {
+            clusterList.innerHTML = '';
+        }
+        showToast("Resultados de clusterização limpos!", "info");
+    } catch (err) {
+        console.error("Erro ao limpar clusterização:", err);
+    }
+}
+
+window.clearScannerResults = clearScannerResults;
+window.clearClusterResults = clearClusterResults;
 
 
 
