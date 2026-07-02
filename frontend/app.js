@@ -3016,18 +3016,12 @@ function clearDashboard() {
         safeSetText('rec-justification', 'Aguardando a execução do backtest para gerar a análise de banca.');
         safeSetDisplay('rec-justification-box', 'none');
 
-        // 5. Clear scanner results
-        if (typeof lastScanResults !== 'undefined') { lastScanResults = null; }
-        if (typeof lastScanParams !== 'undefined') { lastScanParams = null; }
+        // 5. Clear backtest state (excluding Scanner)
         if (typeof lastBacktestSummary !== 'undefined') { lastBacktestSummary = null; }
         if (typeof lastBacktestParams !== 'undefined') { lastBacktestParams = null; }
         
         safeSetDisplay('btn-export-backtest', 'none');
-        safeSetHTML('scanner-results', '');
-        safeSetDisplay('scanner-results', 'none');
-        safeSetHTML('global-scanner-results', '');
         safeSetHTML('eqs-table-container', '');
-        safeSetDisplay('transparency-panel', 'none');
 
         // Clear Calculator results
         safeSetDisplay('calc-results', 'none');
