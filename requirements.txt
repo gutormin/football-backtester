@@ -6,4 +6,5 @@ requests
 xgboost
 scikit-learn
 rapidfuzz
+psycopg2-binary
 python-dotenv
