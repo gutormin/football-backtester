@@ -1370,9 +1370,9 @@ window.addEventListener('unhandledrejection', function(e) {
                                         <th>Mercado</th>
                                         <th>Resultados Cobrir</th>
                                         <th>Odds Individuais</th>
-                                        <th>Odd Dutching</th>
-                                        <th>Prob. Modelo</th>
-                                        <th>Edge (+EV)</th>
+                                        <th title="Multiplicador Sintético da banca total caso QUALQUER um dos placares cobertos vença.">Odd Combinada <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
+                                        <th title="Probabilidade acumulada (IA) de que o jogo termine em QUALQUER um dos placares cobertos.">Prob. Real (IA) <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
+                                        <th title="Valor esperado estimado da aposta combinada. Se for positivo, é lucrativo a longo prazo.">Edge (+EV) <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
                                         <th>Ação</th>
                                     </tr>
                                 </thead>
@@ -1418,6 +1418,16 @@ window.addEventListener('unhandledrejection', function(e) {
                             <div id="dutching-rows-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto; padding-right: 5px; margin-bottom: 10px;">
                                 <!-- Dynamically filled with addDutchingRow() -->
                             </div>
+
+                            <!-- Placares Alternativos Recomendados -->
+                            <div id="dutching-alternatives-container" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px; display: none;">
+                                <div style="font-size: 12px; font-weight: 600; color: #a78bfa; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-lightbulb"></i> IA: Cobrir placares alternativos (+EV)?
+                                </div>
+                                <div id="dutching-alternatives-list" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <!-- Dynamically filled with suggested alternative scores buttons -->
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Col Right: Allocation Table and Chart -->
@@ -1425,14 +1435,22 @@ window.addEventListener('unhandledrejection', function(e) {
                             <div>
                                 <h3 style="font-size: 15px; color: var(--text-primary); margin-top: 0; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-chart-pie" style="color: #8b5cf6;"></i> Alocação de Stakes e Gráfico</h3>
                                 
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                                    <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; text-align: center;">
-                                        <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px;">Probabilidade Combinada</div>
-                                        <div style="font-size: 18px; font-weight: 700; color: #a78bfa;" id="dutching-prob-value">0.00%</div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 15px;">
+                                    <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; text-align: center;" title="Odd Combinada sintética do grupo de placares (Multiplicador de retorno)">
+                                        <div style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px;">Odd Combinada</div>
+                                        <div style="font-size: 16px; font-weight: 700; color: #c084fc;" id="dutching-combined-odd-value">0.00</div>
                                     </div>
-                                    <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; text-align: center;">
-                                        <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 4px;" id="dutching-result-type-label">Lucro Líquido Ganho</div>
-                                        <div style="font-size: 18px; font-weight: 700; color: #34d399;" id="dutching-profit-value">$0.00</div>
+                                    <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; text-align: center;" title="Soma das probabilidades reais calculadas pela IA para os placares selecionados">
+                                        <div style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px;">Probabilidade IA</div>
+                                        <div style="font-size: 16px; font-weight: 700; color: #a78bfa;" id="dutching-real-prob-value">0.00%</div>
+                                    </div>
+                                    <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; text-align: center;" title="Valor Esperado (+EV) do Dutching atualizado em tempo real com as odds inseridas">
+                                        <div style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px;">Edge Real (+EV)</div>
+                                        <div style="font-size: 16px; font-weight: 700; color: #34d399;" id="dutching-edge-value">+0.00%</div>
+                                    </div>
+                                    <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; text-align: center;" title="Lucro líquido esperado se qualquer um dos placares vencer">
+                                        <div style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px;" id="dutching-result-type-label">Lucro Líquido</div>
+                                        <div style="font-size: 16px; font-weight: 700; color: #34d399;" id="dutching-profit-value">$0.00</div>
                                     </div>
                                 </div>
 
@@ -3063,7 +3081,7 @@ window.addEventListener('unhandledrejection', function(e) {
     </div>
 
     <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
-    <script type="module" src="app.js?v=82"></script>
+    <script type="module" src="app.js?v=83"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,

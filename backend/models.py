@@ -574,6 +574,10 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
     fair_cs_01 = float(bk_matrix[0, 1])
     fair_cs_02 = float(bk_matrix[0, 2])
     fair_cs_12 = float(bk_matrix[1, 2])
+    fair_cs_30 = float(bk_matrix[3, 0])
+    fair_cs_31 = float(bk_matrix[3, 1])
+    fair_cs_03 = float(bk_matrix[0, 3])
+    fair_cs_13 = float(bk_matrix[1, 3])
     
     # HT probabilities for bookie
     lambda_home_bookie_ht = lambda_home_bookie * 0.45
@@ -641,6 +645,10 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
         'bookie_cs_01': apply_juice(fair_cs_01, "cs"),
         'bookie_cs_02': apply_juice(fair_cs_02, "cs"),
         'bookie_cs_12': apply_juice(fair_cs_12, "cs"),
+        'bookie_cs_30': apply_juice(fair_cs_30, "cs"),
+        'bookie_cs_31': apply_juice(fair_cs_31, "cs"),
+        'bookie_cs_03': apply_juice(fair_cs_03, "cs"),
+        'bookie_cs_13': apply_juice(fair_cs_13, "cs"),
         'bookie_ht_home': apply_juice(fair_ht_home, "ht_1x2"),
         'bookie_ht_draw': apply_juice(fair_ht_draw, "ht_1x2"),
         'bookie_ht_away': apply_juice(fair_ht_away, "ht_1x2"),

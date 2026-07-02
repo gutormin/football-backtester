@@ -32,6 +32,41 @@ SPORT_LEAGUE_MAP = {
     'soccer_norway_eliteserien': 'NORWAY_ELITESERIEN'
 }
 
+def get_selections_and_alternatives(pred, outcomes_to_cover, est_odds):
+    # 1. Selections probs
+    selections_probs = []
+    for sel in outcomes_to_cover:
+        try:
+            x, y = map(int, sel.split('-'))
+            prob = float(pred['prob_matrix'][x][y])
+        except Exception:
+            prob = 0.0
+        selections_probs.append(round(prob, 4))
+        
+    # 2. Alternative scores
+    alternative_scores = []
+    standard_scores = ['0-0', '1-0', '2-0', '2-1', '3-0', '3-1', '0-1', '0-2', '1-2', '0-3', '1-3', '1-1']
+    for score in standard_scores:
+        if score not in outcomes_to_cover:
+            try:
+                x, y = map(int, score.split('-'))
+                prob_cs = float(pred['prob_matrix'][x][y])
+            except Exception:
+                prob_cs = 0.0
+            
+            key = f"bookie_cs_{score.replace('-', '')}"
+            odd_cs = est_odds.get(key, np.nan)
+            
+            if prob_cs > 0.015 and not pd.isna(odd_cs) and not np.isnan(odd_cs) and odd_cs > 1.0:
+                alternative_scores.append({
+                    'name': score,
+                    'prob': round(prob_cs, 4),
+                    'odd': round(odd_cs, 2)
+                })
+    # Sort alternatives by probability descending
+    alternative_scores.sort(key=lambda x: x['prob'], reverse=True)
+    return selections_probs, alternative_scores
+
 def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto_ia'):
     if not api_key:
         import os
@@ -239,12 +274,15 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                     
                     if edge > 0.01:
                         label_prefix = "🧠 IA: " if strategy == 'auto_ia' else ""
+                        sel_probs, alt_scores = get_selections_and_alternatives(pred, outcomes_to_cover, est_odds)
                         opportunities.append({
                             'match': match_name,
                             'date': match_date,
                             'bookmaker': bookie,
                             'market': f"{label_prefix}{market_label}",
                             'selections': outcomes_to_cover,
+                            'selections_probs': sel_probs,
+                            'alternative_scores': alt_scores,
                             'odds': [round(o, 2) for o in odds_to_cover],
                             'dutching_odd': round(dutching_odd, 2),
                             'model_prob': f"{round(prob_combined * 100, 2)}%",
@@ -334,12 +372,15 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 
                 if edge > 0.01:
                     label_prefix = "🧠 IA: " if strategy == 'auto_ia' else ""
+                    sel_probs, alt_scores = get_selections_and_alternatives(pred, outcomes_to_cover, est_odds_b365)
                     opportunities.append({
                         'match': match_name,
                         'date': match_date,
                         'bookmaker': 'Bet365',
                         'market': f"{label_prefix}{market_label}",
                         'selections': outcomes_to_cover,
+                        'selections_probs': sel_probs,
+                        'alternative_scores': alt_scores,
                         'odds': [round(o, 2) for o in odds_b365],
                         'dutching_odd': round(dutching_odd, 2),
                         'model_prob': f"{round(prob_combined * 100, 2)}%",
@@ -356,12 +397,15 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 
                 if edge_bf > 0.01:
                     label_prefix = "🧠 IA: " if strategy == 'auto_ia' else ""
+                    sel_probs, alt_scores = get_selections_and_alternatives(pred, outcomes_to_cover, est_odds_b365)
                     opportunities.append({
                         'match': match_name,
                         'date': match_date,
                         'bookmaker': 'Betfair Exchange',
                         'market': f"{label_prefix}{market_label}",
                         'selections': outcomes_to_cover,
+                        'selections_probs': sel_probs,
+                        'alternative_scores': alt_scores,
                         'odds': [round(o, 2) for o in odds_betfair],
                         'dutching_odd': round(dutching_odd_bf, 2),
                         'model_prob': f"{round(prob_combined * 100, 2)}%",
@@ -384,6 +428,11 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
                 'bookmaker': 'Betfair Exchange',
                 'market': 'Dutching Favorito Clássico (Mandante)',
                 'selections': ['1-0', '2-0', '2-1', '3-0', '3-1'],
+                'selections_probs': [0.20, 0.15, 0.12, 0.11, 0.105],
+                'alternative_scores': [
+                    {'name': '0-0', 'prob': 0.08, 'odd': 9.0},
+                    {'name': '1-1', 'prob': 0.07, 'odd': 6.50}
+                ],
                 'odds': [6.50, 7.50, 8.50, 11.0, 13.0],
                 'dutching_odd': 1.68,
                 'model_prob': '68.50%',
@@ -399,6 +448,11 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
                 'bookmaker': 'Betfair Exchange',
                 'market': 'Dutching Jogo Truncado / Under (Mandante)',
                 'selections': ['0-0', '1-0', '2-0', '1-1'],
+                'selections_probs': [0.15, 0.20, 0.14, 0.125],
+                'alternative_scores': [
+                    {'name': '2-1', 'prob': 0.08, 'odd': 8.50},
+                    {'name': '0-1', 'prob': 0.06, 'odd': 10.0}
+                ],
                 'odds': [10.0, 6.50, 7.50, 7.00],
                 'dutching_odd': 1.95,
                 'model_prob': '61.50%',
@@ -414,6 +468,11 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
                 'bookmaker': 'Betfair Exchange',
                 'market': 'Dutching Favorito Curto (Mandante)',
                 'selections': ['1-0', '2-0', '2-1'],
+                'selections_probs': [0.20, 0.15, 0.125],
+                'alternative_scores': [
+                    {'name': '0-0', 'prob': 0.08, 'odd': 9.0},
+                    {'name': '1-1', 'prob': 0.07, 'odd': 6.5}
+                ],
                 'odds': [6.50, 7.50, 8.50],
                 'dutching_odd': 2.45,
                 'model_prob': '47.50%',
@@ -429,6 +488,11 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
                 'bookmaker': 'Betfair Exchange',
                 'market': '🧠 IA: Favorito Clássico (Mandante)',
                 'selections': ['1-0', '2-0', '2-1', '3-0', '3-1'],
+                'selections_probs': [0.20, 0.15, 0.12, 0.11, 0.105],
+                'alternative_scores': [
+                    {'name': '0-0', 'prob': 0.08, 'odd': 9.0},
+                    {'name': '1-1', 'prob': 0.07, 'odd': 6.5}
+                ],
                 'odds': [6.50, 7.50, 8.50, 11.0, 13.0],
                 'dutching_odd': 1.68,
                 'model_prob': '68.50%',
@@ -441,6 +505,11 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
                 'bookmaker': 'Bet365',
                 'market': '🧠 IA: Jogo Truncado / Under (Mandante)',
                 'selections': ['0-0', '1-0', '2-0', '1-1'],
+                'selections_probs': [0.12, 0.18, 0.15, 0.131],
+                'alternative_scores': [
+                    {'name': '2-1', 'prob': 0.09, 'odd': 8.0},
+                    {'name': '0-1', 'prob': 0.07, 'odd': 9.50}
+                ],
                 'odds': [11.0, 7.00, 8.00, 7.50],
                 'dutching_odd': 2.08,
                 'model_prob': '58.10%',

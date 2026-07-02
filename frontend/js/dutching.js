@@ -54,7 +54,7 @@ function updateDutchingChart(labels, data) {
     });
 }
 
-function addDutchingRow(name = "", odd = "") {
+function addDutchingRow(name = "", odd = "", modelProb = 0.0) {
     const container = document.getElementById('dutching-rows-container');
     if (!container) return;
     
@@ -67,6 +67,7 @@ function addDutchingRow(name = "", odd = "") {
     div.innerHTML = `
         <input type="text" placeholder="Ex: Placar 1-0" value="${name}" class="dutching-input-name" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px; outline: none;" oninput="calculateDutching()">
         <input type="number" placeholder="Odd" value="${odd}" step="0.05" min="1.01" class="dutching-input-odd" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px; outline: none;" oninput="calculateDutching()">
+        <input type="hidden" class="dutching-input-prob" value="${modelProb}">
         <button type="button" class="btn-clear" onclick="removeDutchingRow('${rowId}')" style="color: var(--text-loss); border-color: rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.05); padding: 8px 10px;"><i class="fa-solid fa-trash-can"></i></button>
     `;
     
@@ -93,13 +94,16 @@ function calculateDutching() {
     
     const selections = [];
     let sumProbabilityImplied = 0.0;
+    let sumProbabilityReal = 0.0;
     
     rows.forEach(row => {
         const nameInput = row.querySelector('.dutching-input-name');
         const oddInput = row.querySelector('.dutching-input-odd');
+        const probInput = row.querySelector('.dutching-input-prob');
         
         const name = nameInput.value.trim() || 'Seleção';
         const odd = parseFloat(oddInput.value) || 0.0;
+        const prob = parseFloat(probInput ? probInput.value : 0.0) || 0.0;
         
         if (odd > 1.0) {
             let calculationOdd = odd;
@@ -107,15 +111,18 @@ function calculateDutching() {
             if (name.toLowerCase().includes('betfair') || name.toLowerCase().includes('exchange')) {
                 calculationOdd = (odd - 1.0) * (1.0 - commission / 100.0) + 1.0;
             }
-            selections.push({ name, odd, calculationOdd });
+            selections.push({ name, odd, calculationOdd, prob });
             sumProbabilityImplied += 1.0 / calculationOdd;
+            sumProbabilityReal += prob;
         }
     });
     
     if (selections.length === 0 || sumProbabilityImplied <= 0) {
         allocationList.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 15px;">Adicione seleções válidas com odds > 1.00.</td></tr>`;
-        document.getElementById('dutching-prob-value').innerText = '0.00%';
-        document.getElementById('dutching-profit-value').innerText = '$0.00';
+        if (document.getElementById('dutching-combined-odd-value')) document.getElementById('dutching-combined-odd-value').innerText = '0.00';
+        if (document.getElementById('dutching-real-prob-value')) document.getElementById('dutching-real-prob-value').innerText = '0.00%';
+        if (document.getElementById('dutching-edge-value')) document.getElementById('dutching-edge-value').innerText = '+0.00%';
+        if (document.getElementById('dutching-profit-value')) document.getElementById('dutching-profit-value').innerText = '$0.00';
         updateDutchingChart([], []);
         return;
     }
@@ -128,7 +135,7 @@ function calculateDutching() {
     
     if (mode === 'total_stake') {
         amountLabel.innerText = 'Valor da Stake Total ($)';
-        targetProfitLabel.innerText = 'Lucro Líquido Ganho';
+        targetProfitLabel.innerText = 'Lucro Líquido';
         totalStake = amount;
         targetProfit = totalStake / sumProbabilityImplied - totalStake;
     } else {
@@ -170,7 +177,22 @@ function calculateDutching() {
         allocationList.appendChild(tr);
     });
     
-    document.getElementById('dutching-prob-value').innerText = (sumProbabilityImplied * 100).toFixed(2) + '%';
+    const combinedOdd = sumProbabilityImplied > 0 ? (1.0 / sumProbabilityImplied) : 0.0;
+    const realProbPercent = sumProbabilityReal * 100;
+    const edge = combinedOdd > 0 ? (sumProbabilityReal * combinedOdd - 1.0) : -1.0;
+    const edgePercent = edge * 100;
+
+    const combinedOddEl = document.getElementById('dutching-combined-odd-value');
+    if (combinedOddEl) combinedOddEl.innerText = combinedOdd.toFixed(2);
+
+    const realProbEl = document.getElementById('dutching-real-prob-value');
+    if (realProbEl) realProbEl.innerText = realProbPercent.toFixed(2) + '%';
+
+    const edgeEl = document.getElementById('dutching-edge-value');
+    if (edgeEl) {
+        edgeEl.innerText = (edgePercent >= 0 ? '+' : '') + edgePercent.toFixed(2) + '%';
+        edgeEl.style.color = edgePercent >= 0 ? '#34d399' : '#f87171';
+    }
     
     if (mode === 'total_stake') {
         const profitColor = targetProfit >= 0 ? '#34d399' : '#f87171';
@@ -232,6 +254,7 @@ function filterDutchingRadar() {
     
     filtered.forEach((opp, index) => {
         const tr = document.createElement('tr');
+        const selectionsWithOdds = opp.selections.map((sel, idx) => `${sel} (${opp.odds[idx].toFixed(2)})`).join(' | ');
         
         tr.innerHTML = `
             <td>
@@ -240,7 +263,7 @@ function filterDutchingRadar() {
             </td>
             <td><span class="badge badge-info" style="font-size: 10px;">${opp.bookmaker}</span></td>
             <td><div style="font-size: 11px; color: var(--text-secondary);">${opp.market}</div></td>
-            <td><div style="font-size: 11px; font-family: monospace;">${opp.selections.join(' | ')}</div></td>
+            <td><div style="font-size: 11px; font-family: monospace; color: #a78bfa;">${selectionsWithOdds}</div></td>
             <td><span style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${opp.dutching_odd.toFixed(2)}</span></td>
             <td><span style="color: #a78bfa; font-weight: 500;">${opp.model_prob}</span></td>
             <td><span style="color: #34d399; font-weight: 700; font-size: 13px;">${opp.edge}</span></td>
@@ -265,8 +288,34 @@ function loadDutchingOpportunityByIndex(index) {
     
     opp.selections.forEach((sel, i) => {
         const suffix = opp.bookmaker === 'Betfair Exchange' ? ' (Betfair)' : '';
-        addDutchingRow(sel + suffix, opp.odds[i]);
+        const prob = (opp.selections_probs && opp.selections_probs[i]) ? opp.selections_probs[i] : 0.0;
+        addDutchingRow(sel + suffix, opp.odds[i], prob);
     });
+
+    const altContainer = document.getElementById('dutching-alternatives-container');
+    const altList = document.getElementById('dutching-alternatives-list');
+    if (altContainer && altList) {
+        altList.innerHTML = '';
+        if (opp.alternative_scores && opp.alternative_scores.length > 0) {
+            altContainer.style.display = 'block';
+            opp.alternative_scores.forEach(alt => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn-clear';
+                btn.style = 'padding: 6px 12px; font-size: 11px; border-color: rgba(167, 139, 250, 0.3); background: rgba(167, 139, 250, 0.05); color: #c084fc; cursor: pointer; display: flex; align-items: center; gap: 6px; border-radius: 4px; font-weight: 600;';
+                btn.innerHTML = `<i class="fa-solid fa-plus-circle"></i> + Cobrir ${alt.name} <span style="font-size: 10px; color: var(--text-muted); font-weight: normal;">(Odd: ${alt.odd.toFixed(2)} | IA: ${(alt.prob * 100).toFixed(1)}%)</span>`;
+                btn.onclick = () => {
+                    const suffix = opp.bookmaker === 'Betfair Exchange' ? ' (Betfair)' : '';
+                    addDutchingRow(alt.name + suffix, alt.odd, alt.prob);
+                    btn.remove();
+                    if (altList.children.length === 0) altContainer.style.display = 'none';
+                };
+                altList.appendChild(btn);
+            });
+        } else {
+            altContainer.style.display = 'none';
+        }
+    }
     
     showToast(`Oportunidade para ${opp.match} carregada na calculadora!`, "success");
 }
