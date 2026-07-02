@@ -278,12 +278,7 @@ window.calculateDutching = calculateDutching;
 window.runDutchingScan = runDutchingScan;
 window.filterDutchingRadar = filterDutchingRadar;
 window.loadDutchingOpportunityByIndex = loadDutchingOpportunityByIndex;
-// window.loadDutchingOpportunity removed to fix ReferenceError
-window.loadDutchingBotConfig = loadDutchingBotConfig;
-window.saveDutchingBotConfig = saveDutchingBotConfig;
-window.testDutchingTelegramAlert = testDutchingTelegramAlert;
-window.loadOddsApiKey = loadOddsApiKey;
-window.saveOddsApiKey = saveOddsApiKey;
+// Bot configs and API key functions are defined and exposed in app.js
 
 
 

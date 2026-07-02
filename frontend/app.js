@@ -9683,6 +9683,12 @@ window.selectAllMarkets = selectAllMarkets;
 window.testNotificationAlert = testNotificationAlert;
 window.toggleMarketDropdown = toggleMarketDropdown;
 
+window.loadDutchingBotConfig = loadDutchingBotConfig;
+window.saveDutchingBotConfig = saveDutchingBotConfig;
+window.testDutchingTelegramAlert = testDutchingTelegramAlert;
+window.loadOddsApiKey = loadOddsApiKey;
+window.saveOddsApiKey = saveOddsApiKey;
+
 window.updateCacheStatus = function() {
     const backtestCache = JSON.parse(localStorage.getItem('radar_backtest_cache') || '{}');
     const cacheCount = Object.keys(backtestCache).length;
