@@ -3,6 +3,8 @@
 // ==========================================================================
 var dutchingChartInstance = null;
 var dutchingRadarAllOpps = [];
+var dutchingSortKey = 'edge';
+var dutchingSortAsc = false;
 
 function updateDutchingChart(labels, data) {
     const ctx = document.getElementById('dutching-pie-chart');
@@ -240,9 +242,33 @@ function filterDutchingRadar() {
     
     tbody.innerHTML = '';
     
-    const filtered = dutchingRadarAllOpps.filter(opp => {
+    let filtered = dutchingRadarAllOpps.filter(opp => {
         if (filterVal === 'best') return true;
         return opp.bookmaker === filterVal;
+    });
+    
+    // Apply sorting
+    filtered.sort((a, b) => {
+        let valA, valB;
+        if (dutchingSortKey === 'match') {
+            valA = a.match.toLowerCase();
+            valB = b.match.toLowerCase();
+        } else if (dutchingSortKey === 'odd') {
+            valA = a.dutching_odd;
+            valB = b.dutching_odd;
+        } else if (dutchingSortKey === 'prob') {
+            valA = parseFloat(a.model_prob) || 0;
+            valB = parseFloat(b.model_prob) || 0;
+        } else if (dutchingSortKey === 'edge') {
+            valA = a.raw_edge;
+            valB = b.raw_edge;
+        } else {
+            return 0;
+        }
+        
+        if (valA < valB) return dutchingSortAsc ? -1 : 1;
+        if (valA > valB) return dutchingSortAsc ? 1 : -1;
+        return 0;
     });
     
     window.dutchingRadarFilteredOpps = filtered;
@@ -320,6 +346,23 @@ function loadDutchingOpportunityByIndex(index) {
     showToast(`Oportunidade para ${opp.match} carregada na calculadora!`, "success");
 }
 
+function sortDutchingRadar(key) {
+    if (dutchingSortKey === key) {
+        dutchingSortAsc = !dutchingSortAsc;
+    } else {
+        dutchingSortKey = key;
+        dutchingSortAsc = (key === 'match') ? true : false;
+    }
+    filterDutchingRadar();
+}
+
+function toggleDutchingGuide() {
+    const guide = document.getElementById('dutching-strategies-guide');
+    if (guide) {
+        guide.style.display = guide.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
 // Expose to window
 window.addDutchingRow = addDutchingRow;
 window.removeDutchingRow = removeDutchingRow;
@@ -327,6 +370,8 @@ window.calculateDutching = calculateDutching;
 window.runDutchingScan = runDutchingScan;
 window.filterDutchingRadar = filterDutchingRadar;
 window.loadDutchingOpportunityByIndex = loadDutchingOpportunityByIndex;
+window.sortDutchingRadar = sortDutchingRadar;
+window.toggleDutchingGuide = toggleDutchingGuide;
 // Bot configs and API key functions are defined and exposed in app.js
 
 

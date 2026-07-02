@@ -1361,18 +1361,42 @@ window.addEventListener('unhandledrejection', function(e) {
                                 <option value="fav_short">⚡ Favorito Curto (3 Placares)</option>
                                 <option value="under_trunc">🛡️ Jogo Truncado / Under (4 Placares)</option>
                             </select>
+
+                            <button type="button" class="btn-clear" onclick="window.toggleDutchingGuide()" style="padding: 4px 8px; font-size: 11px; margin-left: 15px; color: #a78bfa; border-color: rgba(167,139,250,0.2); background: rgba(167,139,250,0.05); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                                <i class="fa-solid fa-circle-info"></i> Legenda de Estratégias
+                            </button>
                         </div>
+
+                        <!-- Definições das Estratégias Collapsible Box -->
+                        <div id="dutching-strategies-guide" style="display: none; background: rgba(139, 92, 246, 0.04); border: 1px solid rgba(139, 92, 246, 0.15); padding: 15px; border-radius: 6px; margin-bottom: 15px; font-size: 12px; line-height: 1.5; color: var(--text-secondary);">
+                            <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--text-primary); font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-brain" style="color: #a78bfa;"></i> Definições das Estratégias de Dutching</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                                <div>
+                                    <strong style="color: #c084fc;">🏆 Favorito Clássico (5 Placares)</strong>
+                                    <p style="margin: 5px 0 0 0; font-size: 11px; color: var(--text-muted);">Cobre: <code>1-0, 2-0, 2-1, 3-0, 3-1</code> (ou o inverso fora). Indicado para quando há um favorito claro em jogo aberto com tendência de gols, garantindo cobertura total da vitória do favorito sem se expor a empates.</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #c084fc;">⚡ Favorito Curto (3 Placares)</strong>
+                                    <p style="margin: 5px 0 0 0; font-size: 11px; color: var(--text-muted);">Cobre: <code>1-0, 2-0, 2-1</code> (ou o inverso fora). Foco na vitória do favorito pelo placar mínimo. Indicado para cenários de favoritismo médio com odds combinadas mais elevadas.</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #c084fc;">🛡️ Jogo Truncado / Under (4 Placares)</strong>
+                                    <p style="margin: 5px 0 0 0; font-size: 11px; color: var(--text-muted);">Cobre: <code>0-0, 1-0, 2-0, 1-1</code> (ou o inverso fora). Cobre empates de poucos gols e vitória magra do favorito. Ideal para partidas muito truncadas com forte viés de Under 2.5.</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
                             <table class="table-styled" style="width: 100%;" id="dutching-radar-table">
                                 <thead>
                                     <tr>
-                                        <th>Partida / Horário</th>
+                                        <th onclick="window.sortDutchingRadar('match')" style="cursor: pointer; user-select: none;" title="Clique para ordenar por Partida">Partida / Horário <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
                                         <th>Mercado</th>
                                         <th>Resultados Cobrir</th>
                                         <th>Odds Individuais</th>
-                                        <th title="Multiplicador Sintético da banca total caso QUALQUER um dos placares cobertos vença.">Odd Combinada <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
-                                        <th title="Probabilidade acumulada (IA) de que o jogo termine em QUALQUER um dos placares cobertos.">Prob. Real (IA) <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
-                                        <th title="Valor esperado estimado da aposta combinada. Se for positivo, é lucrativo a longo prazo.">Edge (+EV) <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
+                                        <th onclick="window.sortDutchingRadar('odd')" style="cursor: pointer; user-select: none;" title="Clique para ordenar por Odd Combinada">Odd Combinada <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i> <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
+                                        <th onclick="window.sortDutchingRadar('prob')" style="cursor: pointer; user-select: none;" title="Clique para ordenar por Probabilidade Real">Prob. Real (IA) <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i> <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
+                                        <th onclick="window.sortDutchingRadar('edge')" style="cursor: pointer; user-select: none;" title="Clique para ordenar por Edge">Edge (+EV) <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i> <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
                                         <th>Ação</th>
                                     </tr>
                                 </thead>
@@ -3081,7 +3105,7 @@ window.addEventListener('unhandledrejection', function(e) {
     </div>
 
     <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
-    <script type="module" src="app.js?v=83"></script>
+    <script type="module" src="app.js?v=84"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
