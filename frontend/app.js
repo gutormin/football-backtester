@@ -5890,155 +5890,146 @@ function renderStatValidation(summary) {
 
 
 function renderOosResults(oosSummary, inSampleSummary) {
-
     const panel = document.getElementById('oos-results-panel');
-
     const grid = document.getElementById('oos-metrics-grid');
-
     const badge = document.getElementById('oos-badge');
+    const stressPanel = document.getElementById('robustness-stress-panel');
 
     if (!panel || !grid) return;
 
-
-
     if (!oosSummary) {
-
         panel.style.display = 'none';
-
+        if (stressPanel) stressPanel.style.display = 'none';
         return;
-
     }
 
-
-
     panel.style.display = 'block';
-
     grid.innerHTML = '';
 
-
-
     const fmtNum = (v, d) => v !== undefined && v !== null ? v.toFixed(d).replace('.', ',') : 'N/A';
-
     const isProfit = oosSummary.net_profit >= 0;
-
     const sign = isProfit ? '+' : '';
 
-
-
     // OOS Metric cards
-
     grid.innerHTML = `
-
         <div class="metric-card" style="border-left: 3px solid ${isProfit ? 'var(--success)' : 'var(--danger)'}; padding: 15px;">
-
             <div class="metric-info">
-
                 <span class="metric-label">Lucro OOS</span>
-
                 <h2 style="font-size: 18px; color: ${isProfit ? '#34d399' : '#f87171'};">${sign}$${oosSummary.net_profit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
-
             </div>
-
         </div>
-
         <div class="metric-card" style="border-left: 3px solid ${oosSummary.roi >= 0 ? 'var(--success)' : 'var(--danger)'}; padding: 15px;">
-
             <div class="metric-info">
-
                 <span class="metric-label">ROI OOS</span>
-
                 <h2 style="font-size: 18px; color: ${oosSummary.roi >= 0 ? '#34d399' : '#f87171'};">${oosSummary.roi >= 0 ? '+' : ''}${fmtNum(oosSummary.roi, 2)}%</h2>
-
             </div>
-
         </div>
-
         <div class="metric-card" style="border-left: 3px solid var(--primary); padding: 15px;">
-
             <div class="metric-info">
-
                 <span class="metric-label">Taxa de Acerto OOS</span>
-
                 <h2 style="font-size: 18px;">${fmtNum(oosSummary.win_rate, 1)}%</h2>
-
             </div>
-
         </div>
-
         <div class="metric-card" style="border-left: 3px solid var(--text-muted); padding: 15px;">
-
             <div class="metric-info">
-
                 <span class="metric-label">Total Apostas OOS</span>
-
                 <h2 style="font-size: 18px;">${oosSummary.total_bets}</h2>
-
             </div>
-
         </div>
-
     `;
 
-
+    // Render Robustness & Slippage Stress tables
+    const oosTbody = document.getElementById('oos-stress-tbody');
+    const slipTbody = document.getElementById('slippage-stress-tbody');
+    
+    if (stressPanel) {
+        if (inSampleSummary && inSampleSummary.oos_robustness_matrix && inSampleSummary.slippage_sensitivity) {
+            stressPanel.style.display = 'block';
+            
+            // Render OOS splits
+            if (oosTbody) {
+                oosTbody.innerHTML = inSampleSummary.oos_robustness_matrix.map(row => {
+                    const activeClass = (row.split_pct === inSampleSummary.oos_split_pct) ? 'style="background: rgba(139, 92, 246, 0.15); font-weight: bold;"' : '';
+                    const roiColor = row.roi >= 0 ? '#34d399' : '#f87171';
+                    return `
+                        <tr ${activeClass}>
+                            <td style="padding: 6px;">${row.split_pct}% ${row.split_pct === inSampleSummary.oos_split_pct ? '<b>(Ativo)</b>' : ''}</td>
+                            <td style="padding: 6px; text-align: center;">${row.total_bets}</td>
+                            <td style="padding: 6px; text-align: right; color: ${row.net_profit >= 0 ? '#34d399' : '#f87171'};">${row.net_profit >= 0 ? '+' : ''}$${row.net_profit.toFixed(2)}</td>
+                            <td style="padding: 6px; text-align: right; color: ${roiColor};">${row.roi >= 0 ? '+' : ''}${row.roi.toFixed(2)}%</td>
+                            <td style="padding: 6px; text-align: right;">${row.win_rate.toFixed(1)}%</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            // Render Slippage scenarios
+            if (slipTbody) {
+                slipTbody.innerHTML = inSampleSummary.slippage_sensitivity.map(row => {
+                    let label = 'N/A';
+                    let color = '#888888';
+                    const activeSlippage = inSampleSummary.slippage_pct || 0.0;
+                    const activeClass = (row.extra_slippage_pct === 0) ? 'style="background: rgba(16, 185, 129, 0.1); font-weight: bold;"' : '';
+                    
+                    if (row.extra_slippage_pct === 0) {
+                        label = `Cenário Base (Slippage: ${activeSlippage}%)`;
+                        color = 'var(--text-primary)';
+                    } else if (row.extra_slippage_pct === 1) {
+                        label = 'Slippage Extra (+1%)';
+                        color = 'var(--text-secondary)';
+                    } else if (row.extra_slippage_pct === 3) {
+                        label = 'Slippage Extra (+3%)';
+                        color = 'var(--warning)';
+                    } else if (row.extra_slippage_pct === 5) {
+                        label = 'Slippage Extra (+5%)';
+                        color = '#ef4444';
+                    }
+                    
+                    const roiColor = row.roi >= 0 ? '#34d399' : '#f87171';
+                    return `
+                        <tr ${activeClass}>
+                            <td style="padding: 6px; color: ${color};">${label}</td>
+                            <td style="padding: 6px; text-align: center;">+${row.extra_slippage_pct}%</td>
+                            <td style="padding: 6px; text-align: right; color: ${roiColor}; font-weight: 600;">${row.roi >= 0 ? '+' : ''}${row.roi.toFixed(2)}%</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        } else {
+            stressPanel.style.display = 'none';
+        }
+    }
 
     // Badge comparing OOS ROI vs in-sample ROI
-
     if (badge && inSampleSummary) {
-
         const isROI = inSampleSummary.roi;
-
         const oosROI = oosSummary.roi;
-
         const sameSign = (isROI >= 0 && oosROI >= 0) || (isROI < 0 && oosROI < 0);
-
         const isImproved = oosROI >= isROI;
-
         let degradation = 0;
 
         if (!isImproved && isROI !== 0) {
-
             degradation = Math.abs((isROI - oosROI) / Math.abs(isROI));
-
         }
-
-
 
         if (isImproved) {
-
             badge.className = 'oos-badge oos-pass';
-
             badge.innerHTML = '<i class="fa-solid fa-circle-arrow-up"></i> Melhorado';
-
             badge.style.cssText = 'background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);';
-
         } else if (sameSign && degradation <= 0.5) {
-
             badge.className = 'oos-badge oos-pass';
-
             badge.innerHTML = '<i class="fa-solid fa-check"></i> Consistente';
-
             badge.style.cssText = '';
-
         } else if (sameSign) {
-
             badge.className = 'oos-badge oos-warn';
-
             badge.innerHTML = '<i class="fa-solid fa-exclamation"></i> Degradado';
-
             badge.style.cssText = '';
-
         } else {
-
             badge.className = 'oos-badge oos-fail';
-
             badge.innerHTML = '<i class="fa-solid fa-xmark"></i> Invertido';
-
             badge.style.cssText = '';
-
         }
-
     }
-
 }
 
 function renderDriftValidation(aiAnalysis, results) {
@@ -8284,6 +8275,8 @@ window.runBacktest = async function(overrideParams) {
         let leagues, startDate, endDate, markets, valThreshold, initialBankroll, stakeRule, stakeValue, oddsSource, oddsTiming, minOdds, maxOdds, exchangeCommission, oos, useMl;
         let minOddsH, maxOddsH, minOddsD, maxOddsD, minOddsA, maxOddsA, minOddsOver25, maxOddsOver25, minOddsUnder25, maxOddsUnder25;
         let dataSource, API_key;
+        let oosSplitVal = 20.0;
+        let slippageVal = 2.0;
 
         if (overrideParams) {
             leagues = overrideParams.leagues || [];
@@ -8308,6 +8301,8 @@ window.runBacktest = async function(overrideParams) {
             maxOdds = overrideParams.maxOdds !== undefined ? overrideParams.maxOdds : 2.50;
             exchangeCommission = overrideParams.exchange_commission !== undefined ? overrideParams.exchange_commission : 0.0;
             oos = overrideParams.out_of_sample !== undefined ? overrideParams.out_of_sample : false;
+            oosSplitVal = overrideParams.oos_split !== undefined ? overrideParams.oos_split : 20.0;
+            slippageVal = overrideParams.slippage !== undefined ? overrideParams.slippage : 2.0;
             useMl = overrideParams.use_ml !== undefined ? overrideParams.use_ml : false;
             minOddsH = overrideParams.minOddsH !== undefined ? overrideParams.minOddsH : null;
             maxOddsH = overrideParams.maxOddsH !== undefined ? overrideParams.maxOddsH : null;
@@ -8339,6 +8334,12 @@ window.runBacktest = async function(overrideParams) {
             
             const oosToggle = document.getElementById('oos-toggle');
             oos = oosToggle ? oosToggle.checked : false;
+            
+            const oosSplitEl = document.getElementById('oos-split-pct');
+            oosSplitVal = oosSplitEl ? parseFloat(oosSplitEl.value) : 20.0;
+
+            const slippageEl = document.getElementById('backtest-slippage');
+            slippageVal = slippageEl ? parseFloat(slippageEl.value) : 2.0;
 
             const useMLToggle = document.getElementById('use-ml-toggle');
             useMl = useMLToggle ? useMLToggle.checked : false;
@@ -8371,6 +8372,8 @@ window.runBacktest = async function(overrideParams) {
             maxOdds: maxOdds,
             exchange_commission: exchangeCommission,
             out_of_sample: oos,
+            oos_split: oosSplitVal,
+            slippage: slippageVal,
             use_ml: useMl,
             data_source: dataSource,
             futpython_api_key: API_key,

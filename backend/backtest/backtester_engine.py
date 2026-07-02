@@ -49,7 +49,7 @@ class ChronologicalBacktester:
         self.ml_history = defaultdict(lambda: {'X': [], 'y': []})
         self.matches_since_ml_fit = 0
 
-    def run(self, leagues, start_date, end_date, market, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', odds_timing='closing', run_monte_carlo=True, min_odds=1.0, max_odds=2.50, exchange_commission=0.0, use_ml=False, data_source='football-data', futpython_api_key='', min_odds_h=None, max_odds_h=None, min_odds_d=None, max_odds_d=None, min_odds_a=None, max_odds_a=None, min_odds_over25=None, max_odds_over25=None, min_odds_under25=None, max_odds_under25=None):
+    def run(self, leagues, start_date, end_date, market, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', odds_timing='closing', run_monte_carlo=True, min_odds=1.0, max_odds=2.50, exchange_commission=0.0, use_ml=False, data_source='football-data', futpython_api_key='', min_odds_h=None, max_odds_h=None, min_odds_d=None, max_odds_d=None, min_odds_a=None, max_odds_a=None, min_odds_over25=None, max_odds_over25=None, min_odds_under25=None, max_odds_under25=None, slippage=None, oos_split_pct=20.0):
         """
         Runs a chronological backtest across selected leagues.
         
@@ -186,11 +186,13 @@ class ChronologicalBacktester:
         games_skipped_nan = 0
         games_skipped_filter = 0
 
-        # Slippage simulation for closing odds:
-        # When using closing odds, we apply a 2% penalty to simulate the real-world
-        # drift between when the model fires a signal and the actual closing line.
-        # This prevents the backtest from using "perfect hindsight" closing prices.
-        SLIPPAGE_FACTOR = 0.98 if odds_timing == 'closing' else 1.0
+        # Slippage simulation:
+        if slippage is not None:
+            slippage_pct = float(slippage)
+        else:
+            slippage_pct = 2.0 if odds_timing == 'closing' else 0.0
+            
+        SLIPPAGE_FACTOR = 1.0 - (slippage_pct / 100.0)
 
         for row in combined_df.to_dict('records'):
             match_date = row['Date']
@@ -1679,7 +1681,9 @@ class ChronologicalBacktester:
             max_dd_fixed, max_dd_prop, max_dd_kelly,
             max_dd_duration_fixed, max_dd_duration_prop, max_dd_duration_kelly,
             equity_curve_fixed, equity_curve_proportional, equity_curve_kelly,
-            max_drawdown
+            max_drawdown,
+            oos_split_pct=oos_split_pct,
+            slippage_pct=slippage_pct
         )
         
         # Inject Phase 1 warnings and stats directly into the returned payload

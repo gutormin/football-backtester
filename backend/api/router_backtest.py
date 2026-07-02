@@ -35,6 +35,8 @@ class BacktestRequest(BaseModel):
     maxOdds: Optional[float] = 2.50
     exchange_commission: float = 0.0
     out_of_sample: bool = False
+    oos_split: Optional[float] = 20.0
+    slippage: Optional[float] = None
     use_ml: bool = False
     data_source: str = "footballdata"
     futpython_api_key: str = ""
@@ -220,7 +222,9 @@ def run_backtest(req: BacktestRequest):
             min_odds_over25=req.minOddsOver25,
             max_odds_over25=req.maxOddsOver25,
             min_odds_under25=req.minOddsUnder25,
-            max_odds_under25=req.maxOddsUnder25
+            max_odds_under25=req.maxOddsUnder25,
+            slippage=req.slippage,
+            oos_split_pct=req.oos_split if req.out_of_sample else 0.0
         )
         if "error" in results:
             raise HTTPException(status_code=400, detail=results["error"])

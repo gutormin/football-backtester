@@ -20,7 +20,9 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
                              max_dd_fixed, max_dd_prop, max_dd_kelly,
                              max_dd_duration_fixed, max_dd_duration_prop, max_dd_duration_kelly,
                              equity_curve_fixed, equity_curve_proportional, equity_curve_kelly,
-                             max_drawdown):
+                             max_drawdown,
+                             oos_split_pct=20.0,
+                             slippage_pct=0.0):
     total_bets = len(bets_record)
     wins = sum(1 for b in bets_record if b['profit'] > 0)
     win_rate = (wins / total_bets * 100) if total_bets > 0 else 0.0
@@ -332,8 +334,8 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
 
     # EQS Score Dinamicamente
     oos_summary = None
-    if len(bets_record) >= 20:
-        n_oos = max(10, int(len(bets_record) * 0.2))
+    if len(bets_record) >= 20 and oos_split_pct > 0:
+        n_oos = max(10, int(len(bets_record) * (oos_split_pct / 100.0)))
         oos_bets = bets_record[-n_oos:]
         oos_staked = sum([b['stake'] for b in oos_bets])
         oos_profit = sum([b['profit'] for b in oos_bets])
@@ -346,6 +348,55 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
             'win_rate': round(oos_win_rate, 1),
             'total_bets': len(oos_bets)
         }
+
+    # OOS Robustness Matrix (Stress Test)
+    oos_robustness_matrix = []
+    if len(bets_record) >= 20:
+        for split in [15, 20, 30, 40]:
+            n_split = max(10, int(len(bets_record) * (split / 100.0)))
+            split_bets = bets_record[-n_split:]
+            split_staked = sum([b['stake'] for b in split_bets])
+            split_profit = sum([b['profit'] for b in split_bets])
+            split_roi = (split_profit / split_staked * 100) if split_staked > 0 else 0.0
+            split_wins = sum([1 for b in split_bets if b['profit'] > 0])
+            split_win_rate = (split_wins / len(split_bets) * 100) if split_bets else 0.0
+            oos_robustness_matrix.append({
+                'split_pct': split,
+                'total_bets': len(split_bets),
+                'net_profit': round(split_profit, 2),
+                'roi': round(split_roi, 2),
+                'win_rate': round(split_win_rate, 1)
+            })
+
+    # Slippage Sensitivity Report (Stress Test)
+    def calc_degraded_roi(bets, extra_slippage_pct):
+        factor = 1.0 - (extra_slippage_pct / 100.0)
+        total_staked = 0.0
+        total_profit = 0.0
+        for b in bets:
+            stake = b['stake']
+            profit = b['profit']
+            total_staked += stake
+            if profit > 0:
+                total_profit += profit * factor
+            else:
+                total_profit += profit
+        return (total_profit / total_staked * 100.0) if total_staked > 0 else 0.0
+
+    slippage_sensitivity = []
+    if bets_record:
+        for extra in [0, 1, 3, 5]:
+            simulated_roi = calc_degraded_roi(bets_record, extra)
+            slippage_sensitivity.append({
+                'extra_slippage_pct': extra,
+                'roi': round(simulated_roi, 2)
+            })
+
+    summary['slippage_applied'] = slippage_pct > 0
+    summary['slippage_pct'] = slippage_pct
+    summary['oos_split_pct'] = oos_split_pct
+    summary['oos_robustness_matrix'] = oos_robustness_matrix
+    summary['slippage_sensitivity'] = slippage_sensitivity
     
     eqs_data = compute_edge_quality_score(summary, oos_summary)
     

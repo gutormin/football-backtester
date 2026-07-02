@@ -78,15 +78,34 @@ window.addEventListener('unhandledrejection', function(e) {
 </div>
 <div class="form-group" style="margin-top: 10px;">
 <label class="multiselect-option-item" style="font-size: 12px; padding: 5px 0;">
-<input id="oos-toggle" type="checkbox"/> Validação Fora-da-Amostra (20%)
-                            <i class="fa-solid fa-circle-info" onclick="showToast(this.title, 'info')" style="font-size: 10px; color: var(--text-muted); cursor: help;" title="Separa automaticamente os últimos 20% do período como teste independente. O ROI deste período nunca é usado para ajustar parâmetros — é o único número em que você pode confiar de verdade."></i>
+<input id="oos-toggle" type="checkbox" onchange="document.getElementById('oos-split-container').style.display = this.checked ? 'block' : 'none';"/> Validação Fora-da-Amostra (OOS)
+                            <i class="fa-solid fa-circle-info" onclick="showToast(this.title, 'info')" style="font-size: 10px; color: var(--text-muted); cursor: help;" title="Separa automaticamente os últimos jogos do período como teste independente. O ROI deste período nunca é usado para ajustar parâmetros — é o único número em que você pode confiar de verdade."></i>
 </label>
+</div>
+<div class="form-group" id="oos-split-container" style="display: none; margin-top: 5px; margin-left: 20px; cursor: help;" title="Tamanho do Período OOS: Define a proporção das apostas finais que serão escondidas no teste cego. Usado para medir a consistência da estratégia em dados não vistos.">
+    <label for="oos-split-pct" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 2px;">Tamanho do Período OOS</label>
+    <select id="oos-split-pct" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none;">
+        <option value="15">15% dos jogos (OOS Rápido)</option>
+        <option value="20" selected>20% dos jogos (Padrão Recomendado)</option>
+        <option value="30">30% dos jogos (Rigoroso)</option>
+        <option value="40">40% dos jogos (Extremo)</option>
+    </select>
 </div>
 <div class="form-group" style="margin-top: 5px;">
 <label class="multiselect-option-item" style="font-size: 12px; padding: 5px 0;">
 <input id="use-ml-toggle" type="checkbox"/> 🧠 Correção por Machine Learning (XGBoost)
                             <i class="fa-solid fa-circle-info" onclick="showToast(this.title, 'info')" style="font-size: 10px; color: var(--text-muted); cursor: help;" title="Treina um modelo XGBoost em lote (expanding window) para aprender com as distorções passadas e ajustar as probabilidades matemáticas futuras, otimizando o Edge."></i>
 </label>
+</div>
+<div class="form-group" style="margin-top: 10px; cursor: help;" title="Slippage das Odds (Penalidade): Simula o impacto de cotações que caem antes de você conseguir apostar (deriva de execução). Deixe em 0% para simulação ideal sem perdas.">
+    <label for="backtest-slippage" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Slippage das Odds (Penalidade)</label>
+    <select id="backtest-slippage" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none;">
+        <option value="0">0% (Ideal - Sem penalidades)</option>
+        <option value="1">1% (Excelente execução)</option>
+        <option value="2" selected>2% (Execução real típica - Recomendado)</option>
+        <option value="3">3% (Execução instável)</option>
+        <option value="5">5% (Cenário pessimista)</option>
+    </select>
 </div>
 </div>
 <div class="form-section">
@@ -1826,6 +1845,56 @@ window.addEventListener('unhandledrejection', function(e) {
                             </h4>
                             <div id="drift-validation-content">
                                 <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- OOS Stress Test & Slippage Degradation Panel -->
+                        <div id="robustness-stress-panel" style="display: none; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 25px;">
+                            <h4 style="color: #a78bfa; font-family: var(--font-heading); margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-shield-halved"></i> Matriz de Robustez & Sensibilidade a Slippage
+                            </h4>
+                            <div class="stress-test-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px;">
+                                <!-- OOS Robustness Table -->
+                                <div style="background: rgba(255, 255, 255, 0.01); border: 1px solid rgba(255, 255, 255, 0.03); padding: 15px; border-radius: 6px; cursor: help;" 
+                                     title="Matriz de Robustez (OOS Stress Test): Mede a consistência da estratégia sob diferentes frações de teste cego (dados ocultados na segunda metade do período). Se o ROI continuar positivo em todos os splits, a estratégia tem alta confiabilidade e não foi sobreajustada.">
+                                    <h5 style="margin-top: 0; margin-bottom: 10px; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                        📋 Estresse de Validação Cega (OOS)
+                                    </h5>
+                                    <table class="table-styled" style="width: 100%; font-size: 11px;">
+                                        <thead>
+                                            <tr>
+                                                <th style="padding: 6px;">Tamanho OOS</th>
+                                                <th style="padding: 6px; text-align: center;">Apostas</th>
+                                                <th style="padding: 6px; text-align: right;">Lucro ($)</th>
+                                                <th style="padding: 6px; text-align: right;">ROI (%)</th>
+                                                <th style="padding: 6px; text-align: right;">Acerto (%)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="oos-stress-tbody">
+                                            <!-- Dynamically populated -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Slippage Sensitivity Table -->
+                                <div style="background: rgba(255, 255, 255, 0.01); border: 1px solid rgba(255, 255, 255, 0.03); padding: 15px; border-radius: 6px; cursor: help;" 
+                                     title="Resistência a Slippage (Odds Stress Test): Mede a perda de rendimento (ROI) da estratégia caso você enfrente dificuldades na execução prática das cotações (Slippage de Odds). Estratégias frágeis têm ROI zerado ou negativo sob apenas 1% ou 3% de queda nas odds.">
+                                    <h5 style="margin-top: 0; margin-bottom: 10px; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                        📉 Curva de Sensibilidade a Slippage
+                                    </h5>
+                                    <table class="table-styled" style="width: 100%; font-size: 11px;">
+                                        <thead>
+                                            <tr>
+                                                <th style="padding: 6px;">Cenário de Execução</th>
+                                                <th style="padding: 6px; text-align: center;">Slippage</th>
+                                                <th style="padding: 6px; text-align: right;">ROI Estimado (%)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="slippage-stress-tbody">
+                                            <!-- Dynamically populated -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
