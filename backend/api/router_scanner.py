@@ -577,7 +577,8 @@ def run_scan(req: ScanRequest):
             "status": "success",
             "scan_type": req.scanType,
             "results": scan_results,
-            "scan_results": scan_results
+            "scan_results": scan_results,
+            "diagnostics": getattr(backtester, 'last_scan_diagnostics', {})
         }
     except Exception as e:
         import traceback

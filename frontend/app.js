@@ -6464,7 +6464,7 @@ async function runEqsScanner(scanType) {
 
         
 
-        renderEqsResults(sortedResults, scanType, requestData);
+        renderEqsResults(sortedResults, scanType, requestData, data.diagnostics);
 
         switchTab('tab-scanner');
 
@@ -6488,28 +6488,57 @@ async function runEqsScanner(scanType) {
 
 
 
-function renderEqsResults(results, scanType, requestData) {
-
+function renderEqsResults(results, scanType, requestData, diagnostics) {
     const resultsContainer = document.getElementById('global-scanner-results');
-
     resultsContainer.innerHTML = '';
 
-    
-
     if (results.length === 0) {
+        let diagHtml = '';
+        if (diagnostics) {
+            const leaguesLoaded = Object.entries(diagnostics.leagues_loaded || {}).map(([code, count]) => {
+                const isZero = count === 0;
+                return `<li style="margin-bottom: 4px; color: ${isZero ? '#ef4444' : 'var(--text-secondary)'};">
+                    <b>${code}:</b> ${count} jogos carregados ${isZero ? '⚠️ (API ou Cache vazios!)' : '✅'}
+                </li>`;
+            }).join('');
+
+            const errorsHtml = (diagnostics.errors || []).map(err => {
+                return `<div style="color: #f87171; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 8px 12px; border-radius: 4px; font-size: 11px; margin-top: 8px; text-align: left;">
+                    <i class="fa-solid fa-circle-exclamation"></i> ${err}
+                </div>`;
+            }).join('');
+
+            diagHtml = `
+                <div class="diagnostics-panel" style="margin-top: 25px; padding: 20px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; max-width: 600px; margin-left: auto; margin-right: auto; text-align: left;">
+                    <h4 style="margin-top: 0; color: var(--primary); font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-microscope"></i> Relatório de Diagnóstico do Scanner
+                    </h4>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+                        Fonte de dados consultada: <span style="color: var(--text-primary); font-weight: bold; text-transform: uppercase;">${diagnostics.data_source || requestData.data_source}</span>
+                    </p>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">
+                        <b>Carregamento por Liga:</b>
+                        <ul style="margin: 6px 0 0 0; padding-left: 20px;">
+                            ${leaguesLoaded || '<li style="color:var(--text-muted);">Nenhuma liga processada.</li>'}
+                        </ul>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; color: var(--text-secondary); border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px; margin-top: 12px;">
+                        <div>Jogos Combinados: <b style="color: var(--text-primary);">${diagnostics.total_combined_matches || 0}</b></div>
+                        <div>Jogos no Período Ativo: <b style="color: var(--text-primary);">${diagnostics.total_active_period_matches || 0}</b></div>
+                        <div>Apostas Simuladas: <b style="color: var(--text-primary);">${diagnostics.total_bets_placed || 0}</b></div>
+                    </div>
+                    ${errorsHtml}
+                </div>
+            `;
+        }
 
         resultsContainer.innerHTML = `
-
-            <div class="empty-state text-center" style="padding: 60px 20px;">
-
+            <div class="empty-state text-center" style="padding: 40px 20px;">
                 <i class="fa-solid fa-triangle-exclamation" style="font-size: 48px; opacity: 0.2; margin-bottom: 15px; display: block; color: var(--warning);"></i>
-
-                <p style="font-size: 16px;">Nenhum ${scanType === 'markets' ? 'mercado' : 'liga'} atendeu aos critérios rigorosos de aprovação Institucional.</p>
-
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px;">Tente ajustar as datas, odd mínima/máxima ou o value threshold.</p>
-
+                <p style="font-size: 16px; margin-bottom: 5px;">Nenhum ${scanType === 'markets' ? 'mercado' : 'liga'} atendeu aos critérios rigorosos de aprovação Institucional.</p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">Tente ajustar as datas, odd mínima/máxima ou o value threshold.</p>
+                ${diagHtml}
             </div>
-
         `;
 
         return;
