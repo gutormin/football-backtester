@@ -962,10 +962,42 @@ def fetch_futpython_data(league_code, start_date, api_key):
         import os
         proxy_url = os.environ.get("FUTPYTHON_PROXY")
         proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+        
+        # Local cache path inside the data directory
+        cache_filename = f"futpython_{pais}_{liga.replace('/', '_')}_{temp}.csv"
+        cache_path = os.path.join(DATA_DIR, cache_filename)
+        
         try:
             res = requests.get(url, timeout=12, proxies=proxies)
-            return temp, res.status_code, res.text
+            if res.status_code == 200 and not res.text.strip().startswith("{"):
+                # Write to local cache
+                try:
+                    with open(cache_path, 'w', encoding='utf-8') as f:
+                        f.write(res.text)
+                except Exception as cache_err:
+                    print(f"Error caching {cache_filename}: {cache_err}")
+                return temp, res.status_code, res.text
+            else:
+                # If status code is not 200 or there is a JSON error, fall back to cache if available
+                if os.path.exists(cache_path) and os.path.getsize(cache_path) > 250:
+                    try:
+                        with open(cache_path, 'r', encoding='utf-8') as f:
+                            cached_text = f.read()
+                        print(f"Using cached file for {cache_filename} due to API response status {res.status_code}")
+                        return temp, 200, cached_text
+                    except Exception as cache_err:
+                        print(f"Error reading cache {cache_filename}: {cache_err}")
+                return temp, res.status_code, res.text
         except Exception as e:
+            # If exception (network connection error/timeout), fall back to cache if available
+            if os.path.exists(cache_path) and os.path.getsize(cache_path) > 250:
+                try:
+                    with open(cache_path, 'r', encoding='utf-8') as f:
+                        cached_text = f.read()
+                    print(f"Using cached file for {cache_filename} due to connection error: {e}")
+                    return temp, 200, cached_text
+                except Exception as cache_err:
+                    print(f"Error reading cache {cache_filename}: {cache_err}")
             return temp, None, str(e)
             
     with ThreadPoolExecutor(max_workers=6) as executor:
