@@ -953,11 +953,13 @@ def fetch_futpython_data(league_code, start_date, api_key):
     ]
     base_url = "https://futpythontrader.com.br/api/download"
     dataframes = []
+    status_codes = {}
     
     for temp in temporadas:
         url = f"{base_url}/{pais}/{liga}/{temp}?api_key={api_key}"
         try:
             res = requests.get(url, timeout=15)
+            status_codes[temp] = res.status_code
             if res.status_code == 200:
                 if res.text.strip().startswith("{"):
                     continue # JSON error like Dataset não encontrado
@@ -1105,7 +1107,11 @@ def fetch_futpython_data(league_code, start_date, api_key):
             print(f"Error fetching FutPythonTrader temp {temp}: {e}")
             
     if not dataframes:
-        return pd.DataFrame()
+        if status_codes:
+            codes_str = ", ".join([f"{t}: {code}" for t, code in status_codes.items()])
+            raise Exception(f"API retornou erros de status HTTP. Códigos: {codes_str}")
+        else:
+            raise Exception("Nenhuma conexão pôde ser estabelecida com a API do FutPython (Possível bloqueio de IP ou Timeout).")
         
     df_total = pd.concat(dataframes, ignore_index=True)
     
