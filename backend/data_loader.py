@@ -952,160 +952,173 @@ def fetch_futpython_data(league_code, start_date, api_key):
         "2025-2026", "2024-2025", "2023-2024", "2022-2023", "2021-2022",
     ]
     base_url = "https://futpythontrader.com.br/api/download"
-    dataframes = []
     status_codes = {}
+    dataframes = []
     
-    for temp in temporadas:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    def download_season(temp):
         url = f"{base_url}/{pais}/{liga}/{temp}?api_key={api_key}"
         try:
-            res = requests.get(url, timeout=15)
-            status_codes[temp] = res.status_code
-            if res.status_code == 200:
-                if res.text.strip().startswith("{"):
-                    continue # JSON error like Dataset não encontrado
-                df = pd.read_csv(io.StringIO(res.text))
-                
-                # Check and fix swapped HT odds columns (dataset-specific errors in FutPythonTrader)
-                for line in ['0_5', '1_5', '2_5']:
-                    over_col = f'Over_HT_{line}'
-                    under_col = f'Under_HT_{line}'
-                    if over_col in df.columns and under_col in df.columns:
-                        # Convert to numeric to ensure correct comparison (some columns might load as object type due to commas)
-                        df[over_col] = pd.to_numeric(df[over_col].astype(str).str.replace(',', '.'), errors='coerce')
-                        df[under_col] = pd.to_numeric(df[under_col].astype(str).str.replace(',', '.'), errors='coerce')
-                        
-                        valid_odds = df[(df[over_col] > 1.0) & (df[under_col] > 1.0)]
-                        if len(valid_odds) > 0:
-                            if line == '0_5':
-                                swapped_count = len(valid_odds[valid_odds[over_col] > valid_odds[under_col]])
-                            else:
-                                swapped_count = len(valid_odds[valid_odds[under_col] > valid_odds[over_col]])
-                            
-                            if swapped_count > len(valid_odds) * 0.5:
-                                # Swap values of the columns
-                                temp_over = df[over_col].copy()
-                                df[over_col] = df[under_col]
-                                df[under_col] = temp_over
-
-                # Rename columns to match standard backtester format
-                df = df.rename(columns={
-                    'Home': 'HomeTeam',
-                    'Away': 'AwayTeam',
-                    'Home_Score': 'FTHG',
-                    'Away_Score': 'FTAG',
-                    'Odd_1_FT': 'B365H',
-                    'Odd_X_FT': 'B365D',
-                    'Odd_2_FT': 'B365A',
-                    'Over_FT_2_5': 'B365>2.5',
-                    'Under_FT_2_5': 'B365<2.5',
-                    'Over_HT_0_5': 'B365>0.5HT',
-                    'Under_HT_0_5': 'B365<0.5HT',
-                    'Over_HT_1_5': 'B365>1.5HT',
-                    'Under_HT_1_5': 'B365<1.5HT',
-                    'Over_HT_2_5': 'B365>2.5HT',
-                    'Under_HT_2_5': 'B365<2.5HT',
-                    'Shots_On_Target_Home_FT': 'HST',
-                    'Shots_On_Target_Away_FT': 'AST',
-                    'xG_Home_FT': 'HomeXG',
-                    'xG_Away_FT': 'AwayXG'
-                })
-                
-                # Fix comma-separated decimals for all numeric columns in FutPythonTrader
-                for col in df.columns:
-                    if col not in ['HomeTeam', 'AwayTeam', 'League', 'Date', 'Time']:
-                        if df[col].dtype == 'object':
-                            df[col] = df[col].astype(str).str.replace(',', '.')
-                            df[col] = pd.to_numeric(df[col], errors='ignore')
-                            
-                # Validate and correct Double Chance odds (corrupted or missing)
-                dc_cols = ['DC_1X', 'DC_X2', 'DC_12']
-                one_x_two = ['B365H', 'B365D', 'B365A']
-                
-                # Make sure 1X2 and DC columns are clean float types
-                for col in dc_cols + one_x_two:
-                    if col in df.columns:
-                        df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce')
-                
-                if all(col in df.columns for col in one_x_two):
-                    # Calculate unnormalized synthetic odds as fallback
-                    h_prob = 1.0 / df['B365H']
-                    d_prob = 1.0 / df['B365D']
-                    a_prob = 1.0 / df['B365A']
-                    
-                    synth_1X = 1.0 / (h_prob + d_prob)
-                    synth_X2 = 1.0 / (a_prob + d_prob)
-                    synth_12 = 1.0 / (h_prob + a_prob)
-                    
-                    # Fill missing/corrupt values
-                    for col, synth_val in [('DC_1X', synth_1X), ('DC_X2', synth_X2), ('DC_12', synth_12)]:
-                        if col not in df.columns:
-                            df[col] = synth_val
-                        else:
-                            # 1. Null, zero or <= 1.0 odds
-                            is_invalid = df[col].isna() | (df[col] <= 1.0)
-                            
-                            # 2. Mathematical corruption or API bug (copy-paste signature)
-                            if col == 'DC_12':
-                                is_corrupt = (
-                                    (df[col] == df['B365D']) | # copied Draw odd
-                                    (df[col] >= df['B365H']) | # combined odd >= home odd
-                                    (df[col] >= df['B365A']) | # combined odd >= away odd
-                                    ((df[col] - synth_val).abs() > 0.25) # large math discrepancy
-                                )
-                            elif col == 'DC_1X':
-                                is_corrupt = (
-                                    (df[col] == df['B365H']) | # copied Home odd
-                                    ((df[col] - synth_val).abs() > 0.25)
-                                )
-                            else: # DC_X2
-                                is_corrupt = (
-                                    (df[col] == df['B365A']) | # copied Away odd
-                                    ((df[col] - synth_val).abs() > 0.25)
-                                )
-                            
-                            # Replace invalid or corrupt values with synthetic fallback
-                            df[col] = df[col].where(~(is_invalid | is_corrupt), synth_val)
-                            
-                            
-                # Derive HTHG and HTAG from Min_Goals_Home and Min_Goals_Away if they exist
-                import numpy as np
-                def parse_ht_goals_robust(s_min, ft_val):
-                    try:
-                        ft_goals = int(float(str(ft_val).strip() or 0))
-                    except:
-                        ft_goals = 0
-
-                    if pd.isna(s_min) or not str(s_min).strip() or str(s_min).strip() == '[]':
-                        if ft_goals > 0:
-                            return np.nan
-                        return 0
-                        
-                    import ast
-                    goals = 0
-                    try:
-                        lst = ast.literal_eval(str(s_min))
-                        if len(lst) != ft_goals:
-                            return np.nan
-                        for m in lst:
-                            m_str = str(m).split('+')[0].strip()
-                            if m_str.isdigit() and int(m_str) <= 45:
-                                goals += 1
-                    except:
-                        return np.nan
-                    return goals
-
-                if 'Min_Goals_Home' in df.columns and 'FTHG' in df.columns:
-                    df['HTHG'] = [parse_ht_goals_robust(r, f) for r, f in zip(df['Min_Goals_Home'], df['FTHG'])]
-                if 'Min_Goals_Away' in df.columns and 'FTAG' in df.columns:
-                    df['HTAG'] = [parse_ht_goals_robust(r, f) for r, f in zip(df['Min_Goals_Away'], df['FTAG'])]
-
-                dataframes.append(df)
-            elif res.status_code == 401:
-                print("FutPythonTrader API Key inválida.")
-                break
+            res = requests.get(url, timeout=12)
+            return temp, res.status_code, res.text
         except Exception as e:
-            print(f"Error fetching FutPythonTrader temp {temp}: {e}")
+            return temp, None, str(e)
             
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {executor.submit(download_season, temp): temp for temp in temporadas}
+        for future in as_completed(futures):
+            temp, status_code, response_text = future.result()
+            if status_code is not None:
+                status_codes[temp] = status_code
+                if status_code == 200:
+                    if response_text.strip().startswith("{"):
+                        continue # JSON error like Dataset não encontrado
+                    try:
+                        df = pd.read_csv(io.StringIO(response_text))
+                        
+                        # Check and fix swapped HT odds columns (dataset-specific errors in FutPythonTrader)
+                        for line in ['0_5', '1_5', '2_5']:
+                            over_col = f'Over_HT_{line}'
+                            under_col = f'Under_HT_{line}'
+                            if over_col in df.columns and under_col in df.columns:
+                                # Convert to numeric to ensure correct comparison (some columns might load as object type due to commas)
+                                df[over_col] = pd.to_numeric(df[over_col].astype(str).str.replace(',', '.'), errors='coerce')
+                                df[under_col] = pd.to_numeric(df[under_col].astype(str).str.replace(',', '.'), errors='coerce')
+                                
+                                valid_odds = df[(df[over_col] > 1.0) & (df[under_col] > 1.0)]
+                                if len(valid_odds) > 0:
+                                    if line == '0_5':
+                                        swapped_count = len(valid_odds[valid_odds[over_col] > valid_odds[under_col]])
+                                    else:
+                                        swapped_count = len(valid_odds[valid_odds[under_col] > valid_odds[over_col]])
+                                    
+                                    if swapped_count > len(valid_odds) * 0.5:
+                                        # Swap values of the columns
+                                        temp_over = df[over_col].copy()
+                                        df[over_col] = df[under_col]
+                                        df[under_col] = temp_over
+                                        
+                        # Rename columns to match standard backtester format
+                        df = df.rename(columns={
+                            'Home': 'HomeTeam',
+                            'Away': 'AwayTeam',
+                            'Home_Score': 'FTHG',
+                            'Away_Score': 'FTAG',
+                            'Odd_1_FT': 'B365H',
+                            'Odd_X_FT': 'B365D',
+                            'Odd_2_FT': 'B365A',
+                            'Over_FT_2_5': 'B365>2.5',
+                            'Under_FT_2_5': 'B365<2.5',
+                            'Over_HT_0_5': 'B365>0.5HT',
+                            'Under_HT_0_5': 'B365<0.5HT',
+                            'Over_HT_1_5': 'B365>1.5HT',
+                            'Under_HT_1_5': 'B365<1.5HT',
+                            'Over_HT_2_5': 'B365>2.5HT',
+                            'Under_HT_2_5': 'B365<2.5HT',
+                            'Shots_On_Target_Home_FT': 'HST',
+                            'Shots_On_Target_Away_FT': 'AST',
+                            'xG_Home_FT': 'HomeXG',
+                            'xG_Away_FT': 'AwayXG'
+                        })
+                        
+                        # Fix comma-separated decimals for all numeric columns in FutPythonTrader
+                        for col in df.columns:
+                            if col not in ['HomeTeam', 'AwayTeam', 'League', 'Date', 'Time']:
+                                if df[col].dtype == 'object':
+                                    df[col] = df[col].astype(str).str.replace(',', '.')
+                                    df[col] = pd.to_numeric(df[col], errors='ignore')
+                                    
+                        # Validate and correct Double Chance odds (corrupted or missing)
+                        dc_cols = ['DC_1X', 'DC_X2', 'DC_12']
+                        one_x_two = ['B365H', 'B365D', 'B365A']
+                        
+                        # Make sure 1X2 and DC columns are clean float types
+                        for col in dc_cols + one_x_two:
+                            if col in df.columns:
+                                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce')
+                        
+                        if all(col in df.columns for col in one_x_two):
+                            # Calculate unnormalized synthetic odds as fallback
+                            h_prob = 1.0 / df['B365H']
+                            d_prob = 1.0 / df['B365D']
+                            a_prob = 1.0 / df['B365A']
+                            
+                            synth_1X = 1.0 / (h_prob + d_prob)
+                            synth_X2 = 1.0 / (a_prob + d_prob)
+                            synth_12 = 1.0 / (h_prob + a_prob)
+                            
+                            # Fill missing/corrupt values
+                            for col, synth_val in [('DC_1X', synth_1X), ('DC_X2', synth_X2), ('DC_12', synth_12)]:
+                                if col not in df.columns:
+                                    df[col] = synth_val
+                                else:
+                                    # 1. Null, zero or <= 1.0 odds
+                                    is_invalid = df[col].isna() | (df[col] <= 1.0)
+                                    
+                                    # 2. Mathematical corruption or API bug (copy-paste signature)
+                                    if col == 'DC_12':
+                                        is_corrupt = (
+                                            (df[col] == df['B365D']) | # copied Draw odd
+                                            (df[col] >= df['B365H']) | # combined odd >= home odd
+                                            (df[col] >= df['B365A']) | # combined odd >= away odd
+                                            ((df[col] - synth_val).abs() > 0.25) # large math discrepancy
+                                        )
+                                    elif col == 'DC_1X':
+                                        is_corrupt = (
+                                            (df[col] == df['B365H']) | # copied Home odd
+                                            ((df[col] - synth_val).abs() > 0.25)
+                                        )
+                                    else: # DC_X2
+                                        is_corrupt = (
+                                            (df[col] == df['B365A']) | # copied Away odd
+                                            ((df[col] - synth_val).abs() > 0.25)
+                                        )
+                                    
+                                    # Replace invalid or corrupt values with synthetic fallback
+                                    df[col] = df[col].where(~(is_invalid | is_corrupt), synth_val)
+                                    
+                        # Derive HTHG and HTAG from Min_Goals_Home and Min_Goals_Away if they exist
+                        import numpy as np
+                        def parse_ht_goals_robust(s_min, ft_val):
+                            try:
+                                ft_goals = int(float(str(ft_val).strip() or 0))
+                            except:
+                                ft_goals = 0
+        
+                            if pd.isna(s_min) or not str(s_min).strip() or str(s_min).strip() == '[]':
+                                if ft_goals > 0:
+                                    return np.nan
+                                return 0
+                                
+                            import ast
+                            goals = 0
+                            try:
+                                lst = ast.literal_eval(str(s_min))
+                                if len(lst) != ft_goals:
+                                    return np.nan
+                                for m in lst:
+                                    m_str = str(m).split('+')[0].strip()
+                                    if m_str.isdigit() and int(m_str) <= 45:
+                                        goals += 1
+                            except:
+                                return np.nan
+                            return goals
+        
+                        if 'Min_Goals_Home' in df.columns and 'FTHG' in df.columns:
+                            df['HTHG'] = [parse_ht_goals_robust(r, f) for r, f in zip(df['Min_Goals_Home'], df['FTHG'])]
+                        if 'Min_Goals_Away' in df.columns and 'FTAG' in df.columns:
+                            df['HTAG'] = [parse_ht_goals_robust(r, f) for r, f in zip(df['Min_Goals_Away'], df['FTAG'])]
+        
+                        dataframes.append(df)
+                    except Exception as e:
+                        print(f"Error parsing csv for temp {temp}: {e}")
+                elif status_code == 401:
+                    print("FutPythonTrader API Key inválida.")
+                    break
+            else:
+                print(f"Error fetching FutPythonTrader temp {temp}: {response_text}")
+                
     if not dataframes:
         if status_codes:
             codes_str = ", ".join([f"{t}: {code}" for t, code in status_codes.items()])
