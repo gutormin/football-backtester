@@ -508,7 +508,11 @@ def load_league_data(league_code, start_date='2021-01-01', data_source="football
             'SC1': 'scotland/championship',
             'BRA': 'brazil/serie-a-betano',
             'USA': 'usa/mls',
-            'ARG': 'argentina/torneo-betano'
+            'ARG': 'argentina/torneo-betano',
+            'MEX': 'mexico/liga-mx',
+            'JPN': 'japan/j1-league',
+            'SWEDEN_ALLSVENSKAN': 'sweden/allsvenskan',
+            'NORWAY_ELITESERIEN': 'norway/eliteserien'
         }
         if league_code in translation_map:
             league_code = translation_map[league_code]
