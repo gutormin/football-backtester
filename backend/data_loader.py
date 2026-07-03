@@ -485,6 +485,34 @@ def sync_data_from_api(force=False):
 def load_league_data(league_code, start_date='2021-01-01', data_source="footballdata", api_key=""):
     """Loads and standardizes data for a given league starting from a specific date."""
     if data_source == "futpython":
+        # Translate Football-Data codes to FutPythonTrader slugs if necessary
+        translation_map = {
+            'E0': 'england/premier-league',
+            'E1': 'england/championship',
+            'E2': 'england/league-one',
+            'E3': 'england/league-two',
+            'SP1': 'spain/laliga',
+            'SP2': 'spain/laliga2',
+            'I1': 'italy/serie-a',
+            'I2': 'italy/serie-b',
+            'D1': 'germany/bundesliga',
+            'D2': 'germany/2-bundesliga',
+            'F1': 'france/ligue-1',
+            'F2': 'france/ligue-2',
+            'N1': 'netherlands/eredivisie',
+            'B1': 'belgium/pro-league',
+            'P1': 'portugal/primeira-liga',
+            'T1': 'turkey/super-lig',
+            'G1': 'greece/super-league',
+            'SC0': 'scotland/premiership',
+            'SC1': 'scotland/championship',
+            'BRA': 'brazil/serie-a-betano',
+            'USA': 'usa/mls',
+            'ARG': 'argentina/torneo-betano'
+        }
+        if league_code in translation_map:
+            league_code = translation_map[league_code]
+            
         if not api_key:
             api_key = get_futpython_api_key()
         return fetch_futpython_data(league_code, start_date, api_key)
