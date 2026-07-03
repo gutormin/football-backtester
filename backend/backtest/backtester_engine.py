@@ -213,6 +213,11 @@ class ChronologicalBacktester:
             fthg = row['FTHG']
             ftag = row['FTAG']
             ftr = row['FTR']
+            # Precompute booleans once per row (avoids repeated string comparisons in bet evaluation)
+            is_home_win = (ftr == 'H')
+            is_away_win = (ftr == 'A')
+            is_draw = (ftr == 'D')
+            total_goals = int(fthg) + int(ftag)
             
             hthg = row.get('HTHG')
             htag = row.get('HTAG')
@@ -260,11 +265,11 @@ class ChronologicalBacktester:
             season_games[season_key][home_team] += 1
             season_games[season_key][away_team] += 1
             
-            if ftr == 'H':
+            if is_home_win:
                 season_points[season_key][home_team] += 3
-            elif ftr == 'A':
+            elif is_away_win:
                 season_points[season_key][away_team] += 3
-            elif ftr == 'D':
+            elif is_draw:
                 season_points[season_key][home_team] += 1
                 season_points[season_key][away_team] += 1
                 
@@ -746,27 +751,27 @@ class ChronologicalBacktester:
                 if mkt in ('home', '1x2_home'):
                     model_prob = prob_h
                     bookie_odds = odds_h
-                    bet_won = (ftr == 'H')
+                    bet_won = is_home_win
                     market_label = "1 (Mandante)"
                 elif mkt in ('away', '1x2_away'):
                     model_prob = prob_a
                     bookie_odds = odds_a
-                    bet_won = (ftr == 'A')
+                    bet_won = is_away_win
                     market_label = "2 (Visitante)"
                 elif mkt in ('draw', '1x2_draw'):
                     model_prob = prob_d
                     bookie_odds = odds_d
-                    bet_won = (ftr == 'D')
+                    bet_won = is_draw
                     market_label = "X (Empate)"
                 elif mkt == 'over25':
                     model_prob = prob_over_25
                     bookie_odds = odds_over25
-                    bet_won = (fthg + ftag > 2)
+                    bet_won = (total_goals > 2)
                     market_label = "Over 2.5"
                 elif mkt == 'under25':
                     model_prob = 1.0 - prob_over_25
                     bookie_odds = odds_under25
-                    bet_won = (fthg + ftag < 3)
+                    bet_won = (total_goals < 3)
                     market_label = "Under 2.5"
                 elif mkt == 'ht_home':
                     if odds_h_ht is not None and not pd.isna(odds_h_ht) and odds_h_ht > 1.0: bookie_odds = odds_h_ht
@@ -820,7 +825,7 @@ class ChronologicalBacktester:
                         if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_over_15']
                     model_prob = prob_over_15
-                    bet_won = (fthg + ftag > 1)
+                    bet_won = (total_goals > 1)
                     market_label = "Over 1.5"
                 elif mkt == 'under15':
                     if odds_under15 is not None and not pd.isna(odds_under15) and odds_under15 > 1.0: bookie_odds = odds_under15
@@ -829,7 +834,7 @@ class ChronologicalBacktester:
                             est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_under_15']
                     model_prob = 1.0 - prob_over_15
-                    bet_won = (fthg + ftag < 2)
+                    bet_won = (total_goals < 2)
                     market_label = "Under 1.5"
                 elif mkt == 'over35':
                     if odds_over35 is not None and not pd.isna(odds_over35) and odds_over35 > 1.0: bookie_odds = odds_over35
@@ -838,7 +843,7 @@ class ChronologicalBacktester:
                             est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_over_35']
                     model_prob = prob_over_35
-                    bet_won = (fthg + ftag > 3)
+                    bet_won = (total_goals > 3)
                     market_label = "Over 3.5"
                 elif mkt == 'under35':
                     if odds_under35 is not None and not pd.isna(odds_under35) and odds_under35 > 1.0: bookie_odds = odds_under35
@@ -847,7 +852,7 @@ class ChronologicalBacktester:
                             est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_under_35']
                     model_prob = 1.0 - prob_over_35
-                    bet_won = (fthg + ftag < 4)
+                    bet_won = (total_goals < 4)
                     market_label = "Under 3.5"
                 elif mkt == 'over45':
                     model_prob = prob_over_45
@@ -857,7 +862,7 @@ class ChronologicalBacktester:
                     except Exception:
                         if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_over_45']
-                    bet_won = (fthg + ftag > 4)
+                    bet_won = (total_goals > 4)
                     market_label = "Over 4.5"
                 elif mkt == 'under45':
                     model_prob = 1.0 - prob_over_45
@@ -867,19 +872,19 @@ class ChronologicalBacktester:
                     except Exception:
                         if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_under_45']
-                    bet_won = (fthg + ftag < 5)
+                    bet_won = (total_goals < 5)
                     market_label = "Under 4.5"
                 elif mkt == 'over55':
                     if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_over_55
                     bookie_odds = est_odds['bookie_over_55']
-                    bet_won = (fthg + ftag > 5)
+                    bet_won = (total_goals > 5)
                     market_label = "Over 5.5"
                 elif mkt == 'under55':
                     if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = 1.0 - prob_over_55
                     bookie_odds = est_odds['bookie_under_55']
-                    bet_won = (fthg + ftag < 6)
+                    bet_won = (total_goals < 6)
                     market_label = "Under 5.5"
                 elif mkt == 'lay_home':
                     model_prob = prob_d + prob_a
@@ -888,7 +893,7 @@ class ChronologicalBacktester:
                         bookie_odds = _dc if _dc > 1.0 else np.nan
                     except Exception:
                         bookie_odds = np.nan
-                    bet_won = (ftr != 'H')
+                    bet_won = not is_home_win
                     market_label = "Contra Mandante (X2)"
                 elif mkt == 'lay_away':
                     model_prob = prob_h + prob_d
@@ -897,7 +902,7 @@ class ChronologicalBacktester:
                         bookie_odds = _dc if _dc > 1.0 else np.nan
                     except Exception:
                         bookie_odds = np.nan
-                    bet_won = (ftr != 'A')
+                    bet_won = not is_away_win
                     market_label = "Contra Visitante (1X)"
                 elif mkt == 'lay_draw':
                     model_prob = prob_h + prob_a
@@ -906,7 +911,7 @@ class ChronologicalBacktester:
                         bookie_odds = _dc if _dc > 1.0 else np.nan
                     except Exception:
                         bookie_odds = np.nan
-                    bet_won = (ftr != 'D')
+                    bet_won = not is_draw
                     market_label = "Contra Empate (12)"
                 elif mkt == 'lay_home_ex':
                     model_prob = prob_d + prob_a
@@ -917,7 +922,7 @@ class ChronologicalBacktester:
                         bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
                     except Exception:
                         bookie_odds = np.nan
-                    bet_won = (ftr != 'H')
+                    bet_won = not is_home_win
                     market_label = "Lay Mandante"
                 elif mkt == 'lay_away_ex':
                     model_prob = prob_h + prob_d
@@ -928,7 +933,7 @@ class ChronologicalBacktester:
                         bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
                     except Exception:
                         bookie_odds = np.nan
-                    bet_won = (ftr != 'A')
+                    bet_won = not is_away_win
                     market_label = "Lay Visitante"
                 elif mkt == 'lay_draw_ex':
                     model_prob = prob_h + prob_a
@@ -939,7 +944,7 @@ class ChronologicalBacktester:
                         bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
                     except Exception:
                         bookie_odds = np.nan
-                    bet_won = (ftr != 'D')
+                    bet_won = not is_draw
                     market_label = "Lay Empate"
                 elif mkt == 'btts_yes':
                     model_prob = prob_btts_yes
@@ -1070,10 +1075,10 @@ class ChronologicalBacktester:
                         kelly_probs = [prob_h, prob_d, prob_a]
                         kelly_outcomes = [bookie_odds - 1.0, 0.0, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0]
                         
-                        if ftr == 'H':
+                        if is_home_win:
                             result_factor = 1.0
                             bet_won = True
-                        elif ftr == 'D':
+                        elif is_draw:
                             result_factor = 0.0
                             bet_won = False
                         else:
@@ -1094,10 +1099,10 @@ class ChronologicalBacktester:
                         kelly_probs = [prob_a, prob_d, prob_h]
                         kelly_outcomes = [bookie_odds - 1.0, 0.0, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0]
                         
-                        if ftr == 'A':
+                        if is_away_win:
                             result_factor = 1.0
                             bet_won = True
-                        elif ftr == 'D':
+                        elif is_draw:
                             result_factor = 0.0
                             bet_won = False
                         else:
@@ -1923,6 +1928,11 @@ class ChronologicalBacktester:
             fthg = row['FTHG']
             ftag = row['FTAG']
             ftr = row['FTR']
+            # Precompute booleans once per row (avoids repeated string comparisons in bet evaluation)
+            is_home_win = (ftr == 'H')
+            is_away_win = (ftr == 'A')
+            is_draw = (ftr == 'D')
+            total_goals = int(fthg) + int(ftag)
             
             hthg = row.get('HTHG')
             htag = row.get('HTAG')
@@ -1968,11 +1978,11 @@ class ChronologicalBacktester:
             season_games[season_key][home_team] += 1
             season_games[season_key][away_team] += 1
             
-            if ftr == 'H':
+            if is_home_win:
                 season_points[season_key][home_team] += 3
-            elif ftr == 'A':
+            elif is_away_win:
                 season_points[season_key][away_team] += 3
-            elif ftr == 'D':
+            elif is_draw:
                 season_points[season_key][home_team] += 1
                 season_points[season_key][away_team] += 1
                 
@@ -2357,23 +2367,23 @@ class ChronologicalBacktester:
                 if mkt in ('home', '1x2_home'):
                     model_prob = prob_h
                     bookie_odds = odds_h
-                    bet_won = (ftr == 'H')
+                    bet_won = is_home_win
                 elif mkt in ('away', '1x2_away'):
                     model_prob = prob_a
                     bookie_odds = odds_a
-                    bet_won = (ftr == 'A')
+                    bet_won = is_away_win
                 elif mkt in ('draw', '1x2_draw'):
                     model_prob = prob_d
                     bookie_odds = odds_d
-                    bet_won = (ftr == 'D')
+                    bet_won = is_draw
                 elif mkt == 'over25':
                     model_prob = prob_over_25
                     bookie_odds = odds_over25
-                    bet_won = (fthg + ftag > 2)
+                    bet_won = (total_goals > 2)
                 elif mkt == 'under25':
                     model_prob = 1.0 - prob_over_25
                     bookie_odds = odds_under25
-                    bet_won = (fthg + ftag < 3)
+                    bet_won = (total_goals < 3)
                 elif mkt == 'ht_home':
                     if odds_h_ht is not None and not pd.isna(odds_h_ht) and odds_h_ht > 1.0: bookie_odds = odds_h_ht
                     else: bookie_odds = np.nan
@@ -2446,15 +2456,15 @@ class ChronologicalBacktester:
                     if mkt == 'over15':
                         model_prob = prob_over_15
                         bookie_odds = est_odds['bookie_over_15']
-                        bet_won = (fthg + ftag > 1)
+                        bet_won = (total_goals > 1)
                     elif mkt == 'over35':
                         model_prob = prob_over_35
                         bookie_odds = est_odds['bookie_over_35']
-                        bet_won = (fthg + ftag > 3)
+                        bet_won = (total_goals > 3)
                     elif mkt == 'under35':
                         model_prob = 1.0 - prob_over_35
                         bookie_odds = est_odds['bookie_under_35']
-                        bet_won = (fthg + ftag < 4)
+                        bet_won = (total_goals < 4)
                     elif mkt == 'over45':
                         model_prob = prob_over_45
                         try:
@@ -2462,7 +2472,7 @@ class ChronologicalBacktester:
                             bookie_odds = _o45 if _o45 > 1.0 else est_odds['bookie_over_45']
                         except Exception:
                             bookie_odds = est_odds['bookie_over_45']
-                        bet_won = (fthg + ftag > 4)
+                        bet_won = (total_goals > 4)
                     elif mkt == 'under45':
                         model_prob = 1.0 - prob_over_45
                         try:
@@ -2470,15 +2480,15 @@ class ChronologicalBacktester:
                             bookie_odds = _u45 if _u45 > 1.0 else est_odds['bookie_under_45']
                         except Exception:
                             bookie_odds = est_odds['bookie_under_45']
-                        bet_won = (fthg + ftag < 5)
+                        bet_won = (total_goals < 5)
                     elif mkt == 'over55':
                         model_prob = prob_over_55
                         bookie_odds = est_odds['bookie_over_55']
-                        bet_won = (fthg + ftag > 5)
+                        bet_won = (total_goals > 5)
                     elif mkt == 'under55':
                         model_prob = 1.0 - prob_over_55
                         bookie_odds = est_odds['bookie_under_55']
-                        bet_won = (fthg + ftag < 6)
+                        bet_won = (total_goals < 6)
                     elif mkt == 'lay_home':
                         model_prob = prob_d + prob_a
                         try:
@@ -2486,7 +2496,7 @@ class ChronologicalBacktester:
                             bookie_odds = _dc if _dc > 1.0 else np.nan
                         except Exception:
                             bookie_odds = np.nan
-                        bet_won = (ftr != 'H')
+                        bet_won = not is_home_win
                     elif mkt == 'lay_away':
                         model_prob = prob_h + prob_d
                         try:
@@ -2494,7 +2504,7 @@ class ChronologicalBacktester:
                             bookie_odds = _dc if _dc > 1.0 else np.nan
                         except Exception:
                             bookie_odds = np.nan
-                        bet_won = (ftr != 'A')
+                        bet_won = not is_away_win
                     elif mkt == 'lay_draw':
                         model_prob = prob_h + prob_a
                         try:
@@ -2502,7 +2512,7 @@ class ChronologicalBacktester:
                             bookie_odds = _dc if _dc > 1.0 else np.nan
                         except Exception:
                             bookie_odds = np.nan
-                        bet_won = (ftr != 'D')
+                        bet_won = not is_draw
                     elif mkt == 'lay_home_ex':
                         model_prob = prob_d + prob_a
                         try:
@@ -2512,7 +2522,7 @@ class ChronologicalBacktester:
                             bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
                         except Exception:
                             bookie_odds = np.nan
-                        bet_won = (ftr != 'H')
+                        bet_won = not is_home_win
                     elif mkt == 'lay_away_ex':
                         model_prob = prob_h + prob_d
                         try:
@@ -2522,7 +2532,7 @@ class ChronologicalBacktester:
                             bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
                         except Exception:
                             bookie_odds = np.nan
-                        bet_won = (ftr != 'A')
+                        bet_won = not is_away_win
                     elif mkt == 'lay_draw_ex':
                         model_prob = prob_h + prob_a
                         try:
@@ -2532,7 +2542,7 @@ class ChronologicalBacktester:
                             bookie_odds = _dc / (_dc - 1.0) if (_dc > 1.001) else np.nan
                         except Exception:
                             bookie_odds = np.nan
-                        bet_won = (ftr != 'D')
+                        bet_won = not is_draw
                     elif mkt == 'btts_yes':
                         model_prob = prob_btts_yes
                         try:

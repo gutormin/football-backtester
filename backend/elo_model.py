@@ -223,15 +223,21 @@ import pandas as pd
 CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'elo_cache')
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-def get_df_cache_key(df: pd.DataFrame) -> str:
+def get_df_cache_key(df: pd.DataFrame, league_code: str = "") -> str:
     if df.empty:
         return "empty"
     max_date = str(df['Date'].max())
-    first_home = str(df['HomeTeam'].iloc[0]) if 'HomeTeam' in df.columns else ""
-    raw_key = f"{len(df)}_{max_date}_{first_home}"
+    min_date = str(df['Date'].min())
+    # Hash first 3 team names (much stronger than just first home team)
+    teams = sorted(set(
+        list(df['HomeTeam'].dropna().unique()[:3]) +
+        list(df['AwayTeam'].dropna().unique()[:3])
+    ))[:6]
+    team_hash = "|".join(teams) if teams else "no_teams"
+    raw_key = f"{league_code}_{len(df)}_{min_date}_{max_date}_{team_hash}"
     return hashlib.md5(raw_key.encode('utf-8')).hexdigest()
 
-def build_elo_tracker_from_history(df: pd.DataFrame) -> EloTracker:
+def build_elo_tracker_from_history(df: pd.DataFrame, league_code: str = "") -> EloTracker:
     """Constrói e cálcula o estado final do Elo Tracker a partir de uma base histórica.
 
     Processa todos os jogos na base fornecida em ordem cronológica.
@@ -246,7 +252,7 @@ def build_elo_tracker_from_history(df: pd.DataFrame) -> EloTracker:
     if df.empty or 'FTHG' not in df.columns or 'FTAG' not in df.columns:
         return EloTracker(k_factor=20, home_advantage=65)
         
-    cache_key = get_df_cache_key(df)
+    cache_key = get_df_cache_key(df, league_code)
     cache_file = os.path.join(CACHE_DIR, f"{cache_key}.pkl")
     
     # Try reading cache

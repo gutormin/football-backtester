@@ -14,10 +14,29 @@ from .api.router_history import router as history_router
 from .api.router_backtest import router as backtest_router
 from .api.router_scanner import router as scanner_router
 
+from contextlib import asynccontextmanager
+
 from .scheduler import run_scheduler_loop, run_arbitrage_scheduler_loop, run_live_odds_tracker_loop, run_dutching_scheduler_loop
 from .cluster_ai_tracker import run_cluster_ai_alerts_loop
 
-app = FastAPI(title="Sports Betting Backtester API")
+
+async def _delayed_task(name, coro_fn, delay=1.0):
+    await asyncio.sleep(delay)
+    await coro_fn()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Starting background scheduler...")
+    asyncio.create_task(_delayed_task("scheduler", run_scheduler_loop, 0.5))
+    asyncio.create_task(_delayed_task("arbitrage", run_arbitrage_scheduler_loop, 0.5))
+    asyncio.create_task(_delayed_task("live_odds", run_live_odds_tracker_loop, 0.5))
+    asyncio.create_task(_delayed_task("cluster_ai", run_cluster_ai_alerts_loop, 2.0))
+    asyncio.create_task(_delayed_task("dutching", run_dutching_scheduler_loop, 0.5))
+    yield
+
+
+app = FastAPI(title="Sports Betting Backtester API", lifespan=lifespan)
 
 # Enable Gzip compression for API responses (saves bandwidth on large payloads)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -35,15 +54,6 @@ app.add_middleware(
 @app.get('/favicon.ico', include_in_schema=False)
 async def favicon():
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-@app.on_event("startup")
-async def startup_event():
-    print("Starting background scheduler...")
-    asyncio.create_task(run_scheduler_loop())
-    asyncio.create_task(run_arbitrage_scheduler_loop())
-    asyncio.create_task(run_live_odds_tracker_loop())
-    asyncio.create_task(run_cluster_ai_alerts_loop())
-    asyncio.create_task(run_dutching_scheduler_loop())
 
 # Include APIRouters with prefix "/api"
 app.include_router(history_router, prefix="/api")

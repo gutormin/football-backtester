@@ -10,7 +10,7 @@ from pydantic import BaseModel, validator
 
 from ..data_loader import (
     DATA_DIR, sync_fixtures, get_all_available_leagues, load_league_data,
-    get_api_token, load_upcoming_from_api, LEAGUES_SEASONAL
+    get_api_token, load_upcoming_from_api, LEAGUES_SEASONAL, auto_detect_data_source
 )
 from ..backtester import ChronologicalBacktester
 from ..smart_money import SmartMoneyBacktester, calculate_confidence_score
@@ -339,11 +339,11 @@ def scan_arbitrage(bookies: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/scan_dutching")
-def scan_dutching(source: str = "odds_api", strategy: str = "fav_short"):
+def scan_dutching(source: str = "odds_api", strategy: str = "fav_short", data_source: str = "auto", futpython_api_key: str = ""):
     try:
         from ..dutching_scanner import get_odds_api_token
         token = get_odds_api_token() or '75d5d936cc573c75bacf71e12b5de769'
-        return fetch_dutching_opportunities(api_key=token, source=source, strategy=strategy)
+        return fetch_dutching_opportunities(api_key=token, source=source, strategy=strategy, data_source=data_source, futpython_api_key=futpython_api_key)
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -951,9 +951,9 @@ def get_autopilot_predictions(source: str = 'api'):
                 continue
                 
             if league_code not in league_cache:
-                hist = load_league_data(league_code, start_date='2020-08-01')
+                hist = load_league_data(league_code, start_date='2020-08-01', data_source=auto_detect_data_source(league_code))
                 league_cache[league_code] = hist
-                elo_cache[league_code] = build_elo_tracker_from_history(hist)
+                elo_cache[league_code] = build_elo_tracker_from_history(hist, league_code)
                 
             hist_df = league_cache[league_code]
             elo_tracker = elo_cache[league_code]

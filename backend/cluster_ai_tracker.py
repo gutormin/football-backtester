@@ -4,7 +4,7 @@ import json
 import pandas as pd
 from datetime import datetime
 
-from .data_loader import DATA_DIR, load_upcoming_from_api, get_api_token, get_all_available_leagues, load_league_data
+from .data_loader import DATA_DIR, load_upcoming_from_api, get_api_token, get_all_available_leagues, load_league_data, auto_detect_data_source
 from .ml_clustering import extract_league_features, cluster_leagues
 from .telegram_bot import (
     send_telegram_message, 
@@ -86,7 +86,7 @@ async def run_cluster_ai_alerts():
     
     features_list = []
     for lg in league_codes:
-        df = load_league_data(lg, start_date="2021-01-01", data_source="footballdata", api_key="")
+        df = load_league_data(lg, start_date="2021-01-01", data_source=auto_detect_data_source(lg), api_key="")
         feat = extract_league_features(lg, df)
         if feat:
             features_list.append(feat)

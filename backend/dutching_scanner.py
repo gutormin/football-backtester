@@ -3,9 +3,27 @@ import requests
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
-from backend.models import PoissonModel, estimate_bookmaker_odds
+from backend.models import PoissonModel, estimate_bookmaker_odds, compute_nb_score_matrix
+
+
+def _apply_negative_binomial(pred):
+    """
+    Replaces Poisson prob_matrix in pred with Negative Binomial version.
+    Preserves lambda values (used for bookmaker odds estimation).
+    NB captures overdispersion — critical for Correct Score accuracy.
+    """
+    nb_matrix, nb_home, nb_away = compute_nb_score_matrix(
+        pred['lambda_home'], pred['lambda_away'],
+        alpha_home=0.12, alpha_away=0.10
+    )
+    pred['prob_matrix'] = nb_matrix
+    pred['prob_home'] = nb_home
+    pred['prob_away'] = nb_away
+    pred['prob_draw'] = 1.0 - nb_home - nb_away
+    pred['_nb_applied'] = True
+
 import json
-from backend.data_loader import load_league_data, get_all_available_leagues, DATA_DIR, get_api_token, load_upcoming_from_api
+from backend.data_loader import load_league_data, get_all_available_leagues, DATA_DIR, get_api_token, load_upcoming_from_api, auto_detect_data_source
 
 def get_odds_api_token():
     config_path = os.path.join(DATA_DIR, 'odds_api_config.json')
@@ -67,23 +85,22 @@ def get_selections_and_alternatives(pred, outcomes_to_cover, est_odds):
     alternative_scores.sort(key=lambda x: x['prob'], reverse=True)
     return selections_probs, alternative_scores
 
-def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto_ia'):
+def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto_ia', data_source='auto', futpython_api_key=''):
     if not api_key:
-        import os
-        from dotenv import load_dotenv
-        load_dotenv()
-        api_key = os.getenv('THE_ODDS_API_KEY')
+        api_key = os.getenv('THE_ODDS_API_KEY') or get_odds_api_token()
     opportunities = []
     poisson = PoissonModel()
-    
-    # Carrega dados históricos apenas das ligas mapeadas para evitar leituras repetidas em loop
+
+    # Load historical data for all available leagues
+    # Auto-detect: use FutPython for South American leagues, football-data CSVs for the rest
     all_leagues = get_all_available_leagues()
     league_codes = [l['code'] for l in all_leagues]
     leagues_data = {}
-    
+
     for league_code in league_codes:
         try:
-            df = load_league_data(league_code, start_date='2020-08-01')
+            ds = data_source if data_source != 'auto' else auto_detect_data_source(league_code)
+            df = load_league_data(league_code, start_date='2020-08-01', data_source=ds, api_key=futpython_api_key)
             if not df.empty:
                 leagues_data[league_code] = df
         except Exception:
@@ -239,9 +256,10 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 pred = poisson.predict_match(home_team_local, away_team_local, hist_df, datetime.now())
                 if not pred or 'lambda_home' not in pred:
                     continue
+                _apply_negative_binomial(pred)
             except Exception:
                 continue
-                
+
             for bookie in ['Bet365', 'Betfair Exchange', 'Pinnacle']:
                 if not (len(odds_data[bookie]['h2h']) == 3 and len(odds_data[bookie]['totals']) == 2):
                     continue
@@ -345,9 +363,10 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 pred = poisson.predict_match(home_team, away_team, hist_df, datetime.now())
                 if not pred or 'lambda_home' not in pred:
                     continue
+                _apply_negative_binomial(pred)
             except Exception:
                 continue
-                
+
             # Calcula estimativa de Correct Score para Bet365
             try:
                 est_odds_b365 = estimate_bookmaker_odds(odds_over25, odds_under25, pred['lambda_home'], pred['lambda_away'])

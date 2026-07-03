@@ -4,6 +4,8 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from xgboost import XGBClassifier
+from sklearn.linear_model import LogisticRegression
+
 logger.info("[MLEnsemble] XGBoost será usado.")
 
 class MLEnsemble:
@@ -98,4 +100,69 @@ class MLEnsemble:
             "ml_is_fitted": self.is_fitted,
             "ml_samples_trained": self.n_samples_trained,
             "ml_min_samples_required": self.MIN_SAMPLES_TO_FIT,
+        }
+
+
+class StackingMetaLearner:
+    """
+    Meta-learner that combines Poisson and XGBoost probabilities via Logistic
+    Regression stacking instead of a hardcoded 50/50 average.
+
+    Input: [poisson_prob, xgb_prob] — 2 features
+    Output: calibrated probability for the market
+
+    Uses L2-regularized Logistic Regression (C=1.0, lbfgs solver) as the
+    meta-learner. Falls back to 50/50 average if not yet fitted.
+    """
+
+    MIN_SAMPLES_TO_FIT = 200
+
+    def __init__(self, market_name: str):
+        self.market_name = market_name
+        self.model = LogisticRegression(penalty='l2', C=1.0, solver='lbfgs', max_iter=1000)
+        self.fitted = False
+        self.n_samples_trained = 0
+        self.coefs = None
+        self.intercept = None
+        self.history = {'poisson': [], 'xgb': [], 'outcomes': []}
+
+    def fit(self) -> bool:
+        history = self.history
+        if len(history['poisson']) < self.MIN_SAMPLES_TO_FIT:
+            return False
+        if len(set(history['outcomes'])) < 2:
+            return False
+
+        X = np.column_stack([history['poisson'], history['xgb']])
+        y = np.array(history['outcomes'])
+
+        self.model.fit(X, y)
+        self.fitted = True
+        self.n_samples_trained = len(y)
+        self.coefs = self.model.coef_[0].tolist()
+        self.intercept = float(self.model.intercept_[0])
+
+        logger.debug(
+            "[Stacking:%s] Fitted with %d samples. Coefs: poisson=%.3f xgb=%.3f intercept=%.3f",
+            self.market_name, len(y), self.coefs[0], self.coefs[1], self.intercept
+        )
+        return True
+
+    def predict(self, poisson_prob: float, xgb_prob: float) -> float:
+        if not self.fitted:
+            return (poisson_prob + xgb_prob) / 2.0
+
+        X = np.array([[poisson_prob, xgb_prob]])
+        proba = self.model.predict_proba(X)
+        if proba.shape[1] > 1:
+            return float(proba[0][1])
+        return (poisson_prob + xgb_prob) / 2.0
+
+    def get_diagnostics(self) -> dict:
+        return {
+            "stacking_fitted": self.fitted,
+            "stacking_samples": self.n_samples_trained,
+            "stacking_coef_poisson": self.coefs[0] if self.coefs else None,
+            "stacking_coef_xgb": self.coefs[1] if self.coefs else None,
+            "stacking_intercept": self.intercept,
         }

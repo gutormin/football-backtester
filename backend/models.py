@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import math
+from scipy.stats import nbinom
 from .elo_model import estimate_dynamic_rho
 
 def find_best_team_match(api_name, historical_teams):
@@ -37,10 +38,9 @@ def find_best_team_match(api_name, historical_teams):
         if clean_api == clean_team or clean_api in clean_team or clean_team in clean_api:
             return team
             
-    # 4. Fuzzy Match with RapidFuzz
+    # 4. Fuzzy Match with difflib (stdlib — no external dependency)
     try:
-        from rapidfuzz import process, fuzz
-        # Clean the list of historical teams to make fuzzy matching cleaner
+        import difflib
         cleaned_historical = []
         team_map = {}
         for team in historical_teams:
@@ -50,12 +50,10 @@ def find_best_team_match(api_name, historical_teams):
             clean_t = clean_t.strip()
             cleaned_historical.append(clean_t)
             team_map[clean_t] = team
-            
-        best_match_info = process.extractOne(clean_api, cleaned_historical, scorer=fuzz.WRatio)
-        if best_match_info:
-            best_clean_team, score, _ = best_match_info
-            if score >= 85.0:  # 85% threshold is the sweet spot for team name matches
-                return team_map[best_clean_team]
+
+        matches = difflib.get_close_matches(clean_api, cleaned_historical, n=1, cutoff=0.85)
+        if matches:
+            return team_map[matches[0]]
     except Exception:
         pass
         
@@ -118,6 +116,59 @@ def get_fair_ah_odds(ah_probs):
     numerator = prob_win + 0.5 * prob_half_win + 0.5 * prob_half_loss + prob_loss
     odds = numerator / denominator
     return float(max(1.01, min(99.0, odds)))
+
+
+def compute_nb_score_matrix(lambda_home, lambda_away, alpha_home=0.12, alpha_away=0.10, max_goals=8, rho=-0.085):
+    """
+    Negative Binomial score matrix with Dixon-Coles correction.
+    NB2 parameterization: Var = mu + alpha * mu^2 (accounts for overdispersion).
+    Uses scipy.stats.nbinom — no extra dependencies needed.
+
+    Default alpha values from football analytics literature:
+    - Home dispersion ~0.10-0.20 (higher: more unpredictable at home)
+    - Away dispersion ~0.08-0.15 (lower: more consistent on the road)
+
+    Returns: (prob_matrix, home_margin, away_margin)
+    """
+    # NB2 → scipy nbinom parameterization
+    # n = 1/alpha, p = 1/(1 + alpha*mu)
+    def nb_pmf(k, mu, alpha):
+        if alpha <= 0:
+            # Degenerate case: alpha=0 → Poisson
+            return math.exp(-mu) * (mu ** k) / math.factorial(k)
+        n_param = 1.0 / alpha
+        p_param = 1.0 / (1.0 + alpha * mu)
+        return nbinom.pmf(k, n_param, p_param)
+
+    home_probs = np.array([nb_pmf(i, lambda_home, alpha_home) for i in range(max_goals + 1)])
+    away_probs = np.array([nb_pmf(i, lambda_away, alpha_away) for i in range(max_goals + 1)])
+
+    # Normalize (truncation at max_goals)
+    home_probs = home_probs / home_probs.sum()
+    away_probs = away_probs / away_probs.sum()
+
+    prob_matrix = np.outer(home_probs, away_probs)
+
+    # Dixon-Coles correction
+    tau_00 = max(0.0, 1.0 - lambda_home * lambda_away * rho)
+    tau_10 = max(0.0, 1.0 + lambda_away * rho)
+    tau_01 = max(0.0, 1.0 + lambda_home * rho)
+    tau_11 = max(0.0, 1.0 - rho)
+
+    prob_matrix[0, 0] *= tau_00
+    prob_matrix[1, 0] *= tau_10
+    prob_matrix[0, 1] *= tau_01
+    prob_matrix[1, 1] *= tau_11
+
+    prob_sum = prob_matrix.sum()
+    if prob_sum > 0:
+        prob_matrix = prob_matrix / prob_sum
+
+    home_margin = float(np.sum(np.tril(prob_matrix, -1)))
+    away_margin = float(np.sum(np.triu(prob_matrix, 1)))
+
+    return prob_matrix, home_margin, away_margin
+
 
 class PoissonModel:
     def __init__(self, rolling_window_days=365, min_matches=10, decay_xi=0.0065):
@@ -398,8 +449,10 @@ class PoissonModel:
         prob_under_55 = 1.0 - prob_over_55
         
         # BTTS (Both Teams To Score)
-        # P(Home >= 1 and Away >= 1) = (1 - P(Home=0)) * (1 - P(Away=0))
-        prob_btts_yes = float((1.0 - home_probs[0]) * (1.0 - away_probs[0]))
+        # Uses joint probability matrix (respects Dixon-Coles correlation) instead of assuming independence
+        prob_btts_yes = float(sum(
+            prob_matrix[i, j] for i in range(1, max_goals + 1) for j in range(1, max_goals + 1)
+        ))
         prob_btts_no = 1.0 - prob_btts_yes
         
         # Asian Handicap Fair Odds
@@ -523,9 +576,9 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
     
     # 5. Compute fair probabilities for all markets using a joint probability matrix
     # Build score matrix from the bookmaker's perspective (up to 6 goals)
-    max_g = 6
-    home_probs_bk = [math.exp(-lambda_home_bookie) * (lambda_home_bookie**i) / math.factorial(i) for i in range(max_g + 1)]
-    away_probs_bk = [math.exp(-lambda_away_bookie) * (lambda_away_bookie**i) / math.factorial(i) for i in range(max_g + 1)]
+    max_goals = 8
+    home_probs_bk = [math.exp(-lambda_home_bookie) * (lambda_home_bookie**i) / math.factorial(i) for i in range(max_goals + 1)]
+    away_probs_bk = [math.exp(-lambda_away_bookie) * (lambda_away_bookie**i) / math.factorial(i) for i in range(max_goals + 1)]
     
     bk_matrix = np.outer(home_probs_bk, away_probs_bk)
     rho = -0.085
@@ -548,8 +601,8 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
     fair_over_35 = 0.0
     fair_over_45 = 0.0
     fair_over_55 = 0.0
-    for x in range(max_g + 1):
-        for y in range(max_g + 1):
+    for x in range(max_goals + 1):
+        for y in range(max_goals + 1):
             tot = x + y
             if tot > 1: fair_over_15 += bk_matrix[x, y]
             if tot > 3: fair_over_35 += bk_matrix[x, y]
@@ -583,8 +636,8 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
     lambda_home_bookie_ht = lambda_home_bookie * 0.45
     lambda_away_bookie_ht = lambda_away_bookie * 0.45
     
-    home_probs_bk_ht = [math.exp(-lambda_home_bookie_ht) * (lambda_home_bookie_ht**i) / math.factorial(i) for i in range(max_g + 1)]
-    away_probs_bk_ht = [math.exp(-lambda_away_bookie_ht) * (lambda_away_bookie_ht**i) / math.factorial(i) for i in range(max_g + 1)]
+    home_probs_bk_ht = [math.exp(-lambda_home_bookie_ht) * (lambda_home_bookie_ht**i) / math.factorial(i) for i in range(max_goals + 1)]
+    away_probs_bk_ht = [math.exp(-lambda_away_bookie_ht) * (lambda_away_bookie_ht**i) / math.factorial(i) for i in range(max_goals + 1)]
     bk_matrix_ht = np.outer(home_probs_bk_ht, away_probs_bk_ht)
     
     tau_00_ht = 1.0 - lambda_home_bookie_ht * lambda_away_bookie_ht * rho
@@ -607,8 +660,8 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
     fair_ht_under05 = float(bk_matrix_ht[0, 0])
     
     fair_ht_over15 = 0.0
-    for x in range(max_g + 1):
-        for y in range(max_g + 1):
+    for x in range(max_goals + 1):
+        for y in range(max_goals + 1):
             if x + y > 1: fair_ht_over15 += bk_matrix_ht[x, y]
     fair_ht_under15 = 1.0 - fair_ht_over15
     

@@ -567,9 +567,9 @@ def resolve_historical_steam_results() -> None:
     loaded_dfs = {}
 
     try:
-        from .data_loader import load_league_data
+        from .data_loader import load_league_data, auto_detect_data_source
     except ImportError:
-        from backend.data_loader import load_league_data
+        from backend.data_loader import load_league_data, auto_detect_data_source
 
     import pandas as pd
 
@@ -606,7 +606,7 @@ def resolve_historical_steam_results() -> None:
 
         if lcode not in loaded_dfs:
             try:
-                loaded_dfs[lcode] = load_league_data(lcode, start_date='2020-08-01')
+                loaded_dfs[lcode] = load_league_data(lcode, start_date='2020-08-01', data_source=auto_detect_data_source(lcode))
             except Exception:
                 loaded_dfs[lcode] = None
 

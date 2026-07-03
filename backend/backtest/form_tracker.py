@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from .helpers import weighted_mean
+from .helpers import weighted_mean, get_league_weighted_decay
 
 def update_form(team_home_scored, team_home_conceded, team_away_scored, team_away_conceded,
                 league_home_goals, league_away_goals, league_code, home_team, away_team, fthg, ftag,
@@ -16,10 +16,11 @@ def update_form(team_home_scored, team_home_conceded, team_away_scored, team_awa
         team_home_conceded[home_team].append(ftag)
         team_away_scored[away_team].append(ftag)
         team_away_conceded[away_team].append(fthg)
-        
+
         league_home_goals[league_code].append(fthg)
         league_away_goals[league_code].append(ftag)
-        
+
+    # HT goals — independent of FT goals, SOT, and xG
     if hthg is not None and htag is not None and not pd.isna(hthg) and not pd.isna(htag):
         if team_home_scored_ht is not None:
             team_home_scored_ht[home_team].append(hthg)
@@ -29,23 +30,25 @@ def update_form(team_home_scored, team_home_conceded, team_away_scored, team_awa
             league_home_goals_ht[league_code].append(hthg)
             league_away_goals_ht[league_code].append(htag)
 
-        if hst is not None and ast is not None and not pd.isna(hst) and not pd.isna(ast):
-            if team_home_sot is not None:
-                team_home_sot[home_team].append(hst)
-                team_home_sot_conceded[home_team].append(ast)
-                team_away_sot[away_team].append(ast)
-                team_away_sot_conceded[away_team].append(hst)
-                league_home_sot[league_code].append(hst)
-                league_away_sot[league_code].append(ast)
-                
-        if hxg is not None and axg is not None and not pd.isna(hxg) and not pd.isna(axg):
-            if team_home_xg is not None:
-                team_home_xg[home_team].append(hxg)
-                team_home_xg_conceded[home_team].append(axg)
-                team_away_xg[away_team].append(axg)
-                team_away_xg_conceded[away_team].append(hxg)
-                league_home_xg[league_code].append(hxg)
-                league_away_xg[league_code].append(axg)
+    # SOT — independent of HT and xG (was nested inside HT check, fixed 02/07/2026)
+    if hst is not None and ast is not None and not pd.isna(hst) and not pd.isna(ast):
+        if team_home_sot is not None:
+            team_home_sot[home_team].append(hst)
+            team_home_sot_conceded[home_team].append(ast)
+            team_away_sot[away_team].append(ast)
+            team_away_sot_conceded[away_team].append(hst)
+            league_home_sot[league_code].append(hst)
+            league_away_sot[league_code].append(ast)
+
+    # xG — independent of HT and SOT (was nested inside HT check, fixed 02/07/2026)
+    if hxg is not None and axg is not None and not pd.isna(hxg) and not pd.isna(axg):
+        if team_home_xg is not None:
+            team_home_xg[home_team].append(hxg)
+            team_home_xg_conceded[home_team].append(axg)
+            team_away_xg[away_team].append(axg)
+            team_away_xg_conceded[away_team].append(hxg)
+            league_home_xg[league_code].append(hxg)
+            league_away_xg[league_code].append(axg)
 
 def calculate_xg_ratings(team_home_xg, team_home_xg_conceded, team_away_xg, team_away_xg_conceded,
                          league_home_xg, league_away_xg, home_team, away_team, league_code, rolling_games=15):
@@ -63,11 +66,12 @@ def calculate_xg_ratings(team_home_xg, team_home_xg_conceded, team_away_xg, team
         avg_a_xg = np.mean(leg_a_xg)
         if pd.isna(avg_h_xg) or avg_h_xg == 0: avg_h_xg = 1.35
         if pd.isna(avg_a_xg) or avg_a_xg == 0: avg_a_xg = 1.05
-        
-        h_xg_att = (weighted_mean(h_xg_scored, 0.06) / avg_h_xg) if h_xg_scored else 1.0
-        h_xg_def = (weighted_mean(h_xg_conceded, 0.06) / avg_a_xg) if h_xg_conceded else 1.0
-        a_xg_att = (weighted_mean(a_xg_scored, 0.06) / avg_a_xg) if a_xg_scored else 1.0
-        a_xg_def = (weighted_mean(a_xg_conceded, 0.06) / avg_h_xg) if a_xg_conceded else 1.0
+
+        _decay = get_league_weighted_decay(league_code)
+        h_xg_att = (weighted_mean(h_xg_scored, _decay) / avg_h_xg) if h_xg_scored else 1.0
+        h_xg_def = (weighted_mean(h_xg_conceded, _decay) / avg_a_xg) if h_xg_conceded else 1.0
+        a_xg_att = (weighted_mean(a_xg_scored, _decay) / avg_a_xg) if a_xg_scored else 1.0
+        a_xg_def = (weighted_mean(a_xg_conceded, _decay) / avg_h_xg) if a_xg_conceded else 1.0
         
         h_xg_att = 1.0 if pd.isna(h_xg_att) else max(0.2, min(4.0, h_xg_att))
         h_xg_def = 1.0 if pd.isna(h_xg_def) else max(0.2, min(4.0, h_xg_def))

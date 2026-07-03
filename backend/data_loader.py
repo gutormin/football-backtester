@@ -177,6 +177,13 @@ LEAGUES_AGGREGATE = {
 
 SEASONS = ['2021', '2122', '2223', '2324', '2425', '2526']
 
+# Leagues that use FutPythonTrader API instead of football-data.co.uk CSVs
+SOUTH_AMERICAN_LEAGUES = {'ARG', 'BRA', 'MEX', 'USA'}
+
+def auto_detect_data_source(league_code):
+    """Returns the appropriate data source for a league code."""
+    return 'futpython' if league_code in SOUTH_AMERICAN_LEAGUES else 'footballdata'
+
 def ensure_data_dir():
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)

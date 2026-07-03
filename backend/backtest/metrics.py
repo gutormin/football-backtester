@@ -3,6 +3,30 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 from ..data_loader import get_all_available_leagues
+
+
+def _benjamini_hochberg(p_values):
+    """
+    Benjamini-Hochberg FDR correction for multiple hypothesis testing.
+    Returns FDR-adjusted q-values. Controls false discovery rate at level alpha
+    when testing many parameter combinations in grid search.
+    """
+    n = len(p_values)
+    if n == 0:
+        return []
+    p_arr = np.array(p_values, dtype=np.float64)
+    # Sort ascending, track original indices
+    order = np.argsort(p_arr)
+    sorted_p = p_arr[order]
+    # BH step-up: q_i = min(p_i * n / rank_i, q_{i+1})
+    q_values = np.minimum(1.0, sorted_p * n / (np.arange(n) + 1.0))
+    # Ensure monotonicity (step-up)
+    for i in range(n - 2, -1, -1):
+        q_values[i] = min(q_values[i], q_values[i + 1])
+    # Map back to original order
+    result = np.zeros(n)
+    result[order] = q_values
+    return result.tolist()
 from ..ai_predictor import (predict_strategy_sustainability, compute_brier_score, 
                             compute_bootstrap_ci, compute_power_analysis, compute_rolling_roi, 
                             compute_pvalue_binomial, compute_edge_quality_score)
@@ -549,7 +573,7 @@ def compile_parallel_scan_summary(states, initial_bankroll, value_threshold, sta
                 'Excluir Zebras (<= 3.00)': lambda b: b['odds'] <= 3.00,
                 'Excluir Super Favs (> 1.50)': lambda b: b['odds'] > 1.50
             }
-            
+
             ev_slices = {
                 '': lambda b: True,
                 ' + Gatilho EV > 1.05': lambda b: b.get('ev', 1.0) > 1.05,
@@ -557,7 +581,7 @@ def compile_parallel_scan_summary(states, initial_bankroll, value_threshold, sta
                 ' + Gatilho EV > 1.15': lambda b: b.get('ev', 1.0) > 1.15,
                 ' + Gatilho EV > 1.25': lambda b: b.get('ev', 1.0) > 1.25
             }
-            
+
             slices = {}
             for o_name, o_func in odds_slices.items():
                 for e_name, e_func in ev_slices.items():
@@ -565,19 +589,21 @@ def compile_parallel_scan_summary(states, initial_bankroll, value_threshold, sta
                         continue
                     name = o_name + e_name
                     slices[name] = lambda b, o=o_func, e=e_func: o(b) and e(b)
-            
+
+            # Collect all slice candidates for FDR correction across multiple comparisons
+            slice_candidates = []
             for s_name, s_func in slices.items():
                 s_bets = [b for b in state['bets_for_ai'] if s_func(b)]
                 if len(s_bets) >= 20:
                     s_staked = sum([b['stake'] for b in s_bets])
                     s_profit = sum([b['profit'] for b in s_bets])
                     s_roi = (s_profit / s_staked * 100) if s_staked > 0 else 0.0
-                    
+
                     if s_roi > 0 and s_roi > base_summary['roi'] + 2.0:
                         s_wins = sum([1 for b in s_bets if b['profit'] > 0])
                         s_avg_odds = float(np.mean([b['odds'] for b in s_bets]))
                         s_avg_ev = float(np.mean([b.get('ev', 1.0) for b in s_bets]))
-                        
+
                         s_oos_summary = None
                         n_oos = max(10, int(len(s_bets) * 0.2))
                         s_oos_bets = s_bets[-n_oos:]
@@ -590,16 +616,16 @@ def compile_parallel_scan_summary(states, initial_bankroll, value_threshold, sta
                                 'roi': round(s_oos_roi, 2),
                                 'win_rate': round((s_oos_wins / len(s_oos_bets) * 100), 1)
                             }
-                            
+
                         s_p_value = compute_pvalue_binomial(s_wins, len(s_bets), s_avg_odds)
                         s_power = compute_power_analysis(s_roi, s_avg_odds, len(s_bets)).get('power_ratio')
                         s_brier = compute_brier_score(s_bets).get('improvement_pct')
                         s_boot = compute_bootstrap_ci(s_bets, n_resamples=100).get('bootstrap_roi_ci_lower')
                         s_decay = compute_rolling_roi(s_bets, window=max(10, int(len(s_bets)*0.2))).get('edge_decay_pct')
-                        
+
                         s_valid_clvs = [b.get('clv') for b in s_bets if b.get('clv') is not None]
                         s_avg_clv = float(np.mean(s_valid_clvs)) if s_valid_clvs else None
-                        
+
                         s_summary = {
                             'roi': s_roi,
                             'bootstrap_roi_ci_lower': s_boot,
@@ -609,13 +635,32 @@ def compile_parallel_scan_summary(states, initial_bankroll, value_threshold, sta
                             'power_ratio': s_power,
                             'brier_improvement': s_brier
                         }
-                        
+
                         s_eqs_data = compute_edge_quality_score(s_summary, s_oos_summary)
                         s_eqs_score = s_eqs_data.get('score', 0)
-                        
-                        if s_eqs_score > best_opt_score and s_eqs_score >= 60:
-                            best_opt_score = s_eqs_score
-                            best_opt_range = s_name
+
+                        slice_candidates.append({
+                            'name': s_name,
+                            'eqs_score': s_eqs_score,
+                            'p_value': s_p_value,
+                            'n_bets': len(s_bets),
+                        })
+
+            # Apply Benjamini-Hochberg FDR correction across all tested slices
+            fdr_pvals = _benjamini_hochberg([c['p_value'] for c in slice_candidates]) if slice_candidates else []
+            fdr_threshold = 0.10  # 10% false discovery rate
+            significant = set()
+            for c, fdr_p in zip(slice_candidates, fdr_pvals):
+                if fdr_p is not None and fdr_p < fdr_threshold:
+                    significant.add(c['name'])
+
+            for c in slice_candidates:
+                s_name = c['name']
+                s_eqs_score = c['eqs_score']
+                # Require FDR significance AND EQS >= 60 to recommend a slice
+                if s_name in significant and s_eqs_score > best_opt_score and s_eqs_score >= 60:
+                    best_opt_score = s_eqs_score
+                    best_opt_range = s_name
 
         if best_opt_range and best_opt_score >= base_eqs_score + 5:
             summaries[key]['optimized_odds_range'] = best_opt_range

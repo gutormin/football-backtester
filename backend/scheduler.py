@@ -62,7 +62,7 @@ import numpy as np
 
 from .data_loader import (
     DATA_DIR, sync_fixtures, load_league_data, get_all_available_leagues,
-    get_api_token, load_upcoming_from_api
+    get_api_token, load_upcoming_from_api, auto_detect_data_source
 )
 from .models import PoissonModel, estimate_bookmaker_odds
 from .telegram_bot import (
@@ -329,7 +329,8 @@ async def run_automatic_tips_scan():
             # Load league data
             if league_code not in league_cache:
                 try:
-                    hist_df = await loop.run_in_executor(None, lambda: load_league_data(league_code, start_date='2020-08-01'))
+                    _ds = auto_detect_data_source(league_code)
+                    hist_df = await loop.run_in_executor(None, lambda: load_league_data(league_code, start_date='2020-08-01', data_source=_ds))
                     league_cache[league_code] = hist_df
                 except Exception:
                     continue
@@ -738,7 +739,7 @@ async def run_automatic_dutching_scan():
     
     try:
         # Puxar oportunidades via The Odds API (live)
-        opps = await loop.run_in_executor(None, lambda: fetch_dutching_opportunities(api_key=token, source='odds_api', strategy='auto_ia'))
+        opps = await loop.run_in_executor(None, lambda: fetch_dutching_opportunities(api_key=token, source='odds_api', strategy='auto_ia', data_source='auto'))
     except Exception as e:
         return {"status": "error", "message": f"Erro ao buscar Dutching: {e}"}
         

@@ -9,7 +9,7 @@ from pydantic import BaseModel, validator
 
 from ..data_loader import (
     sync_data, get_all_available_leagues, load_league_data, DATA_DIR, sync_fixtures,
-    get_api_token, load_upcoming_from_api, LEAGUES_SEASONAL
+    get_api_token, load_upcoming_from_api, LEAGUES_SEASONAL, auto_detect_data_source
 )
 from ..backtester import ChronologicalBacktester
 from ..models import PoissonModel, estimate_bookmaker_odds
@@ -256,7 +256,7 @@ def predict_matchup(req: PredictRequest):
             
         poisson = PoissonModel()
         latest_date = df['Date'].max()
-        elo_tracker = build_elo_tracker_from_history(df)
+        elo_tracker = build_elo_tracker_from_history(df, getattr(req, 'league', ''))
         pred = poisson.predict_match(req.homeTeam, req.awayTeam, df, latest_date + pd.Timedelta(days=1), elo_tracker=elo_tracker)
         
         fair_h = round(1.0 / pred['prob_home'], 2) if pred['prob_home'] > 0 else 99.0
@@ -568,9 +568,9 @@ def get_upcoming_predicted_matches(
                 
             # Load league data
             if league_code not in league_cache:
-                hist = load_league_data(league_code, start_date='2020-08-01')
+                hist = load_league_data(league_code, start_date='2020-08-01', data_source=auto_detect_data_source(league_code))
                 league_cache[league_code] = hist
-                elo_cache[league_code] = build_elo_tracker_from_history(hist)
+                elo_cache[league_code] = build_elo_tracker_from_history(hist, league_code)
                 
             hist_df = league_cache[league_code]
             elo_tracker = elo_cache[league_code]
