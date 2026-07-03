@@ -959,8 +959,11 @@ def fetch_futpython_data(league_code, start_date, api_key):
     
     def download_season(temp):
         url = f"{base_url}/{pais}/{liga}/{temp}?api_key={api_key}"
+        import os
+        proxy_url = os.environ.get("FUTPYTHON_PROXY")
+        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
         try:
-            res = requests.get(url, timeout=12)
+            res = requests.get(url, timeout=12, proxies=proxies)
             return temp, res.status_code, res.text
         except Exception as e:
             return temp, None, str(e)
