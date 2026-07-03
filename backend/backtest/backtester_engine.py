@@ -53,7 +53,7 @@ class ChronologicalBacktester:
         self.stacking_history = defaultdict(lambda: {'poisson': [], 'xgb': [], 'outcomes': []})
         self.matches_since_stacking_fit = 0
 
-    def run(self, leagues, start_date, end_date, market, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', odds_timing='closing', run_monte_carlo=True, min_odds=1.0, max_odds=2.50, exchange_commission=0.0, use_ml=False, data_source='football-data', futpython_api_key='', min_odds_h=None, max_odds_h=None, min_odds_d=None, max_odds_d=None, min_odds_a=None, max_odds_a=None, min_odds_over25=None, max_odds_over25=None, min_odds_under25=None, max_odds_under25=None, slippage=None, oos_split_pct=20.0):
+    def run(self, leagues, start_date, end_date, market, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', odds_timing='closing', run_monte_carlo=True, min_odds=1.0, max_odds=2.50, exchange_commission=0.0, use_ml=False, data_source='football-data', futpython_api_key='', min_odds_h=None, max_odds_h=None, min_odds_d=None, max_odds_d=None, min_odds_a=None, max_odds_a=None, min_odds_over25=None, max_odds_over25=None, min_odds_under25=None, max_odds_under25=None, slippage=None, oos_split_pct=20.0, oos_date_cutoff=None):
         """
         Runs a chronological backtest across selected leagues.
         
@@ -180,7 +180,9 @@ class ChronologicalBacktester:
         # Date boundaries
         start_dt = pd.to_datetime(start_date)
         end_dt = pd.to_datetime(end_date)
-        
+        oos_cutoff_dt = pd.to_datetime(oos_date_cutoff) if oos_date_cutoff else None
+        models_frozen = False
+
         poisson = PoissonModel()
         elo_tracker = EloTracker(k_factor=20, home_advantage=65)
         league_rho_cache = {}  # Cache rho per league
@@ -213,6 +215,11 @@ class ChronologicalBacktester:
             fthg = row['FTHG']
             ftag = row['FTAG']
             ftr = row['FTR']
+            
+            # Skip matches that haven't been played yet (missing scores)
+            if pd.isna(fthg) or pd.isna(ftag):
+                continue
+                
             # Precompute booleans once per row (avoids repeated string comparisons in bet evaluation)
             is_home_win = (ftr == 'H')
             is_away_win = (ftr == 'A')
@@ -221,10 +228,6 @@ class ChronologicalBacktester:
             
             hthg = row.get('HTHG')
             htag = row.get('HTAG')
-            
-            # Skip matches that haven't been played yet (missing scores)
-            if pd.isna(fthg) or pd.isna(ftag):
-                continue
                 
             # Warm up ratings only (skip heavy model calculations) if match is before backtest window
             hst = row.get('HST')
@@ -824,6 +827,7 @@ class ChronologicalBacktester:
                     else:
                         if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_over_15']
+                        is_synthetic = True
                     model_prob = prob_over_15
                     bet_won = (total_goals > 1)
                     market_label = "Over 1.5"
@@ -833,6 +837,7 @@ class ChronologicalBacktester:
                         if est_odds is None:
                             est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_under_15']
+                        is_synthetic = True
                     model_prob = 1.0 - prob_over_15
                     bet_won = (total_goals < 2)
                     market_label = "Under 1.5"
@@ -842,6 +847,7 @@ class ChronologicalBacktester:
                         if est_odds is None:
                             est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_over_35']
+                        is_synthetic = True
                     model_prob = prob_over_35
                     bet_won = (total_goals > 3)
                     market_label = "Over 3.5"
@@ -851,6 +857,7 @@ class ChronologicalBacktester:
                         if est_odds is None:
                             est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_under_35']
+                        is_synthetic = True
                     model_prob = 1.0 - prob_over_35
                     bet_won = (total_goals < 4)
                     market_label = "Under 3.5"
@@ -859,9 +866,11 @@ class ChronologicalBacktester:
                     try:
                         _o45 = float(str(odds_over45).replace(',', '.')) if odds_over45 is not None and not pd.isna(odds_over45) else np.nan
                         bookie_odds = _o45 if _o45 > 1.0 else (estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away) if est_odds is None else est_odds)['bookie_over_45']
+                        if _o45 is None or pd.isna(_o45) or _o45 <= 1.0: is_synthetic = True
                     except Exception:
                         if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_over_45']
+                        is_synthetic = True
                     bet_won = (total_goals > 4)
                     market_label = "Over 4.5"
                 elif mkt == 'under45':
@@ -869,21 +878,25 @@ class ChronologicalBacktester:
                     try:
                         _u45 = float(str(odds_under45).replace(',', '.')) if odds_under45 is not None and not pd.isna(odds_under45) else np.nan
                         bookie_odds = _u45 if _u45 > 1.0 else (estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away) if est_odds is None else est_odds)['bookie_under_45']
+                        if _u45 is None or pd.isna(_u45) or _u45 <= 1.0: is_synthetic = True
                     except Exception:
                         if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                         bookie_odds = est_odds['bookie_under_45']
+                        is_synthetic = True
                     bet_won = (total_goals < 5)
                     market_label = "Under 4.5"
                 elif mkt == 'over55':
                     if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = prob_over_55
                     bookie_odds = est_odds['bookie_over_55']
+                    is_synthetic = True
                     bet_won = (total_goals > 5)
                     market_label = "Over 5.5"
                 elif mkt == 'under55':
                     if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     model_prob = 1.0 - prob_over_55
                     bookie_odds = est_odds['bookie_under_55']
+                    is_synthetic = True
                     bet_won = (total_goals < 6)
                     market_label = "Under 5.5"
                 elif mkt == 'lay_home':
@@ -1337,10 +1350,9 @@ class ChronologicalBacktester:
                 if mkt not in ('dnb_h', 'dnb_a', 'ah_home', 'ah_away'):
                     result_factor = 1.0 if bet_won else -1.0
 
-                # Determine if odds were synthetic (Phase 1 Transparency)
-                if est_odds is not None:
-                    is_synthetic = True
-                elif mkt.startswith('lay_cs_'):
+                # Determine if odds were synthetic (Phase 2: per-market detection)
+                # est_odds is not None check REMOVED — was too broad (tainted all markets in match)
+                if mkt.startswith('lay_cs_'):
                     is_synthetic = True
                 elif mkt == 'dnb_h' and ('odds_dnb_h_real' in locals() and pd.isna(odds_dnb_h_real)):
                     is_synthetic = True
@@ -1466,9 +1478,9 @@ class ChronologicalBacktester:
                             elif staking_rule == 'kelly':
                                 mult_k = stake_value
                                 
-                                # Kelly Criterion = (p * b - 1) / (b - 1)
-                                if bookie_odds > 1.0:
-                                    f_star = (model_prob * bookie_odds - 1.0) / (bookie_odds - 1.0)
+                                # Kelly Criterion = (p * b - 1) / (b - 1), usando effective_odds para consistência com EV
+                                if effective_odds > 1.0:
+                                    f_star = (model_prob * effective_odds - 1.0) / (effective_odds - 1.0)
                                     f_star = max(0.0, f_star) # No short selling
                                     stake = bankroll * f_star * mult_k
                                     stake = min(stake, bankroll * 0.05) # Cap at 5% of bankroll
@@ -1492,9 +1504,9 @@ class ChronologicalBacktester:
 
                                 if bet_won:
                                     if mkt.endswith('_ex'):
-                                        profit = stake / (bookie_odds - 1.0) if bookie_odds > 1.001 else 0.0
+                                        profit = stake / (effective_odds - 1.0) if effective_odds > 1.001 else 0.0
                                     else:
-                                        profit = stake * (bookie_odds - 1.0)
+                                        profit = stake * (effective_odds - 1.0)
                                     # Aplicar comissão de exchange em apostas Lay ganhas
                                     if exchange_commission > 0 and (mkt.startswith('lay') or mkt.endswith('_ex')):
                                         profit = profit * (1 - exchange_commission / 100)
@@ -1523,9 +1535,9 @@ class ChronologicalBacktester:
                                     staked_fixed += st_fixed
                                     if bet_won:
                                         if mkt.endswith('_ex'):
-                                            bankroll_fixed += st_fixed / (bookie_odds - 1.0) if bookie_odds > 1.001 else 0.0
+                                            bankroll_fixed += st_fixed / (effective_odds - 1.0) if effective_odds > 1.001 else 0.0
                                         else:
-                                            bankroll_fixed += st_fixed * (bookie_odds - 1.0)
+                                            bankroll_fixed += st_fixed * (effective_odds - 1.0)
                                         wins_fixed += 1
                                     else:
                                         bankroll_fixed -= st_fixed
@@ -1551,9 +1563,9 @@ class ChronologicalBacktester:
                                     staked_prop += st_prop
                                     if bet_won:
                                         if mkt.endswith('_ex'):
-                                            bankroll_proportional += st_prop / (bookie_odds - 1.0) if bookie_odds > 1.001 else 0.0
+                                            bankroll_proportional += st_prop / (effective_odds - 1.0) if effective_odds > 1.001 else 0.0
                                         else:
-                                            bankroll_proportional += st_prop * (bookie_odds - 1.0)
+                                            bankroll_proportional += st_prop * (effective_odds - 1.0)
                                         wins_prop += 1
                                     else:
                                         bankroll_proportional -= st_prop
@@ -1575,11 +1587,11 @@ class ChronologicalBacktester:
                                 mult_k = 0.25
                                 if staking_rule == 'kelly': mult_k = stake_value
 
-                                if bookie_odds > 1.0:
+                                if effective_odds > 1.0:
                                     if mkt.endswith('_ex'):
-                                        f_star = model_prob - (1.0 - model_prob) / (bookie_odds - 1.0)
+                                        f_star = model_prob - (1.0 - model_prob) / (effective_odds - 1.0)
                                     else:
-                                        f_star = (model_prob * bookie_odds - 1.0) / (bookie_odds - 1.0)
+                                        f_star = (model_prob * effective_odds - 1.0) / (effective_odds - 1.0)
                                     f_star = max(0.0, f_star)
                                     st_kelly = bankroll_kelly * f_star * mult_k
                                     st_kelly = min(st_kelly, bankroll_kelly * 0.05)
@@ -1591,9 +1603,9 @@ class ChronologicalBacktester:
                                     staked_kelly += st_kelly
                                     if bet_won:
                                         if mkt.endswith('_ex'):
-                                            bankroll_kelly += st_kelly / (bookie_odds - 1.0) if bookie_odds > 1.001 else 0.0
+                                            bankroll_kelly += st_kelly / (effective_odds - 1.0) if effective_odds > 1.001 else 0.0
                                         else:
-                                            bankroll_kelly += st_kelly * (bookie_odds - 1.0)
+                                            bankroll_kelly += st_kelly * (effective_odds - 1.0)
                                         wins_kelly += 1
                                     else:
                                         bankroll_kelly -= st_kelly
@@ -1629,7 +1641,7 @@ class ChronologicalBacktester:
                                     closing_odd = closing_odds_under25
                                 
                                 if closing_odd and not pd.isna(closing_odd) and closing_odd > 1.0:
-                                    clv = (bookie_odds / closing_odd - 1.0) * 100  # as percentage
+                                    clv = (effective_odds / closing_odd - 1.0) * 100  # as percentage
 
                                 bets_record.append({
                                     'date': match_date.strftime('%Y-%m-%d'),
@@ -1652,6 +1664,7 @@ class ChronologicalBacktester:
                                     'odds_over25': round(odds_over25, 2) if (odds_over25 and not pd.isna(odds_over25)) else None,
                                     'odds_under25': round(odds_under25, 2) if (odds_under25 and not pd.isna(odds_under25)) else None,
                                     'is_synthetic': is_synthetic,
+                                    'is_oos': (oos_cutoff_dt is not None and match_date >= oos_cutoff_dt),
                                     'ml_applied': ml_applied
                                 })
 
@@ -1665,13 +1678,19 @@ class ChronologicalBacktester:
                     self.stacking_history[mkt]['xgb'].append(ml_prob)
                     self.stacking_history[mkt]['outcomes'].append(1 if bet_won else 0)
                             
+            # Model freeze for true Out-of-Sample: after the cutoff date, stop refitting
+            # calibrators, ML ensembles, and stacking learners so that subsequent bets
+            # are made with models that have never seen this data.
+            if oos_cutoff_dt is not None and match_date >= oos_cutoff_dt:
+                models_frozen = True
+
             # Fit Calibration Periodically
             # NOTE: threshold raised from 50 → 200 to avoid fitting the Platt
             # scaler on pure noise when sample sizes are small. Below 200 obs
             # the scaler was learning random variance, not a real calibration
             # signal, and could make well-calibrated Poisson probs worse.
             self.matches_since_calibration += 1
-            if self.matches_since_calibration >= 100:
+            if not models_frozen and self.matches_since_calibration >= 100:
                 self.matches_since_calibration = 0
                 for c_mkt, hist in self.calibration_history.items():
                     if len(hist['probs']) > 2000:
@@ -1681,11 +1700,11 @@ class ChronologicalBacktester:
                         if c_mkt not in self.calibrators:
                             self.calibrators[c_mkt] = IsotonicCalibrator(epochs=200)
                         self.calibrators[c_mkt].fit(hist['probs'], hist['outcomes'])
-                        
+
             # Fit ML Ensemble Periodically
-            if use_ml:
+            if use_ml and not models_frozen:
                 self.matches_since_ml_fit += 1
-            if self.matches_since_ml_fit >= 300:
+            if not models_frozen and self.matches_since_ml_fit >= 300:
                 self.matches_since_ml_fit = 0
                 for c_mkt, hist in self.ml_history.items():
                     if len(hist['X']) > 3000:
@@ -1697,9 +1716,9 @@ class ChronologicalBacktester:
                         self.ml_ensembles[c_mkt].fit(hist['X'], hist['y'])
 
             # Fit Stacking Meta-Learner Periodically
-            if use_ml:
+            if use_ml and not models_frozen:
                 self.matches_since_stacking_fit += 1
-            if self.matches_since_stacking_fit >= 500:
+            if not models_frozen and self.matches_since_stacking_fit >= 500:
                 self.matches_since_stacking_fit = 0
                 for s_mkt, s_hist in self.stacking_history.items():
                     if len(s_hist['poisson']) > 4000:
@@ -1928,6 +1947,10 @@ class ChronologicalBacktester:
             fthg = row['FTHG']
             ftag = row['FTAG']
             ftr = row['FTR']
+            
+            if pd.isna(fthg) or pd.isna(ftag):
+                continue
+                
             # Precompute booleans once per row (avoids repeated string comparisons in bet evaluation)
             is_home_win = (ftr == 'H')
             is_away_win = (ftr == 'A')
@@ -1936,9 +1959,6 @@ class ChronologicalBacktester:
             
             hthg = row.get('HTHG')
             htag = row.get('HTAG')
-            
-            if pd.isna(fthg) or pd.isna(ftag):
-                continue
                 
             # Skip heavy calculations for warm-up matches
             hst = row.get('HST')
