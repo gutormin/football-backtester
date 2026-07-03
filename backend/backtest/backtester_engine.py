@@ -2454,16 +2454,25 @@ class ChronologicalBacktester:
                         est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
                     
                     if mkt == 'over15':
+                        if odds_over15 is not None and not pd.isna(odds_over15) and odds_over15 > 1.0:
+                            bookie_odds = odds_over15
+                        else:
+                            bookie_odds = est_odds['bookie_over_15']
                         model_prob = prob_over_15
-                        bookie_odds = est_odds['bookie_over_15']
                         bet_won = (total_goals > 1)
                     elif mkt == 'over35':
+                        if odds_over35 is not None and not pd.isna(odds_over35) and odds_over35 > 1.0:
+                            bookie_odds = odds_over35
+                        else:
+                            bookie_odds = est_odds['bookie_over_35']
                         model_prob = prob_over_35
-                        bookie_odds = est_odds['bookie_over_35']
                         bet_won = (total_goals > 3)
                     elif mkt == 'under35':
+                        if odds_under35 is not None and not pd.isna(odds_under35) and odds_under35 > 1.0:
+                            bookie_odds = odds_under35
+                        else:
+                            bookie_odds = est_odds['bookie_under_35']
                         model_prob = 1.0 - prob_over_35
-                        bookie_odds = est_odds['bookie_under_35']
                         bet_won = (total_goals < 4)
                     elif mkt == 'over45':
                         model_prob = prob_over_45
