@@ -967,6 +967,20 @@ def fetch_futpython_data(league_code, start_date, api_key):
         cache_filename = f"futpython_{pais}_{liga.replace('/', '_')}_{temp}.csv"
         cache_path = os.path.join(DATA_DIR, cache_filename)
         
+        # Bypasses: 
+        # 1. On Render (API is blocked/unreachable): load cache immediately to avoid timeout delay.
+        # 2. Past seasons (completed/fixed data): load cache immediately to speed up local backtests.
+        is_current_season = temp in ["2025-2026", "2026", "2026-2027"]
+        on_render = os.environ.get("RENDER") is not None
+        
+        if (on_render or not is_current_season) and os.path.exists(cache_path) and os.path.getsize(cache_path) > 250:
+            try:
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    cached_text = f.read()
+                return temp, 200, cached_text
+            except Exception:
+                pass
+                
         try:
             res = requests.get(url, timeout=12, proxies=proxies)
             if res.status_code == 200 and not res.text.strip().startswith("{"):
