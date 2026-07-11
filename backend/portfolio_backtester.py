@@ -253,7 +253,7 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
         bet_odds = float(b.get('odds', 2.0))
         prob = float(b.get('prob', 50.0)) / 100.0
         bet_won = bool(b.get('won', False))
-        bet_mkt = str(b.get('market', ''))
+        bet_mkt = str(b.get('market_code', b.get('market', '')))
 
         # Use strategy's allocated bankroll and tier-specific cap
         strat_bankroll = strategy_stats[sid]['allocated_bankroll']

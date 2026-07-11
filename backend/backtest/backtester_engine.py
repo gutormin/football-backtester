@@ -1582,6 +1582,7 @@ class ChronologicalBacktester:
                                     'away_team': away_team,
                                     'score': f"{int(fthg)}-{int(ftag)}",
                                     'market': market_label,
+                                    'market_code': mkt,
                                     'odds': round(bookie_odds, 2),
                                     'prob': round(model_prob * 100, 1),
                                     'ev': round(expected_value, 2),
