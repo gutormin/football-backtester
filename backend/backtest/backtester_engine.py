@@ -1349,31 +1349,59 @@ class ChronologicalBacktester:
                             else:
                                 stake = 0.0
 
+                            # ── Lay conversion: user configures LIABILITY (max loss), not backer's stake ──
+                            # Fixed: stake_value is the liability in $
+                            # Proportional: stake_value% of bankroll is the liability
+                            # Kelly: formula already produces correct backer's stake fraction — convert to liability for caps
+                            lay_liability = None
+                            if mkt.startswith('lay_') and effective_odds > 1.001 and stake > 0:
+                                if staking_rule in ('fixed', 'proportional'):
+                                    lay_liability = stake  # user intended this as max loss
+                                    stake = lay_liability / (effective_odds - 1.0)  # backer's stake
+                                elif staking_rule == 'kelly':
+                                    lay_liability = stake * (effective_odds - 1.0)
+
+                            # Compute exposure value: liability for lay, stake for back
+                            exposure_val = lay_liability if lay_liability is not None else stake
+
                             # Apply intra-day correlation correction (only for Kelly/Proportional)
                             if staking_rule != 'fixed':
                                 # Layer 1: Cross-match diversification (sqrt across distinct matches)
                                 if n_matches_today > 1:
-                                    stake = stake / math.sqrt(n_matches_today)
+                                    exposure_val = exposure_val / math.sqrt(n_matches_today)
+                                    if lay_liability is not None:
+                                        lay_liability = exposure_val
+                                        stake = exposure_val / (effective_odds - 1.0)
 
                                 # Layer 2: Same-match correlation (cap total exposure per match at 5%)
-                                match_exposure = daily_match_exposure[date_str_check][match_key] + stake
+                                match_exposure = daily_match_exposure[date_str_check][match_key] + exposure_val
                                 if match_exposure > bankroll * 0.05:
-                                    stake = max(0, bankroll * 0.05 - daily_match_exposure[date_str_check][match_key])
-                                daily_match_exposure[date_str_check][match_key] += stake
+                                    exposure_val = max(0, bankroll * 0.05 - daily_match_exposure[date_str_check][match_key])
+                                    if lay_liability is not None:
+                                        lay_liability = exposure_val
+                                        stake = exposure_val / (effective_odds - 1.0)
+                                daily_match_exposure[date_str_check][match_key] += exposure_val
 
                                 # Layer 3: Cap daily exposure at 10% of bankroll
-                                if daily_exposure[date_str_check] + stake > bankroll * 0.10:
-                                    stake = max(0, bankroll * 0.10 - daily_exposure[date_str_check])
+                                if daily_exposure[date_str_check] + exposure_val > bankroll * 0.10:
+                                    exposure_val = max(0, bankroll * 0.10 - daily_exposure[date_str_check])
+                                    if lay_liability is not None:
+                                        lay_liability = exposure_val
+                                        stake = exposure_val / (effective_odds - 1.0)
 
                             # Apply drawdown circuit breaker (all staking rules)
                             dd_mult = compute_drawdown_multiplier(bankroll, peak_bankroll)
                             if dd_mult < 1.0:
                                 stake = stake * dd_mult
+                                if lay_liability is not None:
+                                    lay_liability = lay_liability * dd_mult
+                                    exposure_val = lay_liability
 
-                            # Avoid placing bet if stake is tiny or we have no bankroll left
-                            if stake > 0.01 and bankroll >= stake:
+                            # Avoid placing bet if stake is tiny or bankroll can't cover liability
+                            required_capital = exposure_val if lay_liability is not None else stake
+                            if stake > 0.01 and bankroll >= required_capital:
                                 bets_placed += 1
-                                total_staked += stake
+                                total_staked += required_capital
 
                                 if mkt in ('dnb_h', 'dnb_a', 'ah_home', 'ah_away'):
                                     # result_factor: 1.0=win, 0.5=half_win, 0.0=push, -0.5=half_loss, -1.0=loss
@@ -1400,7 +1428,7 @@ class ChronologicalBacktester:
                                     bankroll += profit
 
                                 cumulative_profit += profit
-                                daily_exposure[date_str_check] += stake
+                                daily_exposure[date_str_check] += required_capital
                                 daily_pnl[date_str_check] += profit
 
                                 # Max Drawdown calculation
@@ -1415,20 +1443,23 @@ class ChronologicalBacktester:
 
                                 # 1. Fixed Stake Simulation ($10 or the active stake value if it is fixed)
                                 st_fixed = stake_value if staking_rule == 'fixed' else 10.0
-                                if bankroll_fixed >= st_fixed and st_fixed > 0.01:
+                                # Lay: st_fixed is liability, convert to backer's stake for P&L
+                                st_fixed_bet = st_fixed / (effective_odds - 1.0) if mkt.startswith('lay_') and effective_odds > 1.001 else st_fixed
+                                st_fixed_check = st_fixed if mkt.startswith('lay_') else st_fixed_bet  # bankroll check vs liability
+                                if bankroll_fixed >= st_fixed_check and st_fixed_bet > 0.01:
                                     bets_fixed += 1
-                                    staked_fixed += st_fixed
+                                    staked_fixed += st_fixed_check
                                     if bet_won:
                                         if mkt.startswith('lay_'):
-                                            bankroll_fixed += st_fixed
+                                            bankroll_fixed += st_fixed_bet
                                         else:
-                                            bankroll_fixed += st_fixed * (effective_odds - 1.0)
+                                            bankroll_fixed += st_fixed_bet * (effective_odds - 1.0)
                                         wins_fixed += 1
                                     else:
                                         if mkt.startswith('lay_'):
-                                            bankroll_fixed -= st_fixed * (effective_odds - 1.0)
+                                            bankroll_fixed -= st_fixed_bet * (effective_odds - 1.0)
                                         else:
-                                            bankroll_fixed -= st_fixed
+                                            bankroll_fixed -= st_fixed_bet
 
                                     if bankroll_fixed >= peak_fixed:
                                         peak_fixed = bankroll_fixed
@@ -1446,20 +1477,23 @@ class ChronologicalBacktester:
                                 # 2. Proportional Stake Simulation (2% of current bankroll or the active stake value if proportional)
                                 pct_prop = stake_value if staking_rule == 'proportional' else 2.0
                                 st_prop = bankroll_proportional * (pct_prop / 100.0)
-                                if bankroll_proportional >= st_prop and st_prop > 0.01:
+                                # Lay: st_prop is liability, convert to backer's stake for P&L
+                                st_prop_bet = st_prop / (effective_odds - 1.0) if mkt.startswith('lay_') and effective_odds > 1.001 else st_prop
+                                st_prop_check = st_prop if mkt.startswith('lay_') else st_prop_bet
+                                if bankroll_proportional >= st_prop_check and st_prop_bet > 0.01:
                                     bets_prop += 1
-                                    staked_prop += st_prop
+                                    staked_prop += st_prop_check
                                     if bet_won:
                                         if mkt.startswith('lay_'):
-                                            bankroll_proportional += st_prop
+                                            bankroll_proportional += st_prop_bet
                                         else:
-                                            bankroll_proportional += st_prop * (effective_odds - 1.0)
+                                            bankroll_proportional += st_prop_bet * (effective_odds - 1.0)
                                         wins_prop += 1
                                     else:
                                         if mkt.startswith('lay_'):
-                                            bankroll_proportional -= st_prop * (effective_odds - 1.0)
+                                            bankroll_proportional -= st_prop_bet * (effective_odds - 1.0)
                                         else:
-                                            bankroll_proportional -= st_prop
+                                            bankroll_proportional -= st_prop_bet
 
                                     if bankroll_proportional >= peak_prop:
                                         peak_prop = bankroll_proportional
@@ -1492,9 +1526,10 @@ class ChronologicalBacktester:
                                 else:
                                     st_kelly = 0.0
 
-                                if bankroll_kelly >= st_kelly and st_kelly > 0.01:
+                                st_kelly_check = st_kelly * (effective_odds - 1.0) if mkt.startswith('lay_') else st_kelly
+                                if bankroll_kelly >= st_kelly_check and st_kelly > 0.01:
                                     bets_kelly += 1
-                                    staked_kelly += st_kelly
+                                    staked_kelly += st_kelly_check
                                     if bet_won:
                                         if mkt.startswith('lay_'):
                                             bankroll_kelly += st_kelly
@@ -1520,8 +1555,8 @@ class ChronologicalBacktester:
                                         max_dd_kelly = dd_kelly
                                     equity_curve_kelly.append({'date': date_str, 'bankroll': round(bankroll_kelly, 2)})
 
-                                # Update daily exposure
-                                daily_exposure[date_str_check] += stake
+                                # Update daily exposure (liability for lay, stake for back)
+                                daily_exposure[date_str_check] += required_capital
 
                                 # Calculate CLV (Closing Line Value)
                                 clv = None
@@ -2803,27 +2838,50 @@ class ChronologicalBacktester:
                 else:
                     p_stake = 0.0
 
+                # ── Lay conversion for fixed/proportional: liability → backer's stake ──
+                p_liability = None
+                if p_mkt.startswith('lay_') and p_odds > 1.001 and p_stake > 0:
+                    if staking_rule in ('fixed', 'proportional'):
+                        p_liability = p_stake
+                        p_stake = p_liability / (p_odds - 1.0)
+                    elif staking_rule == 'kelly':
+                        p_liability = p_stake * (p_odds - 1.0)
+                p_exposure = p_liability if p_liability is not None else p_stake
+
                 # Liquidity cap by league tier × market type (all methods)
                 if staking_rule != 'fixed' and p_stake > 0:
                     liq_cap_pct = get_liquidity_max_stake(league_code, p_mkt, base_stake_pct=10.0)
                     p_stake = min(p_stake, state_ref['bankroll'] * liq_cap_pct / 100.0)
+                    if p_liability is not None:
+                        p_liability = p_stake * (p_odds - 1.0)
+                        p_exposure = p_liability
 
                 if staking_rule != 'fixed':
                     if n_bets_today > 1:
-                        p_stake = p_stake / math.sqrt(n_bets_today)
+                        p_exposure = p_exposure / math.sqrt(n_bets_today)
+                        if p_liability is not None:
+                            p_liability = p_exposure
+                            p_stake = p_exposure / (p_odds - 1.0)
 
-                    if state_ref['daily_exposure'][date_str_check] + p_stake > state_ref['bankroll'] * 0.10:
-                        p_stake = max(0, state_ref['bankroll'] * 0.10 - state_ref['daily_exposure'][date_str_check])
+                    if state_ref['daily_exposure'][date_str_check] + p_exposure > state_ref['bankroll'] * 0.10:
+                        p_exposure = max(0, state_ref['bankroll'] * 0.10 - state_ref['daily_exposure'][date_str_check])
+                        if p_liability is not None:
+                            p_liability = p_exposure
+                            p_stake = p_exposure / (p_odds - 1.0)
 
                 # Apply drawdown circuit breaker
                 dd_mult = compute_drawdown_multiplier(state_ref['bankroll'], state_ref['peak_bankroll'])
                 if dd_mult < 1.0:
                     p_stake = p_stake * dd_mult
+                    if p_liability is not None:
+                        p_liability = p_liability * dd_mult
+                        p_exposure = p_liability
 
-                if p_stake > 0.01 and state_ref['bankroll'] >= p_stake:
+                p_required = p_exposure if p_liability is not None else p_stake
+                if p_stake > 0.01 and state_ref['bankroll'] >= p_required:
                     _exstats["bets_placed"] += 1
-                    state_ref['daily_exposure'][date_str_check] += p_stake
-                    state_ref['total_staked'] += p_stake
+                    state_ref['daily_exposure'][date_str_check] += p_exposure
+                    state_ref['total_staked'] += p_exposure
                     state_ref['total_bets'] += 1
                     
                     if isinstance(p_won, bool):

@@ -791,10 +791,9 @@ def _extract_steam_moves_from_df(
                 executed_odd = max(1.01, current_odd - (opening_odd - current_odd) * sf)
             elif isinstance(resolved_won, tuple):
                 pass  # executed_odd stays as current_odd
-            profit = round((executed_odd - 1.0) * stake_value if won else -stake_value, 2)
+            profit = round(stake_value if won else -stake_value * (executed_odd - 1.0), 2) if mkt.startswith('lay_') else round((executed_odd - 1.0) * stake_value if won else -stake_value, 2)
 
         return {
-            'date': date_str,
             'match': match_str,
             'league_code': lcode,
             'bookmaker': bookie,
@@ -1290,12 +1289,13 @@ def calculate_clv_weighted_kelly(
 
     # ── Estimate edge ──────────────────────────────────────────────
     if model_prob is not None and model_prob > 0:
-        # Full Kelly: f* = (p*b - q) / b = (p*odds - 1) / (odds - 1)
-        edge = model_prob * current_odd - 1.0
-        if edge > 0:
-            full_kelly = edge / (current_odd - 1.0)
+        # Full Kelly: lay vs back
+        if market.startswith('lay_'):
+            edge = model_prob  # edge = probability of winning the lay
+            full_kelly = model_prob / (current_odd - 1.0) - (1.0 - model_prob) if current_odd > 1.001 else 0.0
         else:
-            full_kelly = 0.0
+            edge = model_prob * current_odd - 1.0
+            full_kelly = edge / (current_odd - 1.0) if current_odd > 1.0 else 0.0
     elif len(clv_values) >= 5 and mean_clv > 0:
         # Estimate edge from CLV: if we consistently beat closing by X%,
         # our edge is approximately X% (simplified)
@@ -1446,12 +1446,12 @@ class SmartMoneyBacktester:
                 
                 stake = alert.get('stake_value', stake_value)
                 alert['executed_odd'] = round(executed_odd, 3)
-                alert['profit'] = round((executed_odd - 1.0) * stake if won else -stake, 2)
+                alert['profit'] = round((executed_odd - 1.0) * stake if won else -stake, 2) if not mkt.startswith('lay_') else round(stake if won else -stake * (executed_odd - 1.0), 2)
             else:
                 alert['executed_odd'] = round(executed_odd, 3)
                 if won is not None:
                     stake = alert.get('stake_value', stake_value)
-                    alert['profit'] = round((current_odd - 1.0) * stake if won else -stake, 2)
+                    alert['profit'] = round((current_odd - 1.0) * stake if won else -stake, 2) if not mkt.startswith('lay_') else round(stake if won else -stake * (current_odd - 1.0), 2)
 
             # Fallback para alertas sem perfil (por exemplo, antigos salvos na live)
             if 'profile_type' not in alert:

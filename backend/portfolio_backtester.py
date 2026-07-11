@@ -15,14 +15,21 @@ from .ai_predictor import (predict_strategy_sustainability, compute_brier_score,
 from .backtest.helpers import allocate_core_satellite
 
 
-def _get_stake(risk_method, initial_bankroll, current_bankroll, prob, odds, max_stake_pct=10.0):
+def _get_stake(risk_method, initial_bankroll, current_bankroll, prob, odds, max_stake_pct=10.0, market=''):
     """
     Calculate stake for a bet.
 
     For fixed_X% methods: stake base is initial_bankroll (definition of fixed stake).
     For Kelly methods: stake base is current_bankroll to enable compounding.
     Caps via max_stake_pct (overridable per strategy tier).
+
+    For Lay markets with fixed/proportional: the returned value is LIABILITY (max loss),
+    which the caller must convert to backer's stake = liability / (odds - 1).
+    For Lay markets with Kelly: the returned value IS backer's stake (Kelly formula
+    already accounts for lay dynamics).
     """
+    is_lay = market.startswith('lay_') if market else False
+
     if risk_method.startswith('fixed_'):
         try:
             pct = float(risk_method.split('_')[1])
@@ -31,7 +38,10 @@ def _get_stake(risk_method, initial_bankroll, current_bankroll, prob, odds, max_
         stake = initial_bankroll * (pct / 100.0)
     elif risk_method == 'kelly_quarter':
         if odds > 1.0:
-            k_fraction = ((prob * odds) - 1.0) / (odds - 1.0)
+            if is_lay:
+                k_fraction = prob / (odds - 1.0) - (1.0 - prob)
+            else:
+                k_fraction = ((prob * odds) - 1.0) / (odds - 1.0)
             k_fraction = max(0.0, min(k_fraction, 0.20))   # cap at 20% full Kelly
             stake = current_bankroll * (k_fraction / 4.0)  # Quarter-Kelly on current bankroll
         else:
@@ -243,23 +253,41 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
         bet_odds = float(b.get('odds', 2.0))
         prob = float(b.get('prob', 50.0)) / 100.0
         bet_won = bool(b.get('won', False))
+        bet_mkt = str(b.get('market', ''))
 
         # Use strategy's allocated bankroll and tier-specific cap
         strat_bankroll = strategy_stats[sid]['allocated_bankroll']
         max_stake_pct = strategy_stats[sid]['max_stake_pct']
 
-        stake = _get_stake(risk_method, initial_bankroll, strat_bankroll, prob, bet_odds, max_stake_pct=max_stake_pct)
+        stake = _get_stake(risk_method, initial_bankroll, strat_bankroll, prob, bet_odds, max_stake_pct=max_stake_pct, market=bet_mkt)
 
-        if strat_bankroll < stake or strat_bankroll < 1.0:
+        # ── Lay liability conversion: user configures LIABILITY (max loss), not backer's stake ──
+        lay_liability = None
+        if bet_mkt.startswith('lay_') and bet_odds > 1.001 and stake > 0:
+            if risk_method.startswith('fixed_'):
+                lay_liability = stake  # user intended this as max loss
+                stake = lay_liability / (bet_odds - 1.0)  # backer's stake
+            elif risk_method == 'kelly_quarter':
+                lay_liability = stake * (bet_odds - 1.0)  # Kelly already backer's stake
+
+        # Bankroll check: for lay, verify against liability
+        required = lay_liability if lay_liability is not None else stake
+        if strat_bankroll < required or strat_bankroll < 1.0:
             b['stake'] = 0.0
             b['profit'] = 0.0
             continue
 
-        # Correct profit calculation: outcome × odds
-        if bet_won:
-            profit = stake * (bet_odds - 1.0)
+        # Profit calculation: lay vs back
+        if bet_mkt.startswith('lay_'):
+            if bet_won:
+                profit = stake  # keep backer's stake
+            else:
+                profit = -stake * (bet_odds - 1.0)  # lose liability
         else:
-            profit = -stake
+            if bet_won:
+                profit = stake * (bet_odds - 1.0)
+            else:
+                profit = -stake
 
         b['stake'] = round(stake, 2)
         b['profit'] = round(profit, 2)
@@ -285,9 +313,10 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
         if dd > max_drawdown:
             max_drawdown = dd
 
-        # Strategy stats
+        # Strategy stats — track liability (capital at risk) for lay
+        capital_at_risk = lay_liability if lay_liability is not None else stake
         strategy_stats[sid]['bets'] += 1
-        strategy_stats[sid]['staked'] += stake
+        strategy_stats[sid]['staked'] += capital_at_risk
         strategy_stats[sid]['profit'] += profit
         if bet_won:
             strategy_stats[sid]['wins'] += 1

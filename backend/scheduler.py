@@ -320,10 +320,13 @@ async def run_automatic_tips_scan():
                 
             return m_prob, b_odds, m_label
 
-        def calculate_stake_pct(rule, val, bankroll, prob, odds):
+        def calculate_stake_pct(rule, val, bankroll, prob, odds, mkt=''):
             pct = 0.0
             if rule == 'kelly':
-                f_star = (prob * odds - 1.0) / (odds - 1.0)
+                if mkt.startswith('lay_'):
+                    f_star = prob / (odds - 1.0) - (1.0 - prob)
+                else:
+                    f_star = (prob * odds - 1.0) / (odds - 1.0)
                 pct = max(0.0, f_star) * val * 100.0
                 pct = min(pct, 10.0)
             elif rule == 'proportional':
@@ -390,7 +393,7 @@ async def run_automatic_tips_scan():
                     if dup_key in sent_lookup:
                         continue
                         
-                    stake_pct = calculate_stake_pct(staking_rule_manual, stake_value_manual, initial_bankroll_manual, m_prob, b_odds)
+                    stake_pct = calculate_stake_pct(staking_rule_manual, stake_value_manual, initial_bankroll_manual, m_prob, b_odds, market)
                     
                     league_name = code_to_name.get(league_code, league_code)
                     time_str = str(row.get('Time')) if not pd.isna(row.get('Time')) else '00:00'
@@ -480,7 +483,7 @@ async def run_automatic_tips_scan():
                         if dup_key in sent_lookup:
                             continue
                             
-                        stake_pct = calculate_stake_pct(staking_rule, stake_value, initial_bankroll, m_prob, b_odds)
+                        stake_pct = calculate_stake_pct(staking_rule, stake_value, initial_bankroll, m_prob, b_odds, market)
                         
                         league_name = code_to_name.get(league_code, league_code)
                         time_str = str(row.get('Time')) if not pd.isna(row.get('Time')) else '00:00'
