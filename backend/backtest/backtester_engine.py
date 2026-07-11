@@ -1,8 +1,11 @@
 import pandas as pd
 import numpy as np
 import math
+import logging
 from datetime import datetime
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 from ..data_loader import load_league_data, get_all_available_leagues
 from ..ai_predictor import (predict_strategy_sustainability, compute_brier_score, 
                            compute_bootstrap_ci, compute_power_analysis, compute_rolling_roi, 
@@ -10,8 +13,10 @@ from ..ai_predictor import (predict_strategy_sustainability, compute_brier_score
 from ..calibration import IsotonicCalibrator
 from ..ml_ensemble import MLEnsemble, StackingMetaLearner
 from ..elo_model import EloTracker, estimate_dynamic_rho
-from ..models import PoissonModel, estimate_bookmaker_odds, calculate_ah_probabilities, get_fair_ah_odds
-from .helpers import weighted_mean, solve_kelly_multi, compute_slippage_factor, compute_corners_probs, get_league_weighted_decay
+from ..models import estimate_bookmaker_odds, calculate_ah_probabilities, get_fair_ah_odds
+from ..probability_pipeline import ProbabilityPipeline, MODEL_POISSON, MODEL_NEGATIVE_BINOMIAL
+from ..constants import ELO_K_FACTOR, ELO_HOME_ADVANTAGE, RHO_CACHE_INVALIDATION_MATCHES
+from .helpers import weighted_mean, solve_kelly_multi, compute_slippage_factor, compute_corners_probs, get_league_weighted_decay, compute_drawdown_multiplier, compute_edge_scaled_cap, get_liquidity_max_stake, compute_dynamic_kelly_fraction
 from .form_tracker import update_form, calculate_xg_ratings, calculate_motivation
 from .metrics import compile_backtest_summary, compile_parallel_scan_summary
 
@@ -53,7 +58,45 @@ class ChronologicalBacktester:
         self.stacking_history = defaultdict(lambda: {'poisson': [], 'xgb': [], 'outcomes': []})
         self.matches_since_stacking_fit = 0
 
-    def run(self, leagues, start_date, end_date, market, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', odds_timing='closing', run_monte_carlo=True, min_odds=1.0, max_odds=2.50, exchange_commission=0.0, use_ml=False, data_source='football-data', futpython_api_key='', min_odds_h=None, max_odds_h=None, min_odds_d=None, max_odds_d=None, min_odds_a=None, max_odds_a=None, min_odds_over25=None, max_odds_over25=None, min_odds_under25=None, max_odds_under25=None, slippage=None, oos_split_pct=20.0, oos_date_cutoff=None):
+    def export_state(self):
+        """Export engine state for walk-forward continuity between folds."""
+        import copy
+        return {
+            'calibrators': copy.deepcopy(self.calibrators),
+            'calibration_history': copy.deepcopy(dict(self.calibration_history)),
+            'ml_ensembles': copy.deepcopy(self.ml_ensembles),
+            'ml_history': copy.deepcopy(dict(self.ml_history)),
+            'stacking_learners': copy.deepcopy(self.stacking_learners),
+            'stacking_history': copy.deepcopy(dict(self.stacking_history)),
+            'matches_since_calibration': self.matches_since_calibration,
+            'matches_since_ml_fit': self.matches_since_ml_fit,
+            'matches_since_stacking_fit': self.matches_since_stacking_fit,
+        }
+
+    def transfer_state(self, state):
+        """Transfer engine state from a previous walk-forward fold."""
+        if state is None:
+            return
+        self.calibrators = state.get('calibrators', {})
+        self.calibration_history = defaultdict(
+            lambda: {'probs': [], 'outcomes': []},
+            {k: dict(v) for k, v in state.get('calibration_history', {}).items()}
+        )
+        self.ml_ensembles = state.get('ml_ensembles', {})
+        self.ml_history = defaultdict(
+            lambda: {'X': [], 'y': []},
+            {k: dict(v) for k, v in state.get('ml_history', {}).items()}
+        )
+        self.stacking_learners = state.get('stacking_learners', {})
+        self.stacking_history = defaultdict(
+            lambda: {'poisson': [], 'xgb': [], 'outcomes': []},
+            {k: dict(v) for k, v in state.get('stacking_history', {}).items()}
+        )
+        self.matches_since_calibration = state.get('matches_since_calibration', 0)
+        self.matches_since_ml_fit = state.get('matches_since_ml_fit', 0)
+        self.matches_since_stacking_fit = state.get('matches_since_stacking_fit', 0)
+
+    def run(self, leagues, start_date, end_date, market, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', odds_timing='closing', run_monte_carlo=True, min_odds=1.0, max_odds=2.50, exchange_commission=0.0, use_ml=False, data_source='football-data', futpython_api_key='', min_odds_h=None, max_odds_h=None, min_odds_d=None, max_odds_d=None, min_odds_a=None, max_odds_a=None, min_odds_over25=None, max_odds_over25=None, min_odds_under25=None, max_odds_under25=None, slippage=None, oos_split_pct=20.0, oos_date_cutoff=None, model_type=MODEL_POISSON):
         """
         Runs a chronological backtest across selected leagues.
         
@@ -67,6 +110,16 @@ class ChronologicalBacktester:
         stake_value: float (fixed amount, % of bankroll, or kelly multiplier)
         odds_source: 'B365' or 'Avg' or 'Max'
         """
+        # Normalize odds_source (frontend sends lowercase like 'bet365')
+        if odds_source:
+            _os = odds_source.lower()
+            if _os in ('b365', 'bet365'):
+                odds_source = 'B365'
+            elif _os in ('avg', 'average', 'market_average', 'market'):
+                odds_source = 'Avg'
+            elif _os in ('max', 'pinnacle', 'maximum'):
+                odds_source = 'Max'
+
         # 1. Load data for all selected leagues
         all_matches = []
         for league_code in leagues:
@@ -80,7 +133,18 @@ class ChronologicalBacktester:
         # Combine all matches and sort chronologically
         combined_df = pd.concat(all_matches, ignore_index=True)
         combined_df = combined_df.sort_values(by=['Date', 'Time']).reset_index(drop=True)
-        
+
+        # Pre-compute league-average xG for fallback when match xG is missing
+        _league_xg_fallback = {}
+        for _lc in leagues:
+            _ldf = combined_df[combined_df['LeagueCode'] == _lc]
+            _hxg = _ldf['HomeXG'].dropna()
+            _axg = _ldf['AwayXG'].dropna()
+            _league_xg_fallback[_lc] = {
+                'home': float(_hxg.mean()) if len(_hxg) > 10 else 1.45,
+                'away': float(_axg.mean()) if len(_axg) > 10 else 1.15,
+            }
+
         # 2. Setup state trackers for rolling form (Chronological O(M) simulation)
         # We track goals scored and conceded for home and away separately
         team_home_scored = defaultdict(list)
@@ -183,22 +247,41 @@ class ChronologicalBacktester:
         oos_cutoff_dt = pd.to_datetime(oos_date_cutoff) if oos_date_cutoff else None
         models_frozen = False
 
-        poisson = PoissonModel()
-        elo_tracker = EloTracker(k_factor=20, home_advantage=65)
+        self.probability_pipeline = ProbabilityPipeline(model_type=model_type)
+        elo_tracker = EloTracker(k_factor=ELO_K_FACTOR, home_advantage=ELO_HOME_ADVANTAGE)
         league_rho_cache = {}  # Cache rho per league
         league_goals_for_rho = defaultdict(lambda: {'h': [], 'a': [], 'lh': [], 'la': []})
         daily_exposure = defaultdict(float)  # Track daily total stake exposure
         daily_bet_count = defaultdict(int)  # Track number of bets per day
-        
+        daily_match_exposure = defaultdict(lambda: defaultdict(float))  # date -> match_key -> per-match stake
+        daily_match_count = defaultdict(lambda: defaultdict(int))       # date -> match_key -> num bets
+        daily_pnl = defaultdict(float)      # Track daily profit/loss for EWMA volatility
+        all_daily_returns = []              # Sequential daily returns for regime detection
+        prev_date = None                    # Track previous match date to detect day boundaries
+        day_start_bankroll = initial_bankroll  # Bankroll at start of current day for return calc
+
         last_match_date = {}
         season_points = defaultdict(lambda: defaultdict(int))
         season_games = defaultdict(lambda: defaultdict(int))
         
         # 3. Chronological iteration
-        # Initialize Phase 1 warning counters
-        games_evaluated_total = 0
-        games_skipped_nan = 0
-        games_skipped_filter = 0
+        # Exclusion tracking — makes selection bias visible
+        matches_total_in_file = len(combined_df)
+        # Extract seasons analyzed
+        season_col = combined_df['Season'].dropna().unique() if 'Season' in combined_df.columns else []
+        if len(season_col) == 1 and season_col[0] == 'All':
+            seasons_sorted = [int(y) for y in sorted(combined_df['Date'].dt.year.unique())]
+        else:
+            seasons_sorted = sorted(set(str(s) for s in season_col if s != 'All'))
+        seasons_analyzed = seasons_sorted if seasons_sorted else ['?']
+        matches_skipped_unplayed = 0
+        matches_skipped_no_1x2 = 0
+        markets_evaluated_total = 0
+        markets_skipped_nan = 0
+        markets_skipped_ht_no_data = 0
+        markets_skipped_filter = 0
+        markets_skipped_ev = 0
+        bets_placed = 0
 
         # Parametric slippage: base percentage (user override or default)
         if slippage is not None:
@@ -208,6 +291,18 @@ class ChronologicalBacktester:
 
         for row in combined_df.to_dict('records'):
             match_date = row['Date']
+            date_str_check = match_date.strftime('%Y-%m-%d')
+
+            # Detect day boundary: compute daily return for previous day
+            if prev_date is not None and date_str_check != prev_date:
+                if day_start_bankroll > 0:
+                    daily_ret = daily_pnl.get(prev_date, 0.0) / day_start_bankroll
+                    all_daily_returns.append(daily_ret)
+                day_start_bankroll = bankroll
+                prev_date = date_str_check
+            elif prev_date is None:
+                prev_date = date_str_check
+
             league_code = row['LeagueCode']
             _decay = get_league_weighted_decay(league_code)
             home_team = row['HomeTeam']
@@ -215,9 +310,10 @@ class ChronologicalBacktester:
             fthg = row['FTHG']
             ftag = row['FTAG']
             ftr = row['FTR']
-            
+
             # Skip matches that haven't been played yet (missing scores)
             if pd.isna(fthg) or pd.isna(ftag):
+                matches_skipped_unplayed += 1
                 continue
                 
             # Precompute booleans once per row (avoids repeated string comparisons in bet evaluation)
@@ -235,11 +331,11 @@ class ChronologicalBacktester:
             hxg = row.get('HomeXG')
             axg = row.get('AwayXG')
             
-            # xG Fallback logic
+            # xG Fallback: use SOT*0.33 first, then league-average xG (NOT actual goals)
             if pd.isna(hxg) or hxg == 0:
-                hxg = (hst * 0.33) if not pd.isna(hst) else (fthg * 0.9)
+                hxg = (hst * 0.33) if (not pd.isna(hst) and hst > 0) else _league_xg_fallback.get(league_code, {}).get('home', 1.45)
             if pd.isna(axg) or axg == 0:
-                axg = (ast * 0.33) if not pd.isna(ast) else (ftag * 0.9)
+                axg = (ast * 0.33) if (not pd.isna(ast) and ast > 0) else _league_xg_fallback.get(league_code, {}).get('away', 1.15)
                 
             # Calculate rest days (fatigue)
             current_dt = pd.to_datetime(match_date)
@@ -381,10 +477,10 @@ class ChronologicalBacktester:
                     odds_a = row.get('AvgA')
                     odds_over25 = row.get('Avg>2.5')
                     odds_under25 = row.get('Avg<2.5')
-                odds_over05_ht = row.get('B365>0.5HT')
-                odds_under05_ht = row.get('B365<0.5HT')
-                odds_over15_ht = row.get('B365>1.5HT')
-                odds_under15_ht = row.get('B365<1.5HT')
+                odds_over05_ht = row.get('Over_HT_0_5', row.get('B365>0.5HT'))
+                odds_under05_ht = row.get('Under_HT_0_5', row.get('B365<0.5HT'))
+                odds_over15_ht = row.get('Over_HT_1_5', row.get('B365>1.5HT'))
+                odds_under15_ht = row.get('Under_HT_1_5', row.get('B365<1.5HT'))
             else: # Max
                 if odds_timing == 'closing':
                     odds_h = row.get('MaxCH', row.get('MaxH'))
@@ -398,7 +494,12 @@ class ChronologicalBacktester:
                     odds_a = row.get('MaxA')
                     odds_over25 = row.get('Max>2.5')
                     odds_under25 = row.get('Max<2.5')
-                
+
+                odds_over05_ht = row.get('Over_HT_0_5', row.get('B365>0.5HT'))
+                odds_under05_ht = row.get('Under_HT_0_5', row.get('B365<0.5HT'))
+                odds_over15_ht = row.get('Over_HT_1_5', row.get('B365>1.5HT'))
+                odds_under15_ht = row.get('Under_HT_1_5', row.get('B365<1.5HT'))
+
             # Pinnacle closing line odds for CLV calculation
             closing_odds_h = row.get('PSCH', row.get('PSH', row.get('MaxCH')))
             closing_odds_d = row.get('PSCD', row.get('PSD', row.get('MaxCD')))
@@ -435,6 +536,7 @@ class ChronologicalBacktester:
             
             # If standard odds are missing, we cannot proceed with this match
             if pd.isna(odds_h) or pd.isna(odds_d) or pd.isna(odds_a):
+                matches_skipped_no_1x2 += 1
                 # Still record the match result in team histories to keep form up-to-date!
                 self._update_form(team_home_scored, team_home_conceded, team_away_scored, team_away_conceded,
                                   league_home_goals, league_away_goals, league_code, home_team, away_team, fthg, ftag,
@@ -451,281 +553,38 @@ class ChronologicalBacktester:
                                           row.get("HC"), row.get("AC"))
                 continue
                 
-            # Compute predictive probabilities
-            # To avoid bias, we calculate ratings using team history BEFORE this match
-            h_xg_att = 1.0
-            h_xg_def = 1.0
-            a_xg_att = 1.0
-            a_xg_def = 1.0
-            
-            h_scored = team_home_scored[home_team][-self.rolling_games:]
-            h_conceded = team_home_conceded[home_team][-self.rolling_games:]
-            a_scored = team_away_scored[away_team][-self.rolling_games:]
-            a_conceded = team_away_conceded[away_team][-self.rolling_games:]
-            
-            leg_h_goals = league_home_goals[league_code][-100:] # Last 100 league games
-            leg_a_goals = league_away_goals[league_code][-100:]
-            
-            # Fallback to defaults if no history
-            avg_h_goals = np.mean(leg_h_goals) if leg_h_goals else 1.35
-            avg_a_goals = np.mean(leg_a_goals) if leg_a_goals else 1.05
-            
-            h_att_raw = (weighted_mean(h_scored, _decay) / avg_h_goals) if h_scored else 1.0
-            h_def_raw = (weighted_mean(h_conceded, _decay) / avg_a_goals) if h_conceded else 1.0
-            a_att_raw = (weighted_mean(a_scored, _decay) / avg_a_goals) if a_scored else 1.0
-            a_def_raw = (weighted_mean(a_conceded, _decay) / avg_h_goals) if a_conceded else 1.0
-            
-            # Regression to the mean (Shrinkage) to prevent overfitting
-            h_att = 0.70 * h_att_raw + 0.30 * 1.0
-            h_def = 0.70 * h_def_raw + 0.30 * 1.0
-            a_att = 0.70 * a_att_raw + 0.30 * 1.0
-            a_def = 0.70 * a_def_raw + 0.30 * 1.0
-            
-            # Verify and cap (tighter bounds than 0.2 - 4.0)
-            h_att = 1.0 if pd.isna(h_att) else max(0.4, min(2.5, h_att))
-            h_def = 1.0 if pd.isna(h_def) else max(0.4, min(2.5, h_def))
-            a_att = 1.0 if pd.isna(a_att) else max(0.4, min(2.5, a_att))
-            a_def = 1.0 if pd.isna(a_def) else max(0.4, min(2.5, a_def))
-            
-            lambda_goals_home = avg_h_goals * h_att * a_def
-            lambda_goals_away = avg_a_goals * a_att * h_def
-            
-            # HT Goals lambda
-            h_scored_ht = team_home_scored_ht[home_team][-self.rolling_games:]
-            h_conceded_ht = team_home_conceded_ht[home_team][-self.rolling_games:]
-            a_scored_ht = team_away_scored_ht[away_team][-self.rolling_games:]
-            a_conceded_ht = team_away_conceded_ht[away_team][-self.rolling_games:]
-            
-            leg_h_goals_ht = league_home_goals_ht[league_code][-100:]
-            leg_a_goals_ht = league_away_goals_ht[league_code][-100:]
-            
-            avg_h_goals_ht = np.mean(leg_h_goals_ht) if leg_h_goals_ht else (avg_h_goals * 0.45)
-            avg_a_goals_ht = np.mean(leg_a_goals_ht) if leg_a_goals_ht else (avg_a_goals * 0.45)
-            
-            if avg_h_goals_ht == 0: avg_h_goals_ht = 0.6
-            if avg_a_goals_ht == 0: avg_a_goals_ht = 0.45
-            
-            h_att_ht_raw = (weighted_mean(h_scored_ht, _decay) / avg_h_goals_ht) if h_scored_ht else 1.0
-            h_def_ht_raw = (weighted_mean(h_conceded_ht, _decay) / avg_a_goals_ht) if h_conceded_ht else 1.0
-            a_att_ht_raw = (weighted_mean(a_scored_ht, _decay) / avg_a_goals_ht) if a_scored_ht else 1.0
-            a_def_ht_raw = (weighted_mean(a_conceded_ht, _decay) / avg_h_goals_ht) if a_conceded_ht else 1.0
-            
-            # Stronger regression to the mean for HT because data is noisier (lots of 0s)
-            h_att_ht = 0.60 * h_att_ht_raw + 0.40 * 1.0
-            h_def_ht = 0.60 * h_def_ht_raw + 0.40 * 1.0
-            a_att_ht = 0.60 * a_att_ht_raw + 0.40 * 1.0
-            a_def_ht = 0.60 * a_def_ht_raw + 0.40 * 1.0
-            
-            # Tighter caps for HT to prevent extreme probabilities like 99.9%
-            h_att_ht = 1.0 if pd.isna(h_att_ht) else max(0.5, min(2.0, h_att_ht))
-            h_def_ht = 1.0 if pd.isna(h_def_ht) else max(0.5, min(2.0, h_def_ht))
-            a_att_ht = 1.0 if pd.isna(a_att_ht) else max(0.5, min(2.0, a_att_ht))
-            a_def_ht = 1.0 if pd.isna(a_def_ht) else max(0.5, min(2.0, a_def_ht))
-            
-            lambda_home_ht = avg_h_goals_ht * h_att_ht * a_def_ht
-            lambda_away_ht = avg_a_goals_ht * a_att_ht * h_def_ht
-
-            # Gratefully blend with SOT expected goals if shot data is available
-            h_sot_scored = team_home_sot[home_team][-self.rolling_games:]
-            h_sot_conceded = team_home_sot_conceded[home_team][-self.rolling_games:]
-            a_sot_scored = team_away_sot[away_team][-self.rolling_games:]
-            a_sot_conceded = team_away_sot_conceded[away_team][-self.rolling_games:]
-            
-            leg_h_sot = league_home_sot[league_code][-100:]
-            leg_a_sot = league_away_sot[league_code][-100:]
-            
-            has_sot_data = (h_sot_scored and h_sot_conceded and a_sot_scored and a_sot_conceded and leg_h_sot and leg_a_sot)
-            
-            if has_sot_data:
-                avg_h_sot = np.mean(leg_h_sot)
-                avg_a_sot = np.mean(leg_a_sot)
-                
-                # Check for division by zero or NaN
-                if pd.isna(avg_h_sot) or avg_h_sot == 0: avg_h_sot = 4.5
-                if pd.isna(avg_a_sot) or avg_a_sot == 0: avg_a_sot = 3.5
-                
-                h_sot_att_raw = (weighted_mean(h_sot_scored, _decay) / avg_h_sot) if h_sot_scored else 1.0
-                h_sot_def_raw = (weighted_mean(h_sot_conceded, _decay) / avg_a_sot) if h_sot_conceded else 1.0
-                a_sot_att_raw = (weighted_mean(a_sot_scored, _decay) / avg_a_sot) if a_sot_scored else 1.0
-                a_sot_def_raw = (weighted_mean(a_sot_conceded, _decay) / avg_h_sot) if a_sot_conceded else 1.0
-                
-                # Shrinkage
-                h_sot_att = 0.70 * h_sot_att_raw + 0.30 * 1.0
-                h_sot_def = 0.70 * h_sot_def_raw + 0.30 * 1.0
-                a_sot_att = 0.70 * a_sot_att_raw + 0.30 * 1.0
-                a_sot_def = 0.70 * a_sot_def_raw + 0.30 * 1.0
-                
-                # Verify and cap SOT ratings
-                h_sot_att = 1.0 if pd.isna(h_sot_att) else max(0.4, min(2.5, h_sot_att))
-                h_sot_def = 1.0 if pd.isna(h_sot_def) else max(0.4, min(2.5, h_sot_def))
-                a_sot_att = 1.0 if pd.isna(a_sot_att) else max(0.4, min(2.5, a_sot_att))
-                a_sot_def = 1.0 if pd.isna(a_sot_def) else max(0.4, min(2.5, a_sot_def))
-                
-                exp_sot_home = avg_h_sot * h_sot_att * a_sot_def
-                exp_sot_away = avg_a_sot * a_sot_att * h_sot_def
-                
-                # Goals per SOT
-                conversion_home = avg_h_goals / avg_h_sot
-                conversion_away = avg_a_goals / avg_a_sot
-                
-                lambda_shots_home = exp_sot_home * conversion_home
-                lambda_shots_away = exp_sot_away * conversion_away
-                
-                # Cap project shots-based lambda
-                lambda_shots_home = max(0.1, min(5.0, lambda_shots_home))
-                lambda_shots_away = max(0.1, min(5.0, lambda_shots_away))
-                
-                # Calculate Expected Goals (xG) based lambda
-                h_xg_scored = team_home_xg[home_team][-self.rolling_games:]
-                h_xg_conceded = team_home_xg_conceded[home_team][-self.rolling_games:]
-                a_xg_scored = team_away_xg[away_team][-self.rolling_games:]
-                a_xg_conceded = team_away_xg_conceded[away_team][-self.rolling_games:]
-                
-                leg_h_xg = league_home_xg[league_code][-100:]
-                leg_a_xg = league_away_xg[league_code][-100:]
-                
-                has_xg_data = (h_xg_scored and h_xg_conceded and a_xg_scored and a_xg_conceded and leg_h_xg and leg_a_xg)
-                if has_xg_data:
-                    avg_h_xg = np.mean(leg_h_xg)
-                    avg_a_xg = np.mean(leg_a_xg)
-                    if pd.isna(avg_h_xg) or avg_h_xg == 0: avg_h_xg = 1.35
-                    if pd.isna(avg_a_xg) or avg_a_xg == 0: avg_a_xg = 1.05
-                    
-                    h_xg_att_raw = (weighted_mean(h_xg_scored, _decay) / avg_h_xg) if h_xg_scored else 1.0
-                    h_xg_def_raw = (weighted_mean(h_xg_conceded, _decay) / avg_a_xg) if h_xg_conceded else 1.0
-                    a_xg_att_raw = (weighted_mean(a_xg_scored, _decay) / avg_a_xg) if a_xg_scored else 1.0
-                    a_xg_def_raw = (weighted_mean(a_xg_conceded, _decay) / avg_h_xg) if a_xg_conceded else 1.0
-                    
-                    # Shrinkage
-                    h_xg_att = 0.70 * h_xg_att_raw + 0.30 * 1.0
-                    h_xg_def = 0.70 * h_xg_def_raw + 0.30 * 1.0
-                    a_xg_att = 0.70 * a_xg_att_raw + 0.30 * 1.0
-                    a_xg_def = 0.70 * a_xg_def_raw + 0.30 * 1.0
-                    
-                    h_xg_att = 1.0 if pd.isna(h_xg_att) else max(0.4, min(2.5, h_xg_att))
-                    h_xg_def = 1.0 if pd.isna(h_xg_def) else max(0.4, min(2.5, h_xg_def))
-                    a_xg_att = 1.0 if pd.isna(a_xg_att) else max(0.4, min(2.5, a_xg_att))
-                    a_xg_def = 1.0 if pd.isna(a_xg_def) else max(0.4, min(2.5, a_xg_def))
-                    
-                    lambda_xg_home = avg_h_xg * h_xg_att * a_xg_def
-                    lambda_xg_away = avg_a_xg * a_xg_att * h_xg_def
-                    
-                    lambda_xg_home = max(0.1, min(5.0, lambda_xg_home))
-                    lambda_xg_away = max(0.1, min(5.0, lambda_xg_away))
-                    
-                    # BLEND: 50% xG, 30% Shots, 20% Goals
-                    lambda_home = 0.50 * lambda_xg_home + 0.30 * lambda_shots_home + 0.20 * lambda_goals_home
-                    lambda_away = 0.50 * lambda_xg_away + 0.30 * lambda_shots_away + 0.20 * lambda_goals_away
-                else:
-                    # BLEND: 60% Goals, 40% Shots
-                    lambda_home = 0.60 * lambda_goals_home + 0.40 * lambda_shots_home
-                    lambda_away = 0.60 * lambda_goals_away + 0.40 * lambda_shots_away
-                
-                # Apply Elo-based adjustment to lambdas
-                elo_factor_h = elo_tracker.get_elo_factor(home_team, away_team)
-                elo_factor_a = 2.0 - elo_factor_h
-                lambda_home *= elo_factor_h
-                lambda_away *= elo_factor_a
-            else:
-                lambda_home = lambda_goals_home
-                lambda_away = lambda_goals_away
-                # Apply Elo-based adjustment to lambdas (goals only)
-                elo_factor_h = elo_tracker.get_elo_factor(home_team, away_team)
-                elo_factor_a = 2.0 - elo_factor_h
-                lambda_home *= elo_factor_h
-                lambda_away *= elo_factor_a
-                
-            # HARD CAPS for final lambdas to prevent probability artifacts (underflow)
-            lambda_home = max(0.5, min(5.0, lambda_home))
-            lambda_away = max(0.5, min(5.0, lambda_away))
-            
-            # Safe HT lambda caps
-            if 'lambda_home_ht' in locals() and lambda_home_ht is not None:
-                lambda_home_ht = max(0.35, min(2.5, lambda_home_ht))
-            else:
-                lambda_home_ht = 0.5
-                
-            if 'lambda_away_ht' in locals() and lambda_away_ht is not None:
-                lambda_away_ht = max(0.25, min(2.5, lambda_away_ht))
-            else:
-                lambda_away_ht = 0.4
-            
-            # Predict outcome probabilities
-            max_goals = 8
-            home_probs = [math.exp(-lambda_home) * (lambda_home**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-            away_probs = [math.exp(-lambda_away) * (lambda_away**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-            
-            # Compute joint probabilities
-            prob_matrix = np.outer(home_probs, away_probs)
-            
-            # Dynamic rho estimation per league
-            if league_code in league_rho_cache:
-                rho = league_rho_cache[league_code]
-            else:
-                rho_data = league_goals_for_rho[league_code]
-                rho = estimate_dynamic_rho(rho_data['h'], rho_data['a'], rho_data['lh'], rho_data['la'])
-                league_rho_cache[league_code] = rho
-            tau_00 = 1.0 - lambda_home * lambda_away * rho
-            tau_10 = 1.0 + lambda_away * rho
-            tau_01 = 1.0 + lambda_home * rho
-            tau_11 = 1.0 - rho
-            
-            prob_matrix[0, 0] *= max(0.0, tau_00)
-            prob_matrix[1, 0] *= max(0.0, tau_10)
-            prob_matrix[0, 1] *= max(0.0, tau_01)
-            prob_matrix[1, 1] *= max(0.0, tau_11)
-            
-            matrix_sum = np.sum(prob_matrix)
-            if matrix_sum > 0:
-                prob_matrix = prob_matrix / matrix_sum
-            
-            prob_h = float(np.sum(np.tril(prob_matrix, -1))) # x > y (Home Win)
-            prob_d = float(np.sum(np.diag(prob_matrix)))     # x == y (Draw)
-            prob_a = float(np.sum(np.triu(prob_matrix, 1)))  # x < y (Away Win)
-            
-            prob_over_25 = 0.0
-            prob_over_15 = 0.0
-            prob_over_35 = 0.0
-            prob_over_45 = 0.0
-            prob_over_55 = 0.0
-            for x in range(max_goals + 1):
-                for y in range(max_goals + 1):
-                    tot = x + y
-                    if tot > 2: prob_over_25 += prob_matrix[x, y]
-                    if tot > 1: prob_over_15 += prob_matrix[x, y]
-                    if tot > 3: prob_over_35 += prob_matrix[x, y]
-                    if tot > 4: prob_over_45 += prob_matrix[x, y]
-                    if tot > 5: prob_over_55 += prob_matrix[x, y]
-            
-            prob_btts_yes = float(sum(
-                prob_matrix[i, j] for i in range(1, max_goals + 1) for j in range(1, max_goals + 1)
-            ))
-            
-            # HT Probabilities
-            home_probs_ht = [math.exp(-lambda_home_ht) * (lambda_home_ht**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-            away_probs_ht = [math.exp(-lambda_away_ht) * (lambda_away_ht**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-            prob_matrix_ht = np.outer(home_probs_ht, away_probs_ht)
-            
-            tau_00_ht = 1.0 - lambda_home_ht * lambda_away_ht * rho
-            tau_10_ht = 1.0 + lambda_away_ht * rho
-            tau_01_ht = 1.0 + lambda_home_ht * rho
-            tau_11_ht = 1.0 - rho
-            prob_matrix_ht[0, 0] *= max(0.0, tau_00_ht)
-            prob_matrix_ht[1, 0] *= max(0.0, tau_10_ht)
-            prob_matrix_ht[0, 1] *= max(0.0, tau_01_ht)
-            prob_matrix_ht[1, 1] *= max(0.0, tau_11_ht)
-            matrix_sum_ht = np.sum(prob_matrix_ht)
-            if matrix_sum_ht > 0:
-                prob_matrix_ht = prob_matrix_ht / matrix_sum_ht
-                
-            prob_h_ht = float(np.sum(np.tril(prob_matrix_ht, -1)))
-            prob_d_ht = float(np.sum(np.diag(prob_matrix_ht)))
-            prob_a_ht = float(np.sum(np.triu(prob_matrix_ht, 1)))
-            prob_over_05_ht = 1.0 - float(prob_matrix_ht[0, 0])
-            prob_over_15_ht = 0.0
-            for x in range(max_goals + 1):
-                for y in range(max_goals + 1):
-                    if x + y > 1: prob_over_15_ht += prob_matrix_ht[x, y]
+            # Compute predictive probabilities via shared pipeline
+            bundle = self._compute_match_probabilities(
+                team_home_scored, team_home_conceded, team_away_scored, team_away_conceded,
+                league_home_goals, league_away_goals,
+                team_home_sot, team_home_sot_conceded, team_away_sot, team_away_sot_conceded,
+                league_home_sot, league_away_sot,
+                team_home_xg, team_home_xg_conceded, team_away_xg, team_away_xg_conceded,
+                league_home_xg, league_away_xg,
+                team_home_scored_ht, team_home_conceded_ht, team_away_scored_ht,
+                team_away_conceded_ht, league_home_goals_ht, league_away_goals_ht,
+                home_team, away_team, league_code, _decay,
+                league_rho_cache, league_goals_for_rho, elo_tracker
+            )
+            # Unpack all downstream variables
+            lambda_home = bundle['lambda_home']; lambda_away = bundle['lambda_away']
+            lambda_goals_home = bundle['lambda_goals_home']; lambda_goals_away = bundle['lambda_goals_away']
+            lambda_shots_home = bundle['lambda_shots_home']; lambda_shots_away = bundle['lambda_shots_away']
+            lambda_xg_home = bundle['lambda_xg_home']; lambda_xg_away = bundle['lambda_xg_away']
+            lambda_home_ht = bundle['lambda_home_ht']; lambda_away_ht = bundle['lambda_away_ht']
+            h_att = bundle['h_att']; h_def = bundle['h_def']; a_att = bundle['a_att']; a_def = bundle['a_def']
+            h_xg_att = bundle['h_xg_att']; h_xg_def = bundle['h_xg_def']; a_xg_att = bundle['a_xg_att']; a_xg_def = bundle['a_xg_def']
+            elo_factor_h = bundle['elo_factor_h']; elo_factor_a = bundle['elo_factor_a']
+            prob_matrix = bundle['prob_matrix']
+            prob_h = bundle['prob_h']; prob_d = bundle['prob_d']; prob_a = bundle['prob_a']
+            prob_over_25 = bundle['prob_over_25']; prob_over_15 = bundle['prob_over_15']
+            prob_over_35 = bundle['prob_over_35']; prob_over_45 = bundle['prob_over_45']; prob_over_55 = bundle['prob_over_55']
+            prob_btts_yes = bundle['prob_btts_yes']
+            prob_matrix_ht = bundle['prob_matrix_ht']
+            prob_h_ht = bundle['prob_h_ht']; prob_d_ht = bundle['prob_d_ht']; prob_a_ht = bundle['prob_a_ht']
+            prob_over_05_ht = bundle['prob_over_05_ht']; prob_over_15_ht = bundle['prob_over_15_ht']
+            rho = bundle['rho']
+            avg_h_goals = bundle['avg_h_goals']; avg_a_goals = bundle['avg_a_goals']
 
             # Lazy loading of estimated odds from the solver
             est_odds = None
@@ -747,8 +606,11 @@ class ChronologicalBacktester:
                 result_factor = -1.0
                 is_synthetic = False
                 ml_applied = False
+                kelly_probs = None  # populated for multi-outcome markets (DNB, AH)
+                kelly_outcomes = None
 
                 if mkt.startswith('ht_') and (pd.isna(hthg) or pd.isna(htag)):
+                    markets_skipped_ht_no_data += 1
                     continue
 
                 if mkt in ('home', '1x2_home'):
@@ -825,7 +687,7 @@ class ChronologicalBacktester:
                 elif mkt == 'over15':
                     if odds_over15 is not None and not pd.isna(odds_over15) and odds_over15 > 1.0: bookie_odds = odds_over15
                     else:
-                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                         bookie_odds = est_odds['bookie_over_15']
                         is_synthetic = True
                     model_prob = prob_over_15
@@ -835,7 +697,7 @@ class ChronologicalBacktester:
                     if odds_under15 is not None and not pd.isna(odds_under15) and odds_under15 > 1.0: bookie_odds = odds_under15
                     else:
                         if est_odds is None:
-                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                         bookie_odds = est_odds['bookie_under_15']
                         is_synthetic = True
                     model_prob = 1.0 - prob_over_15
@@ -845,7 +707,7 @@ class ChronologicalBacktester:
                     if odds_over35 is not None and not pd.isna(odds_over35) and odds_over35 > 1.0: bookie_odds = odds_over35
                     else:
                         if est_odds is None:
-                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                         bookie_odds = est_odds['bookie_over_35']
                         is_synthetic = True
                     model_prob = prob_over_35
@@ -855,7 +717,7 @@ class ChronologicalBacktester:
                     if odds_under35 is not None and not pd.isna(odds_under35) and odds_under35 > 1.0: bookie_odds = odds_under35
                     else:
                         if est_odds is None:
-                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                         bookie_odds = est_odds['bookie_under_35']
                         is_synthetic = True
                     model_prob = 1.0 - prob_over_35
@@ -865,10 +727,10 @@ class ChronologicalBacktester:
                     model_prob = prob_over_45
                     try:
                         _o45 = float(str(odds_over45).replace(',', '.')) if odds_over45 is not None and not pd.isna(odds_over45) else np.nan
-                        bookie_odds = _o45 if _o45 > 1.0 else (estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away) if est_odds is None else est_odds)['bookie_over_45']
+                        bookie_odds = _o45 if _o45 > 1.0 else (estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho) if est_odds is None else est_odds)['bookie_over_45']
                         if _o45 is None or pd.isna(_o45) or _o45 <= 1.0: is_synthetic = True
                     except Exception:
-                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                         bookie_odds = est_odds['bookie_over_45']
                         is_synthetic = True
                     bet_won = (total_goals > 4)
@@ -877,56 +739,29 @@ class ChronologicalBacktester:
                     model_prob = 1.0 - prob_over_45
                     try:
                         _u45 = float(str(odds_under45).replace(',', '.')) if odds_under45 is not None and not pd.isna(odds_under45) else np.nan
-                        bookie_odds = _u45 if _u45 > 1.0 else (estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away) if est_odds is None else est_odds)['bookie_under_45']
+                        bookie_odds = _u45 if _u45 > 1.0 else (estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho) if est_odds is None else est_odds)['bookie_under_45']
                         if _u45 is None or pd.isna(_u45) or _u45 <= 1.0: is_synthetic = True
                     except Exception:
-                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                         bookie_odds = est_odds['bookie_under_45']
                         is_synthetic = True
                     bet_won = (total_goals < 5)
                     market_label = "Under 4.5"
                 elif mkt == 'over55':
-                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                     model_prob = prob_over_55
                     bookie_odds = est_odds['bookie_over_55']
                     is_synthetic = True
                     bet_won = (total_goals > 5)
                     market_label = "Over 5.5"
                 elif mkt == 'under55':
-                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                     model_prob = 1.0 - prob_over_55
                     bookie_odds = est_odds['bookie_under_55']
                     is_synthetic = True
                     bet_won = (total_goals < 6)
                     market_label = "Under 5.5"
-                elif mkt == 'lay_home':
-                    model_prob = prob_d + prob_a
-                    try:
-                        _dc = float(str(odds_dc_x2).replace(',', '.')) if odds_dc_x2 is not None and not pd.isna(odds_dc_x2) else np.nan
-                        bookie_odds = _dc if _dc > 1.0 else np.nan
-                    except Exception:
-                        bookie_odds = np.nan
-                    bet_won = not is_home_win
-                    market_label = "Contra Mandante (X2)"
-                elif mkt == 'lay_away':
-                    model_prob = prob_h + prob_d
-                    try:
-                        _dc = float(str(odds_dc_1x).replace(',', '.')) if odds_dc_1x is not None and not pd.isna(odds_dc_1x) else np.nan
-                        bookie_odds = _dc if _dc > 1.0 else np.nan
-                    except Exception:
-                        bookie_odds = np.nan
-                    bet_won = not is_away_win
-                    market_label = "Contra Visitante (1X)"
-                elif mkt == 'lay_draw':
-                    model_prob = prob_h + prob_a
-                    try:
-                        _dc = float(str(odds_dc_12).replace(',', '.')) if odds_dc_12 is not None and not pd.isna(odds_dc_12) else np.nan
-                        bookie_odds = _dc if _dc > 1.0 else np.nan
-                    except Exception:
-                        bookie_odds = np.nan
-                    bet_won = not is_draw
-                    market_label = "Contra Empate (12)"
-                elif mkt == 'lay_home_ex':
+                elif mkt in ('lay_home', 'lay_home_ex'):
                     model_prob = prob_d + prob_a
                     try:
                         _dc = float(str(odds_dc_x2).replace(',', '.')) if odds_dc_x2 is not None and not pd.isna(odds_dc_x2) else np.nan
@@ -936,8 +771,10 @@ class ChronologicalBacktester:
                     except Exception:
                         bookie_odds = np.nan
                     bet_won = not is_home_win
-                    market_label = "Lay Mandante"
-                elif mkt == 'lay_away_ex':
+                    market_label = "Lay Mandante (X2)" if mkt.endswith('_ex') else "Contra Mandante (X2)"
+                # lay_home / lay_home_ex, lay_away / lay_away_ex, lay_draw / lay_draw_ex
+                # are identical market pairs (PT vs EN label). Merged to avoid duplicate bets.
+                elif mkt in ('lay_away', 'lay_away_ex'):
                     model_prob = prob_h + prob_d
                     try:
                         _dc = float(str(odds_dc_1x).replace(',', '.')) if odds_dc_1x is not None and not pd.isna(odds_dc_1x) else np.nan
@@ -947,8 +784,8 @@ class ChronologicalBacktester:
                     except Exception:
                         bookie_odds = np.nan
                     bet_won = not is_away_win
-                    market_label = "Lay Visitante"
-                elif mkt == 'lay_draw_ex':
+                    market_label = "Lay Visitante (1X)" if mkt.endswith('_ex') else "Contra Visitante (1X)"
+                elif mkt in ('lay_draw', 'lay_draw_ex'):
                     model_prob = prob_h + prob_a
                     try:
                         _dc = float(str(odds_dc_12).replace(',', '.')) if odds_dc_12 is not None and not pd.isna(odds_dc_12) else np.nan
@@ -958,7 +795,7 @@ class ChronologicalBacktester:
                     except Exception:
                         bookie_odds = np.nan
                     bet_won = not is_draw
-                    market_label = "Lay Empate"
+                    market_label = "Lay Empate (12)" if mkt.endswith('_ex') else "Contra Empate (12)"
                 elif mkt == 'btts_yes':
                     model_prob = prob_btts_yes
                     try:
@@ -978,7 +815,7 @@ class ChronologicalBacktester:
                     bet_won = (fthg == 0 or ftag == 0)
                     market_label = "BTTS Não"
                 elif mkt.startswith('cs_'):
-                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                    if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                     def _get_cs_odd(api_col, fallback_key):
                         """Returns real bookmaker odd from API column, falling back to Poisson estimate."""
                         raw = row.get(api_col)
@@ -1028,7 +865,7 @@ class ChronologicalBacktester:
                         bet_won = (fthg == 1 and ftag == 2)
                         market_label = "Placar Exato 1-2"
                     elif mkt.startswith('lay_cs_'):
-                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        if est_odds is None: est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                         cs_code = mkt.replace('lay_', '')
                         
                         if cs_code == 'cs_10':
@@ -1362,10 +1199,18 @@ class ChronologicalBacktester:
                     is_synthetic = True
                 elif mkt == 'ah_away' and ('odds_ah_a' in locals() and (pd.isna(odds_ah_a) or odds_ah_a <= 1.0)):
                     is_synthetic = True
-                elif mkt in ('lay_home_ex', 'lay_away_ex', 'lay_draw_ex'):
-                    dc_col = 'DC_X2' if mkt == 'lay_home_ex' else ('DC_1X' if mkt == 'lay_away_ex' else 'DC_12')
+                elif mkt in ('lay_home', 'lay_home_ex', 'lay_away', 'lay_away_ex', 'lay_draw', 'lay_draw_ex'):
+                    if mkt.startswith('lay_home'):
+                        dc_col = 'DC_X2'
+                        fallback_ok = (odds_d > 1.0 and odds_a > 1.0)
+                    elif mkt.startswith('lay_away'):
+                        dc_col = 'DC_1X'
+                        fallback_ok = (odds_h > 1.0 and odds_d > 1.0)
+                    else:
+                        dc_col = 'DC_12'
+                        fallback_ok = (odds_h > 1.0 and odds_a > 1.0)
                     _dc_val = row.get(dc_col)
-                    if pd.isna(_dc_val) or float(str(_dc_val).replace(',', '.')) <= 1.0:
+                    if (pd.isna(_dc_val) or float(str(_dc_val).replace(',', '.')) <= 1.0) and not fallback_ok:
                         is_synthetic = True
                 elif mkt.startswith('cs_'):
                     api_col_map = {
@@ -1419,11 +1264,11 @@ class ChronologicalBacktester:
 
                 # If match date is within our backtest active window, evaluate betting
                 if start_dt <= match_date <= end_dt:
-                    games_evaluated_total += 1
-                    
+                    markets_evaluated_total += 1
+
                     is_filtered = False
                     if pd.isna(bookie_odds) or bookie_odds <= 1.0:
-                        games_skipped_nan += 1
+                        markets_skipped_nan += 1
                     else:
                         is_filtered = (
                             (min_odds_h is not None and not pd.isna(odds_h) and odds_h < min_odds_h) or
@@ -1439,7 +1284,7 @@ class ChronologicalBacktester:
                             (bookie_odds < min_odds or bookie_odds > max_odds)
                         )
                         if is_filtered:
-                            games_skipped_filter += 1
+                            markets_skipped_filter += 1
 
                     # We can place a bet if odds are valid and we have a "+EV" (positive expected value) edge
                     if not pd.isna(bookie_odds) and bookie_odds > 1.0:
@@ -1459,15 +1304,17 @@ class ChronologicalBacktester:
                         if bookie_odds < min_odds or bookie_odds > max_odds:
                             continue
 
-                        # Apply parametric slippage (varies by odds and market liquidity)
-                        effective_odds = bookie_odds * compute_slippage_factor(bookie_odds, mkt, slippage_base_pct)
+                        # Apply parametric slippage (varies by odds, market liquidity, and league)
+                        effective_odds = bookie_odds * compute_slippage_factor(bookie_odds, mkt, slippage_base_pct, league_code)
                         expected_value = model_prob * effective_odds
 
                         if expected_value >= value_threshold:
-                            # Intra-day correlation: limit daily exposure
-                            date_str_check = match_date.strftime('%Y-%m-%d')
-                            daily_bet_count[date_str_check] += 1
-                            n_bets_today = daily_bet_count[date_str_check]
+                            # Intra-day correlation: distinguish same-match vs different-match
+                            match_key = f"{home_team}|{away_team}"
+
+                            # Track distinct matches bet today
+                            daily_match_count[date_str_check][match_key] += 1
+                            n_matches_today = len(daily_match_count[date_str_check])
 
                             # Determine bet size (Staking)
                             if staking_rule == 'fixed':
@@ -1477,13 +1324,26 @@ class ChronologicalBacktester:
                                 stake = bankroll * (stake_value / 100.0)
                             elif staking_rule == 'kelly':
                                 mult_k = stake_value
-                                
-                                # Kelly Criterion = (p * b - 1) / (b - 1), usando effective_odds para consistência com EV
+
+                                # Dynamic Kelly: smooth adjustment based on EWMA vol vs target
+                                if all_daily_returns:
+                                    mult_k = compute_dynamic_kelly_fraction(mult_k, all_daily_returns)
+
                                 if effective_odds > 1.0:
-                                    f_star = (model_prob * effective_odds - 1.0) / (effective_odds - 1.0)
-                                    f_star = max(0.0, f_star) # No short selling
+                                    if kelly_probs is not None and kelly_outcomes is not None and len(kelly_probs) > 1:
+                                        f_star = solve_kelly_multi(kelly_probs, kelly_outcomes, max_f=0.20)
+                                    elif mkt.startswith('lay_'):
+                                        f_star = model_prob / (effective_odds - 1.0) - (1.0 - model_prob)
+                                    else:
+                                        f_star = (model_prob * effective_odds - 1.0) / (effective_odds - 1.0)
+                                    f_star = max(0.0, f_star)
                                     stake = bankroll * f_star * mult_k
-                                    stake = min(stake, bankroll * 0.05) # Cap at 5% of bankroll
+                                    # Edge-scaled cap
+                                    cap_pct = compute_edge_scaled_cap(model_prob, effective_odds, mkt)
+                                    stake = min(stake, bankroll * cap_pct / 100.0)
+                                    # Liquidity cap (league + market)
+                                    liq_cap_pct = get_liquidity_max_stake(league_code, mkt, base_stake_pct=5.0)
+                                    stake = min(stake, bankroll * liq_cap_pct / 100.0)
                                 else:
                                     stake = 0.0
                             else:
@@ -1491,32 +1351,57 @@ class ChronologicalBacktester:
 
                             # Apply intra-day correlation correction (only for Kelly/Proportional)
                             if staking_rule != 'fixed':
-                                if n_bets_today > 1:
-                                    stake = stake / math.sqrt(n_bets_today)
-                                
-                                # Cap daily exposure at 10% of bankroll
+                                # Layer 1: Cross-match diversification (sqrt across distinct matches)
+                                if n_matches_today > 1:
+                                    stake = stake / math.sqrt(n_matches_today)
+
+                                # Layer 2: Same-match correlation (cap total exposure per match at 5%)
+                                match_exposure = daily_match_exposure[date_str_check][match_key] + stake
+                                if match_exposure > bankroll * 0.05:
+                                    stake = max(0, bankroll * 0.05 - daily_match_exposure[date_str_check][match_key])
+                                daily_match_exposure[date_str_check][match_key] += stake
+
+                                # Layer 3: Cap daily exposure at 10% of bankroll
                                 if daily_exposure[date_str_check] + stake > bankroll * 0.10:
                                     stake = max(0, bankroll * 0.10 - daily_exposure[date_str_check])
 
+                            # Apply drawdown circuit breaker (all staking rules)
+                            dd_mult = compute_drawdown_multiplier(bankroll, peak_bankroll)
+                            if dd_mult < 1.0:
+                                stake = stake * dd_mult
+
                             # Avoid placing bet if stake is tiny or we have no bankroll left
                             if stake > 0.01 and bankroll >= stake:
+                                bets_placed += 1
                                 total_staked += stake
 
-                                if bet_won:
-                                    if mkt.endswith('_ex'):
-                                        profit = stake / (effective_odds - 1.0) if effective_odds > 1.001 else 0.0
+                                if mkt in ('dnb_h', 'dnb_a', 'ah_home', 'ah_away'):
+                                    # result_factor: 1.0=win, 0.5=half_win, 0.0=push, -0.5=half_loss, -1.0=loss
+                                    if result_factor > 0:
+                                        profit = stake * (effective_odds - 1.0) * result_factor
+                                    elif result_factor < 0:
+                                        profit = stake * result_factor
+                                    else:
+                                        profit = 0.0
+                                    bankroll += profit
+                                elif bet_won:
+                                    if mkt.startswith('lay_'):
+                                        profit = stake
+                                        if exchange_commission > 0:
+                                            profit = profit * (1 - exchange_commission / 100)
                                     else:
                                         profit = stake * (effective_odds - 1.0)
-                                    # Aplicar comissão de exchange em apostas Lay ganhas
-                                    if exchange_commission > 0 and (mkt.startswith('lay') or mkt.endswith('_ex')):
-                                        profit = profit * (1 - exchange_commission / 100)
                                     bankroll += profit
                                 else:
-                                    profit = -stake
+                                    if mkt.startswith('lay_'):
+                                        profit = -stake * (effective_odds - 1.0)
+                                    else:
+                                        profit = -stake
                                     bankroll += profit
 
                                 cumulative_profit += profit
                                 daily_exposure[date_str_check] += stake
+                                daily_pnl[date_str_check] += profit
 
                                 # Max Drawdown calculation
                                 if bankroll > peak_bankroll:
@@ -1534,13 +1419,16 @@ class ChronologicalBacktester:
                                     bets_fixed += 1
                                     staked_fixed += st_fixed
                                     if bet_won:
-                                        if mkt.endswith('_ex'):
-                                            bankroll_fixed += st_fixed / (effective_odds - 1.0) if effective_odds > 1.001 else 0.0
+                                        if mkt.startswith('lay_'):
+                                            bankroll_fixed += st_fixed
                                         else:
                                             bankroll_fixed += st_fixed * (effective_odds - 1.0)
                                         wins_fixed += 1
                                     else:
-                                        bankroll_fixed -= st_fixed
+                                        if mkt.startswith('lay_'):
+                                            bankroll_fixed -= st_fixed * (effective_odds - 1.0)
+                                        else:
+                                            bankroll_fixed -= st_fixed
 
                                     if bankroll_fixed >= peak_fixed:
                                         peak_fixed = bankroll_fixed
@@ -1562,13 +1450,16 @@ class ChronologicalBacktester:
                                     bets_prop += 1
                                     staked_prop += st_prop
                                     if bet_won:
-                                        if mkt.endswith('_ex'):
-                                            bankroll_proportional += st_prop / (effective_odds - 1.0) if effective_odds > 1.001 else 0.0
+                                        if mkt.startswith('lay_'):
+                                            bankroll_proportional += st_prop
                                         else:
                                             bankroll_proportional += st_prop * (effective_odds - 1.0)
                                         wins_prop += 1
                                     else:
-                                        bankroll_proportional -= st_prop
+                                        if mkt.startswith('lay_'):
+                                            bankroll_proportional -= st_prop * (effective_odds - 1.0)
+                                        else:
+                                            bankroll_proportional -= st_prop
 
                                     if bankroll_proportional >= peak_prop:
                                         peak_prop = bankroll_proportional
@@ -1588,8 +1479,11 @@ class ChronologicalBacktester:
                                 if staking_rule == 'kelly': mult_k = stake_value
 
                                 if effective_odds > 1.0:
-                                    if mkt.endswith('_ex'):
-                                        f_star = model_prob - (1.0 - model_prob) / (effective_odds - 1.0)
+                                    if kelly_probs is not None and kelly_outcomes is not None and len(kelly_probs) > 1:
+                                        f_star = solve_kelly_multi(kelly_probs, kelly_outcomes, max_f=0.20)
+                                    elif mkt.startswith('lay_'):
+                                        # Kelly for lay bets: f* = p/(L-1) - (1-p)
+                                        f_star = model_prob / (effective_odds - 1.0) - (1.0 - model_prob)
                                     else:
                                         f_star = (model_prob * effective_odds - 1.0) / (effective_odds - 1.0)
                                     f_star = max(0.0, f_star)
@@ -1602,13 +1496,16 @@ class ChronologicalBacktester:
                                     bets_kelly += 1
                                     staked_kelly += st_kelly
                                     if bet_won:
-                                        if mkt.endswith('_ex'):
-                                            bankroll_kelly += st_kelly / (effective_odds - 1.0) if effective_odds > 1.001 else 0.0
+                                        if mkt.startswith('lay_'):
+                                            bankroll_kelly += st_kelly
                                         else:
                                             bankroll_kelly += st_kelly * (effective_odds - 1.0)
                                         wins_kelly += 1
                                     else:
-                                        bankroll_kelly -= st_kelly
+                                        if mkt.startswith('lay_'):
+                                            bankroll_kelly -= st_kelly * (effective_odds - 1.0)
+                                        else:
+                                            bankroll_kelly -= st_kelly
 
                                     if bankroll_kelly >= peak_kelly:
                                         peak_kelly = bankroll_kelly
@@ -1668,6 +1565,10 @@ class ChronologicalBacktester:
                                     'ml_applied': ml_applied
                                 })
 
+                        else:
+                            # Expected value below threshold — counted as skipped
+                            markets_skipped_ev += 1
+
                 # 3b. NOW store calibration history (after betting decision)
                 self.calibration_history[mkt]['probs'].append(raw_prob)
                 self.calibration_history[mkt]['outcomes'].append(1 if bet_won else 0)
@@ -1710,7 +1611,7 @@ class ChronologicalBacktester:
                     if len(hist['X']) > 3000:
                         hist['X'] = hist['X'][-3000:]
                         hist['y'] = hist['y'][-3000:]
-                    if len(hist['X']) >= 100:
+                    if len(hist['X']) >= 200:  # aligned with MLEnsemble.MIN_SAMPLES_TO_FIT
                         if c_mkt not in self.ml_ensembles:
                             self.ml_ensembles[c_mkt] = MLEnsemble(c_mkt)
                         self.ml_ensembles[c_mkt].fit(hist['X'], hist['y'])
@@ -1746,7 +1647,9 @@ class ChronologicalBacktester:
                                       league_code, home_team, away_team,
                                       row.get('HC'), row.get('AC'))
 
-            elo_tracker.update(home_team, away_team, int(fthg), int(ftag))
+            # Elo and rho updates freeze during OOS to prevent data leakage
+            if not models_frozen:
+                elo_tracker.update(home_team, away_team, int(fthg), int(ftag))
             # Update rho estimation data
             rho_data = league_goals_for_rho[league_code]
             rho_data['h'].append(int(fthg))
@@ -1754,8 +1657,13 @@ class ChronologicalBacktester:
             rho_data['lh'].append(lambda_home if 'lambda_home' in dir() else 1.3)
             rho_data['la'].append(lambda_away if 'lambda_away' in dir() else 1.0)
             # Invalidate rho cache for this league every 50 matches
-            if len(rho_data['h']) % 50 == 0:
+            if len(rho_data['h']) % RHO_CACHE_INVALIDATION_MATCHES == 0:
                 league_rho_cache.pop(league_code, None)
+
+        # Append final day's return after loop ends
+        if prev_date is not None and day_start_bankroll > 0:
+            daily_ret = daily_pnl.get(prev_date, 0.0) / day_start_bankroll
+            all_daily_returns.append(daily_ret)
 
         # Compile performance results
         summary_dict = compile_backtest_summary(
@@ -1773,13 +1681,19 @@ class ChronologicalBacktester:
             slippage_pct=slippage_base_pct
         )
         
-        # Inject Phase 1 warnings and stats directly into the returned payload
-        summary_dict['summary']['games_evaluated_total'] = games_evaluated_total
-        summary_dict['summary']['games_skipped_nan'] = games_skipped_nan
-        summary_dict['summary']['games_skipped_filter'] = games_skipped_filter
-        
-        nan_pct = (games_skipped_nan / games_evaluated_total * 100) if games_evaluated_total > 0 else 0.0
-        summary_dict['summary']['nan_skipped_pct'] = round(nan_pct, 1)
+        # Inject exclusion tracking stats
+        s = summary_dict['summary']
+        s['matches_total_in_file'] = matches_total_in_file
+        s['matches_skipped_unplayed'] = matches_skipped_unplayed
+        s['matches_skipped_no_1x2'] = matches_skipped_no_1x2
+        s['seasons_analyzed'] = seasons_analyzed
+        s['markets_evaluated_total'] = markets_evaluated_total
+        s['markets_skipped_nan'] = markets_skipped_nan
+        s['markets_skipped_ht_no_data'] = markets_skipped_ht_no_data
+        s['markets_skipped_filter'] = markets_skipped_filter
+        s['markets_skipped_ev'] = markets_skipped_ev
+        s['bets_placed'] = bets_placed
+        s['nan_skipped_pct'] = round((markets_skipped_nan / markets_evaluated_total * 100) if markets_evaluated_total > 0 else 0.0, 1)
         
         synthetic_bets_count = sum(1 for b in bets_record if b.get('is_synthetic', False))
         summary_dict['summary']['synthetic_bets_count'] = synthetic_bets_count
@@ -1803,14 +1717,221 @@ class ChronologicalBacktester:
                 
         summary_dict['summary']['calibration_samples'] = cal_samples
         summary_dict['summary']['calibration_skipped'] = cal_skipped
-        
+
+        self.last_bets_record = bets_record
+
         return summary_dict
 
-    def run_parallel_scan(self, leagues, start_date, end_date, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', odds_timing='closing', min_odds=1.0, max_odds=2.50, scan_type='markets', markets_list=None, use_ml=False, data_source='football-data', futpython_api_key=''):
+    def run_walk_forward(self, leagues, start_date, end_date, n_folds=5, market=None,
+                         value_threshold=1.02, initial_bankroll=1000,
+                         staking_rule='fixed', stake_value=10,
+                         odds_source='B365', odds_timing='closing',
+                         min_odds=1.0, max_odds=2.50, use_ml=False,
+                         data_source='football-data', futpython_api_key='',
+                         min_odds_h=None, max_odds_h=None, min_odds_d=None, max_odds_d=None,
+                         min_odds_a=None, max_odds_a=None,
+                         min_odds_over25=None, max_odds_over25=None,
+                         min_odds_under25=None, max_odds_under25=None,
+                         exchange_commission=0.0, slippage=None, **kwargs):
+        """
+        True walk-forward validation with expanding windows and state continuity.
+
+        Divides the total period into n_folds. Each fold trains on all data before its test
+        window and tests on its allocated window. Calibrators, ML ensembles, stacking learners,
+        and their histories are carried forward from one fold to the next so that early folds'
+        fitted models benefit later folds (expanding-window retraining).
+
+        Returns aggregate metrics: per-fold breakdown + cross-fold mean/median/std/min/max ROI.
+        """
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        total_days = (end_dt - start_dt).days
+
+        if total_days <= 0:
+            return {"error": "end_date must be after start_date"}
+        if n_folds < 2:
+            return {"error": "Walk-forward requires at least 2 folds"}
+
+        fold_size_days = total_days // n_folds
+        all_fold_results = []
+        all_oos_bets = []
+        prev_state = None  # Carries calibrators, ML ensembles, stacking state across folds
+
+        for fold in range(n_folds):
+            # Test window for this fold
+            test_start = start_dt + pd.Timedelta(days=int(fold_size_days * fold))
+            test_end = start_dt + pd.Timedelta(days=int(fold_size_days * (fold + 1)) - 1)
+            if fold == n_folds - 1:
+                test_end = end_dt  # Last fold gets remaining days
+
+            train_days = (test_start - start_dt).days
+            if train_days < 30:
+                continue  # Skip folds with too little training data
+
+            oos_date_cutoff = test_start.strftime('%Y-%m-%d')
+            fold_end_str = test_end.strftime('%Y-%m-%d')
+
+            # Create fresh engine for each fold (no cross-fold state leakage)
+            fold_engine = ChronologicalBacktester()
+            if prev_state is not None:
+                fold_engine.transfer_state(prev_state)
+
+            try:
+                fold_result = fold_engine.run(
+                    leagues=leagues,
+                    start_date=start_date,
+                    end_date=fold_end_str,
+                    market=market if isinstance(market, (list, str)) else [market],
+                    value_threshold=value_threshold,
+                    initial_bankroll=initial_bankroll,
+                    staking_rule=staking_rule,
+                    stake_value=stake_value,
+                    odds_source=odds_source,
+                    odds_timing=odds_timing,
+                    min_odds=min_odds,
+                    max_odds=max_odds,
+                    use_ml=use_ml,
+                    data_source=data_source,
+                    futpython_api_key=futpython_api_key,
+                    min_odds_h=min_odds_h, max_odds_h=max_odds_h,
+                    min_odds_d=min_odds_d, max_odds_d=max_odds_d,
+                    min_odds_a=min_odds_a, max_odds_a=max_odds_a,
+                    min_odds_over25=min_odds_over25, max_odds_over25=max_odds_over25,
+                    min_odds_under25=min_odds_under25, max_odds_under25=max_odds_under25,
+                    exchange_commission=exchange_commission,
+                    slippage=slippage,
+                    oos_split_pct=0.0,
+                    oos_date_cutoff=oos_date_cutoff,
+                    run_monte_carlo=False,
+                    model_type=kwargs.get('model_type', MODEL_POISSON)
+                )
+            except Exception as e:
+                logger.warning(f"Walk-forward fold {fold + 1} failed: {e}")
+                continue
+
+            if "error" in fold_result:
+                continue
+
+            fold_oos_bets = [b for b in fold_engine.last_bets_record if b.get('is_oos', False)]
+
+            if len(fold_oos_bets) < 10:
+                continue
+
+            fold_profit = sum(b.get('profit', 0) for b in fold_oos_bets)
+            fold_staked = sum(b.get('stake', 0) for b in fold_oos_bets)
+            fold_wins = sum(1 for b in fold_oos_bets if b.get('profit', 0) > 0)
+            fold_roi = (fold_profit / fold_staked * 100) if fold_staked > 0 else 0
+            fold_win_rate = (fold_wins / len(fold_oos_bets) * 100) if fold_oos_bets else 0
+
+            fold_result = {
+                'fold': fold + 1,
+                'train_start': start_date,
+                'train_end': test_start.strftime('%Y-%m-%d'),
+                'test_start': test_start.strftime('%Y-%m-%d'),
+                'test_end': fold_end_str,
+                'train_days': train_days,
+                'test_days': (test_end - test_start).days,
+                'total_bets': len(fold_oos_bets),
+                'wins': fold_wins,
+                'losses': len(fold_oos_bets) - fold_wins,
+                'net_profit': round(fold_profit, 2),
+                'total_staked': round(fold_staked, 2),
+                'roi': round(fold_roi, 2),
+                'win_rate': round(fold_win_rate, 1),
+                'profit_factor': round(fold_profit / max(abs(sum(
+                    b.get('profit', 0) for b in fold_oos_bets if b.get('profit', 0) < 0
+                )), 0.01), 2),
+            }
+
+            # Drawdown from equity curve
+            bankroll = initial_bankroll
+            peak = initial_bankroll
+            max_dd = 0.0
+            for b in fold_oos_bets:
+                bankroll += b.get('profit', 0)
+                if bankroll > peak:
+                    peak = bankroll
+                dd = (peak - bankroll) / peak if peak > 0 else 0
+                if dd > max_dd:
+                    max_dd = dd
+            fold_result['max_drawdown_pct'] = round(max_dd * 100, 2)
+
+            all_fold_results.append(fold_result)
+
+            # Preserve engine state for next fold (expanding-window continuity)
+            prev_state = fold_engine.export_state()
+
+            # Tag bets with fold number for traceability
+            for b in fold_oos_bets:
+                b['walk_forward_fold'] = fold + 1
+            all_oos_bets.extend(fold_oos_bets)
+
+        if not all_fold_results:
+            return {"error": "Not enough data for walk-forward validation across any fold."}
+
+        fold_rois = [f['roi'] for f in all_fold_results]
+        fold_profits = [f['net_profit'] for f in all_fold_results]
+        fold_win_rates = [f['win_rate'] for f in all_fold_results]
+        fold_drawdowns = [f['max_drawdown_pct'] for f in all_fold_results]
+
+        # Robustness: proportion of folds with positive ROI
+        positive_folds = sum(1 for r in fold_rois if r > 0)
+
+        # Walk-forward score: composite 0-100
+        # Rewards consistent positive ROI, penalizes high cross-fold variance
+        mean_roi = float(np.mean(fold_rois))
+        std_roi = float(np.std(fold_rois, ddof=1)) if len(fold_rois) > 1 else 0.0
+        cv_roi = abs(std_roi / mean_roi) if abs(mean_roi) > 0.01 else (10.0 if std_roi > 1 else 5.0)
+
+        # Score components (each 0-25)
+        consistency_score = min(25, positive_folds / len(all_fold_results) * 25)
+        roi_score = min(25, max(0, mean_roi * 3))  # 8.33% ROI = max score
+        stability_score = min(25, max(0, 25 - cv_roi * 5))  # Lower CV = higher score
+        drawdown_score = min(25, max(0, 25 - float(np.mean(fold_drawdowns)) * 0.5))  # Lower DD = higher score
+
+        wf_score = round(consistency_score + roi_score + stability_score + drawdown_score, 1)
+
+        aggregate = {
+            'method': 'walk_forward',
+            'n_folds': len(all_fold_results),
+            'n_folds_configured': n_folds,
+            'folds_completed': len(all_fold_results),
+            'folds_skipped': n_folds - len(all_fold_results),
+            'fold_results': all_fold_results,
+            'total_oos_bets': sum(f['total_bets'] for f in all_fold_results),
+            'mean_roi': round(mean_roi, 2),
+            'median_roi': round(float(np.median(fold_rois)), 2),
+            'std_roi': round(std_roi, 2),
+            'min_roi': round(float(min(fold_rois)), 2),
+            'max_roi': round(float(max(fold_rois)), 2),
+            'mean_profit': round(float(np.mean(fold_profits)), 2),
+            'mean_win_rate': round(float(np.mean(fold_win_rates)), 1),
+            'mean_max_drawdown': round(float(np.mean(fold_drawdowns)), 2),
+            'positive_folds': positive_folds,
+            'positive_folds_pct': round(positive_folds / len(all_fold_results) * 100, 1),
+            'cv_roi': round(cv_roi, 2),
+            'walk_forward_score': wf_score,
+            'verdict': 'STRONG' if wf_score >= 70 else ('MODERATE' if wf_score >= 45 else 'WEAK'),
+            'all_oos_bets': all_oos_bets,
+        }
+
+        return aggregate
+
+    def run_parallel_scan(self, leagues, start_date, end_date, value_threshold, initial_bankroll, staking_rule, stake_value, odds_source='B365', odds_timing='closing', min_odds=1.0, max_odds=2.50, scan_type='markets', markets_list=None, use_ml=False, data_source='football-data', futpython_api_key='', model_type=MODEL_POISSON):
         """
         Runs a highly optimized parallel scan of either multiple markets or multiple leagues
         in a single chronological pass to avoid duplicate ratings computation.
         """
+        # Normalize odds_source (frontend sends lowercase like 'bet365')
+        if odds_source:
+            _os = odds_source.lower()
+            if _os in ('b365', 'bet365'):
+                odds_source = 'B365'
+            elif _os in ('avg', 'average', 'market_average', 'market'):
+                odds_source = 'Avg'
+            elif _os in ('max', 'pinnacle', 'maximum'):
+                odds_source = 'Max'
+
         # 1. Load data for all selected leagues
         self.last_scan_diagnostics = {
             "leagues_loaded": {},
@@ -1836,14 +1957,37 @@ class ChronologicalBacktester:
             return {}
             
         combined_df = pd.concat(all_matches, ignore_index=True)
-        
+
         if combined_df.empty:
             return {}
-            
+
+        # Pre-compute league-average xG for fallback when match xG is missing
+        _league_xg_fallback = {}
+        for _lc in leagues:
+            _ldf = combined_df[combined_df['LeagueCode'] == _lc]
+            _hxg = _ldf['HomeXG'].dropna()
+            _axg = _ldf['AwayXG'].dropna()
+            _league_xg_fallback[_lc] = {
+                'home': float(_hxg.mean()) if len(_hxg) > 10 else 1.45,
+                'away': float(_axg.mean()) if len(_axg) > 10 else 1.15,
+            }
+
         self.last_scan_diagnostics["total_combined_matches"] = len(combined_df)
+        self.last_scan_diagnostics["exclusion_stats"] = {
+            "matches_total_in_file": len(combined_df),
+            "matches_skipped_unplayed": 0,
+            "matches_skipped_no_1x2": 0,
+            "markets_evaluated_total": 0,
+            "markets_skipped_ht_no_data": 0,
+            "markets_skipped_nan": 0,
+            "markets_skipped_filter": 0,
+            "markets_skipped_ev": 0,
+            "bets_placed": 0,
+        }
+        _exstats = self.last_scan_diagnostics["exclusion_stats"]
         active_matches = combined_df[(combined_df['Date'] >= pd.to_datetime(start_date)) & (combined_df['Date'] <= pd.to_datetime(end_date))]
         self.last_scan_diagnostics["total_active_period_matches"] = len(active_matches)
-        print('Total combined_df matches:', len(combined_df))
+        logger.debug('Total combined_df matches: %d', len(combined_df))
         combined_df.sort_values('Date', inplace=True)
         combined_df = combined_df.sort_values(by=['Date', 'Time']).reset_index(drop=True)
         
@@ -1885,21 +2029,24 @@ class ChronologicalBacktester:
         team_away_conceded_ht = defaultdict(list)
         league_home_goals_ht = defaultdict(list)
         league_away_goals_ht = defaultdict(list)
-        
-        elo_tracker = EloTracker(k_factor=20, home_advantage=65)
+
+        elo_tracker = EloTracker(k_factor=ELO_K_FACTOR, home_advantage=ELO_HOME_ADVANTAGE)
+        self.probability_pipeline = ProbabilityPipeline(model_type=model_type)
         league_rho_cache = {}
         league_goals_for_rho = defaultdict(lambda: {'h': [], 'a': [], 'lh': [], 'la': []})
-        
+
         last_match_date = {}
         season_points = defaultdict(lambda: defaultdict(int))
         season_games = defaultdict(lambda: defaultdict(int))
-        
+        models_frozen = False
+
         # 3. Setup independent simulation states
         states = {}
         if scan_type == 'markets':
             for mkt in markets_list:
                 states[mkt] = {
                     'bankroll': initial_bankroll,
+                    'peak_bankroll': initial_bankroll,
                     'total_staked': 0.0,
                     'total_bets': 0,
                     'wins': 0,
@@ -1911,6 +2058,7 @@ class ChronologicalBacktester:
             for l_code in leagues:
                 states[l_code] = {
                     'bankroll': initial_bankroll,
+                    'peak_bankroll': initial_bankroll,
                     'total_staked': 0.0,
                     'total_bets': 0,
                     'wins': 0,
@@ -1923,6 +2071,7 @@ class ChronologicalBacktester:
                 for m in markets_list:
                     states[f"{l}|{m}"] = {
                         'bankroll': initial_bankroll,
+                        'peak_bankroll': initial_bankroll,
                         'total_staked': 0.0,
                         'total_bets': 0,
                         'wins': 0,
@@ -1930,7 +2079,34 @@ class ChronologicalBacktester:
                         'daily_exposure': defaultdict(float),
                         'daily_bet_count': defaultdict(int)
                     }
-                
+
+        elif scan_type == 'staking':
+            # Staking rule comparison: each league|market gets 3 parallel sub-states
+            STAKING_CONFIGS = {
+                'fixed':        {'staking_rule': 'fixed',        'stake_value': 10.0},
+                'proportional': {'staking_rule': 'proportional', 'stake_value': 2.0},
+                'kelly':        {'staking_rule': 'kelly',        'stake_value': 0.25},
+            }
+            def _make_substate():
+                return {
+                    'bankroll': initial_bankroll,
+                    'peak_bankroll': initial_bankroll,
+                    'total_staked': 0.0,
+                    'total_bets': 0,
+                    'wins': 0,
+                    'bets_for_ai': [],
+                    'daily_exposure': defaultdict(float),
+                    'daily_bet_count': defaultdict(int)
+                }
+            for l in leagues:
+                for m in markets_list:
+                    key = f"{l}|{m}"
+                    states[key] = {
+                        'fixed':        _make_substate(),
+                        'proportional': _make_substate(),
+                        'kelly':        _make_substate(),
+                    }
+
         start_dt = pd.to_datetime(start_date)
         end_dt = pd.to_datetime(end_date)
         
@@ -1949,8 +2125,9 @@ class ChronologicalBacktester:
             ftr = row['FTR']
             
             if pd.isna(fthg) or pd.isna(ftag):
+                _exstats["matches_skipped_unplayed"] += 1
                 continue
-                
+
             # Precompute booleans once per row (avoids repeated string comparisons in bet evaluation)
             is_home_win = (ftr == 'H')
             is_away_win = (ftr == 'A')
@@ -1966,10 +2143,11 @@ class ChronologicalBacktester:
             hxg = row.get('HomeXG')
             axg = row.get('AwayXG')
             
+            # xG Fallback: use SOT*0.33 first, then league-average xG (NOT actual goals)
             if pd.isna(hxg) or hxg == 0:
-                hxg = (hst * 0.33) if not pd.isna(hst) else (fthg * 0.9)
+                hxg = (hst * 0.33) if (not pd.isna(hst) and hst > 0) else _league_xg_fallback.get(league_code, {}).get('home', 1.45)
             if pd.isna(axg) or axg == 0:
-                axg = (ast * 0.33) if not pd.isna(ast) else (ftag * 0.9)
+                axg = (ast * 0.33) if (not pd.isna(ast) and ast > 0) else _league_xg_fallback.get(league_code, {}).get('away', 1.15)
                 
             # Calculate rest days (fatigue)
             current_dt = pd.to_datetime(match_date)
@@ -2129,11 +2307,12 @@ class ChronologicalBacktester:
             closing_odds_over25 = row.get('PC>2.5', row.get('MaxC>2.5'))
             closing_odds_under25 = row.get('PC<2.5', row.get('MaxC<2.5'))
             if pd.isna(odds_h) or pd.isna(odds_d) or pd.isna(odds_a):
+                _exstats["matches_skipped_no_1x2"] += 1
                 self._update_form(team_home_scored, team_home_conceded, team_away_scored, team_away_conceded,
                                   league_home_goals, league_away_goals, league_code, home_team, away_team, fthg, ftag,
                                   team_home_sot, team_home_sot_conceded, team_away_sot, team_away_sot_conceded,
                                   league_home_sot, league_away_sot, hst, ast,
-                                  team_home_scored_ht=team_home_scored_ht, team_home_conceded_ht=team_home_conceded_ht, 
+                                  team_home_scored_ht=team_home_scored_ht, team_home_conceded_ht=team_home_conceded_ht,
                                   team_away_scored_ht=team_away_scored_ht, team_away_conceded_ht=team_away_conceded_ht,
                                   league_home_goals_ht=league_home_goals_ht, league_away_goals_ht=league_away_goals_ht, hthg=hthg, htag=htag)
                 self._update_corners_form(team_home_corners_for, team_home_corners_against,
@@ -2143,227 +2322,37 @@ class ChronologicalBacktester:
                                           row.get("HC"), row.get("AC"))
                 continue
                 
-            # Compute predictive ratings
-            h_xg_att, h_xg_def, a_xg_att, a_xg_def = self._calculate_xg_ratings(
+            # Compute predictive probabilities via shared pipeline
+            bundle = self._compute_match_probabilities(
+                team_home_scored, team_home_conceded, team_away_scored, team_away_conceded,
+                league_home_goals, league_away_goals,
+                team_home_sot, team_home_sot_conceded, team_away_sot, team_away_sot_conceded,
+                league_home_sot, league_away_sot,
                 team_home_xg, team_home_xg_conceded, team_away_xg, team_away_xg_conceded,
-                league_home_xg, league_away_xg, home_team, away_team, league_code
+                league_home_xg, league_away_xg,
+                team_home_scored_ht, team_home_conceded_ht, team_away_scored_ht,
+                team_away_conceded_ht, league_home_goals_ht, league_away_goals_ht,
+                home_team, away_team, league_code, _decay,
+                league_rho_cache, league_goals_for_rho, elo_tracker
             )
-            h_scored = team_home_scored[home_team][-self.rolling_games:]
-            h_conceded = team_home_conceded[home_team][-self.rolling_games:]
-            a_scored = team_away_scored[away_team][-self.rolling_games:]
-            a_conceded = team_away_conceded[away_team][-self.rolling_games:]
-            
-            leg_h_goals = league_home_goals[league_code][-100:]
-            leg_a_goals = league_away_goals[league_code][-100:]
-            
-            avg_h_goals = np.mean(leg_h_goals) if leg_h_goals else 1.35
-            avg_a_goals = np.mean(leg_a_goals) if leg_a_goals else 1.05
-            
-            h_att = (weighted_mean(h_scored, _decay) / avg_h_goals) if h_scored else 1.0
-            h_def = (weighted_mean(h_conceded, _decay) / avg_a_goals) if h_conceded else 1.0
-            a_att = (weighted_mean(a_scored, _decay) / avg_a_goals) if a_scored else 1.0
-            a_def = (weighted_mean(a_conceded, _decay) / avg_h_goals) if a_conceded else 1.0
-            
-            h_att = 1.0 if pd.isna(h_att) else max(0.4, min(2.5, h_att))
-            h_def = 1.0 if pd.isna(h_def) else max(0.4, min(2.5, h_def))
-            a_att = 1.0 if pd.isna(a_att) else max(0.4, min(2.5, a_att))
-            a_def = 1.0 if pd.isna(a_def) else max(0.4, min(2.5, a_def))
-
-            lambda_goals_home = avg_h_goals * h_att * a_def
-            lambda_goals_away = avg_a_goals * a_att * h_def
-
-            # HT Goals lambda
-            h_scored_ht = team_home_scored_ht[home_team][-self.rolling_games:]
-            h_conceded_ht = team_home_conceded_ht[home_team][-self.rolling_games:]
-            a_scored_ht = team_away_scored_ht[away_team][-self.rolling_games:]
-            a_conceded_ht = team_away_conceded_ht[away_team][-self.rolling_games:]
-            
-            leg_h_goals_ht = league_home_goals_ht[league_code][-100:]
-            leg_a_goals_ht = league_away_goals_ht[league_code][-100:]
-            
-            avg_h_goals_ht = np.mean(leg_h_goals_ht) if leg_h_goals_ht else (avg_h_goals * 0.45)
-            avg_a_goals_ht = np.mean(leg_a_goals_ht) if leg_a_goals_ht else (avg_a_goals * 0.45)
-            
-            if avg_h_goals_ht == 0: avg_h_goals_ht = 0.6
-            if avg_a_goals_ht == 0: avg_a_goals_ht = 0.45
-            
-            h_att_ht = (weighted_mean(h_scored_ht, _decay) / avg_h_goals_ht) if h_scored_ht else 1.0
-            h_def_ht = (weighted_mean(h_conceded_ht, _decay) / avg_a_goals_ht) if h_conceded_ht else 1.0
-            a_att_ht = (weighted_mean(a_scored_ht, _decay) / avg_a_goals_ht) if a_scored_ht else 1.0
-            a_def_ht = (weighted_mean(a_conceded_ht, _decay) / avg_h_goals_ht) if a_conceded_ht else 1.0
-            
-            h_att_ht = 1.0 if pd.isna(h_att_ht) else max(0.5, min(2.0, h_att_ht))
-            h_def_ht = 1.0 if pd.isna(h_def_ht) else max(0.5, min(2.0, h_def_ht))
-            a_att_ht = 1.0 if pd.isna(a_att_ht) else max(0.5, min(2.0, a_att_ht))
-            a_def_ht = 1.0 if pd.isna(a_def_ht) else max(0.5, min(2.0, a_def_ht))
-            
-            lambda_home_ht = avg_h_goals_ht * h_att_ht * a_def_ht
-            lambda_away_ht = avg_a_goals_ht * a_att_ht * h_def_ht
-            lambda_home = lambda_goals_home
-            lambda_away = lambda_goals_away
-            
-            elo_factor_h = elo_tracker.get_elo_factor(home_team, away_team)
-            elo_factor_a = 2.0 - elo_factor_h
-            lambda_home *= elo_factor_h
-            lambda_away *= elo_factor_a
-            
-            h_sot_scored = team_home_sot[home_team][-self.rolling_games:]
-            h_sot_conceded = team_home_sot_conceded[home_team][-self.rolling_games:]
-            a_sot_scored = team_away_sot[away_team][-self.rolling_games:]
-            a_sot_conceded = team_away_sot_conceded[away_team][-self.rolling_games:]
-            
-            leg_h_sot = league_home_sot[league_code][-100:]
-            leg_a_sot = league_away_sot[league_code][-100:]
-            
-            has_sot_data = (h_sot_scored and h_sot_conceded and a_sot_scored and a_sot_conceded and leg_h_sot and leg_a_sot)
-            
-            if has_sot_data:
-                avg_h_sot = np.mean(leg_h_sot)
-                avg_a_sot = np.mean(leg_a_sot)
-                
-                if pd.isna(avg_h_sot) or avg_h_sot == 0: avg_h_sot = 4.5
-                if pd.isna(avg_a_sot) or avg_a_sot == 0: avg_a_sot = 3.5
-                
-                h_sot_att = (weighted_mean(h_sot_scored, _decay) / avg_h_sot) if h_sot_scored else 1.0
-                h_sot_def = (weighted_mean(h_sot_conceded, _decay) / avg_a_sot) if h_sot_conceded else 1.0
-                a_sot_att = (weighted_mean(a_sot_scored, _decay) / avg_a_sot) if a_sot_scored else 1.0
-                a_sot_def = (weighted_mean(a_sot_conceded, _decay) / avg_h_sot) if a_sot_conceded else 1.0
-                
-                h_sot_att = 1.0 if pd.isna(h_sot_att) else max(0.4, min(2.5, h_sot_att))
-                h_sot_def = 1.0 if pd.isna(h_sot_def) else max(0.4, min(2.5, h_sot_def))
-                a_sot_att = 1.0 if pd.isna(a_sot_att) else max(0.4, min(2.5, a_sot_att))
-                a_sot_def = 1.0 if pd.isna(a_sot_def) else max(0.4, min(2.5, a_sot_def))
-                
-                exp_sot_home = avg_h_sot * h_sot_att * a_sot_def
-                exp_sot_away = avg_a_sot * a_sot_att * h_sot_def
-                
-                conversion_home = avg_h_goals / avg_h_sot
-                conversion_away = avg_a_goals / avg_a_sot
-                
-                lambda_shots_home = exp_sot_home * conversion_home
-                lambda_shots_away = exp_sot_away * conversion_away
-                
-                lambda_shots_home = max(0.1, min(5.0, lambda_shots_home))
-                lambda_shots_away = max(0.1, min(5.0, lambda_shots_away))
-                
-                # Calculate Expected Goals (xG) based lambda
-                h_xg_scored = team_home_xg[home_team][-self.rolling_games:]
-                h_xg_conceded = team_home_xg_conceded[home_team][-self.rolling_games:]
-                a_xg_scored = team_away_xg[away_team][-self.rolling_games:]
-                a_xg_conceded = team_away_xg_conceded[away_team][-self.rolling_games:]
-                
-                leg_h_xg = league_home_xg[league_code][-100:]
-                leg_a_xg = league_away_xg[league_code][-100:]
-                
-                has_xg_data = (h_xg_scored and h_xg_conceded and a_xg_scored and a_xg_conceded and leg_h_xg and leg_a_xg)
-                if has_xg_data:
-                    avg_h_xg = np.mean(leg_h_xg)
-                    avg_a_xg = np.mean(leg_a_xg)
-                    if pd.isna(avg_h_xg) or avg_h_xg == 0: avg_h_xg = 1.35
-                    if pd.isna(avg_a_xg) or avg_a_xg == 0: avg_a_xg = 1.05
-                    
-                    lambda_xg_home = avg_h_xg * h_xg_att * a_xg_def
-                    lambda_xg_away = avg_a_xg * a_xg_att * h_xg_def
-                    
-                    lambda_xg_home = max(0.1, min(5.0, lambda_xg_home))
-                    lambda_xg_away = max(0.1, min(5.0, lambda_xg_away))
-                    
-                    # BLEND: 50% xG, 30% Shots, 20% Goals
-                    lambda_home = 0.50 * lambda_xg_home + 0.30 * lambda_shots_home + 0.20 * lambda_goals_home
-                    lambda_away = 0.50 * lambda_xg_away + 0.30 * lambda_shots_away + 0.20 * lambda_goals_away
-                else:
-                    # BLEND: 60% Goals, 40% Shots
-                    lambda_home = 0.60 * lambda_goals_home + 0.40 * lambda_shots_home
-                    lambda_away = 0.60 * lambda_goals_away + 0.40 * lambda_shots_away
-                
-                lambda_home *= elo_factor_h
-                lambda_away *= elo_factor_a
-                
-            max_goals = 8
-            home_probs = [math.exp(-lambda_home) * (lambda_home**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-            away_probs = [math.exp(-lambda_away) * (lambda_away**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-            
-            prob_matrix = np.outer(home_probs, away_probs)
-            
-            if league_code in league_rho_cache:
-                rho = league_rho_cache[league_code]
-            else:
-                rho_data = league_goals_for_rho[league_code]
-                rho = estimate_dynamic_rho(rho_data['h'], rho_data['a'], rho_data['lh'], rho_data['la'])
-                league_rho_cache[league_code] = rho
-                
-            tau_00 = 1.0 - lambda_home * lambda_away * rho
-            tau_10 = 1.0 + lambda_away * rho
-            tau_01 = 1.0 + lambda_home * rho
-            tau_11 = 1.0 - rho
-            
-            prob_matrix[0, 0] *= max(0.0, tau_00)
-            prob_matrix[1, 0] *= max(0.0, tau_10)
-            prob_matrix[0, 1] *= max(0.0, tau_01)
-            prob_matrix[1, 1] *= max(0.0, tau_11)
-            
-            matrix_sum = np.sum(prob_matrix)
-            if matrix_sum > 0:
-                prob_matrix = prob_matrix / matrix_sum
-                
-            prob_h = float(np.sum(np.tril(prob_matrix, -1)))
-            prob_d = float(np.sum(np.diag(prob_matrix)))
-            prob_a = float(np.sum(np.triu(prob_matrix, 1)))
-            
-            prob_over_25 = 0.0
-            prob_over_15 = 0.0
-            prob_over_35 = 0.0
-            prob_over_45 = 0.0
-            prob_over_55 = 0.0
-            for x in range(max_goals + 1):
-                for y in range(max_goals + 1):
-                    tot = x + y
-                    if tot > 2: prob_over_25 += prob_matrix[x, y]
-                    if tot > 1: prob_over_15 += prob_matrix[x, y]
-                    if tot > 3: prob_over_35 += prob_matrix[x, y]
-                    if tot > 4: prob_over_45 += prob_matrix[x, y]
-                    if tot > 5: prob_over_55 += prob_matrix[x, y]
-                    
-            prob_btts_yes = float(sum(
-                prob_matrix[i, j] for i in range(1, max_goals + 1) for j in range(1, max_goals + 1)
-            ))
-            
-            # HT Probabilities
-            # Safe HT lambda caps
-            if 'lambda_home_ht' in locals() and lambda_home_ht is not None:
-                lambda_home_ht = max(0.35, min(2.5, lambda_home_ht))
-            else:
-                lambda_home_ht = 0.5
-                
-            if 'lambda_away_ht' in locals() and lambda_away_ht is not None:
-                lambda_away_ht = max(0.25, min(2.5, lambda_away_ht))
-            else:
-                lambda_away_ht = 0.4
-                
-            home_probs_ht = [math.exp(-lambda_home_ht) * (lambda_home_ht**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-            away_probs_ht = [math.exp(-lambda_away_ht) * (lambda_away_ht**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-            prob_matrix_ht = np.outer(home_probs_ht, away_probs_ht)
-            
-            tau_00_ht = 1.0 - lambda_home_ht * lambda_away_ht * rho
-            tau_10_ht = 1.0 + lambda_away_ht * rho
-            tau_01_ht = 1.0 + lambda_home_ht * rho
-            tau_11_ht = 1.0 - rho
-            prob_matrix_ht[0, 0] *= max(0.0, tau_00_ht)
-            prob_matrix_ht[1, 0] *= max(0.0, tau_10_ht)
-            prob_matrix_ht[0, 1] *= max(0.0, tau_01_ht)
-            prob_matrix_ht[1, 1] *= max(0.0, tau_11_ht)
-            matrix_sum_ht = np.sum(prob_matrix_ht)
-            if matrix_sum_ht > 0:
-                prob_matrix_ht = prob_matrix_ht / matrix_sum_ht
-                
-            prob_h_ht = float(np.sum(np.tril(prob_matrix_ht, -1)))
-            prob_d_ht = float(np.sum(np.diag(prob_matrix_ht)))
-            prob_a_ht = float(np.sum(np.triu(prob_matrix_ht, 1)))
-            prob_over_05_ht = 1.0 - float(prob_matrix_ht[0, 0])
-            prob_over_15_ht = 0.0
-            for x in range(max_goals + 1):
-                for y in range(max_goals + 1):
-                    if x + y > 1: prob_over_15_ht += prob_matrix_ht[x, y]
+            # Unpack all downstream variables
+            lambda_home = bundle['lambda_home']; lambda_away = bundle['lambda_away']
+            lambda_goals_home = bundle['lambda_goals_home']; lambda_goals_away = bundle['lambda_goals_away']
+            lambda_shots_home = bundle['lambda_shots_home']; lambda_shots_away = bundle['lambda_shots_away']
+            lambda_xg_home = bundle['lambda_xg_home']; lambda_xg_away = bundle['lambda_xg_away']
+            lambda_home_ht = bundle['lambda_home_ht']; lambda_away_ht = bundle['lambda_away_ht']
+            h_att = bundle['h_att']; h_def = bundle['h_def']; a_att = bundle['a_att']; a_def = bundle['a_def']
+            h_xg_att = bundle['h_xg_att']; h_xg_def = bundle['h_xg_def']; a_xg_att = bundle['a_xg_att']; a_xg_def = bundle['a_xg_def']
+            elo_factor_h = bundle['elo_factor_h']; elo_factor_a = bundle['elo_factor_a']
+            prob_matrix = bundle['prob_matrix']
+            prob_h = bundle['prob_h']; prob_d = bundle['prob_d']; prob_a = bundle['prob_a']
+            prob_over_25 = bundle['prob_over_25']; prob_over_15 = bundle['prob_over_15']
+            prob_over_35 = bundle['prob_over_35']; prob_over_45 = bundle['prob_over_45']; prob_over_55 = bundle['prob_over_55']
+            prob_btts_yes = bundle['prob_btts_yes']
+            prob_matrix_ht = bundle['prob_matrix_ht']
+            prob_h_ht = bundle['prob_h_ht']; prob_d_ht = bundle['prob_d_ht']; prob_a_ht = bundle['prob_a_ht']
+            prob_over_05_ht = bundle['prob_over_05_ht']; prob_over_15_ht = bundle['prob_over_15_ht']
+            rho = bundle['rho']
             
             est_odds = None
 
@@ -2382,6 +2371,7 @@ class ChronologicalBacktester:
                 
                 # Check for missing HT data for HT markets
                 if mkt.startswith('ht_') and (pd.isna(hthg) or pd.isna(htag)):
+                    _exstats["markets_skipped_ht_no_data"] += 1
                     return None
                 
                 if mkt in ('home', '1x2_home'):
@@ -2445,8 +2435,7 @@ class ChronologicalBacktester:
                     bet_won = (hthg + htag <= 1)
                 elif mkt == 'ah_home':
                     if ahh_line is None or pd.isna(ahh_line): return None
-                    from .models import calculate_ah_probabilities
-                    ah_probs = calculate_ah_probabilities(pred['prob_matrix'], ahh_line)
+                    ah_probs = calculate_ah_probabilities(prob_matrix, ahh_line)
                     model_prob = ah_probs['win'] + 0.5 * ah_probs['half_win']
                     bookie_odds = odds_ahh
                     
@@ -2458,8 +2447,7 @@ class ChronologicalBacktester:
                     else: bet_won = -1.0
                 elif mkt == 'ah_away':
                     if ahh_line is None or pd.isna(ahh_line): return None
-                    from .models import calculate_ah_probabilities
-                    ah_probs = calculate_ah_probabilities(pred['prob_matrix'], -ahh_line)
+                    ah_probs = calculate_ah_probabilities(prob_matrix, -ahh_line)
                     model_prob = ah_probs['win'] + 0.5 * ah_probs['half_win']
                     bookie_odds = odds_aha
                     
@@ -2471,7 +2459,7 @@ class ChronologicalBacktester:
                     else: bet_won = -1.0
                 else:
                     if est_odds is None:
-                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away)
+                        est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
                     
                     if mkt == 'over15':
                         if odds_over15 is not None and not pd.isna(odds_over15) and odds_over15 > 1.0:
@@ -2518,31 +2506,7 @@ class ChronologicalBacktester:
                         model_prob = 1.0 - prob_over_55
                         bookie_odds = est_odds['bookie_under_55']
                         bet_won = (total_goals < 6)
-                    elif mkt == 'lay_home':
-                        model_prob = prob_d + prob_a
-                        try:
-                            _dc = float(str(odds_dc_x2).replace(',', '.')) if odds_dc_x2 is not None and not pd.isna(odds_dc_x2) else np.nan
-                            bookie_odds = _dc if _dc > 1.0 else np.nan
-                        except Exception:
-                            bookie_odds = np.nan
-                        bet_won = not is_home_win
-                    elif mkt == 'lay_away':
-                        model_prob = prob_h + prob_d
-                        try:
-                            _dc = float(str(odds_dc_1x).replace(',', '.')) if odds_dc_1x is not None and not pd.isna(odds_dc_1x) else np.nan
-                            bookie_odds = _dc if _dc > 1.0 else np.nan
-                        except Exception:
-                            bookie_odds = np.nan
-                        bet_won = not is_away_win
-                    elif mkt == 'lay_draw':
-                        model_prob = prob_h + prob_a
-                        try:
-                            _dc = float(str(odds_dc_12).replace(',', '.')) if odds_dc_12 is not None and not pd.isna(odds_dc_12) else np.nan
-                            bookie_odds = _dc if _dc > 1.0 else np.nan
-                        except Exception:
-                            bookie_odds = np.nan
-                        bet_won = not is_draw
-                    elif mkt == 'lay_home_ex':
+                    elif mkt in ('lay_home', 'lay_home_ex'):
                         model_prob = prob_d + prob_a
                         try:
                             _dc = float(str(odds_dc_x2).replace(',', '.')) if odds_dc_x2 is not None and not pd.isna(odds_dc_x2) else np.nan
@@ -2552,7 +2516,7 @@ class ChronologicalBacktester:
                         except Exception:
                             bookie_odds = np.nan
                         bet_won = not is_home_win
-                    elif mkt == 'lay_away_ex':
+                    elif mkt in ('lay_away', 'lay_away_ex'):
                         model_prob = prob_h + prob_d
                         try:
                             _dc = float(str(odds_dc_1x).replace(',', '.')) if odds_dc_1x is not None and not pd.isna(odds_dc_1x) else np.nan
@@ -2562,7 +2526,7 @@ class ChronologicalBacktester:
                         except Exception:
                             bookie_odds = np.nan
                         bet_won = not is_away_win
-                    elif mkt == 'lay_draw_ex':
+                    elif mkt in ('lay_draw', 'lay_draw_ex'):
                         model_prob = prob_h + prob_a
                         try:
                             _dc = float(str(odds_dc_12).replace(',', '.')) if odds_dc_12 is not None and not pd.isna(odds_dc_12) else np.nan
@@ -2792,12 +2756,20 @@ class ChronologicalBacktester:
                 # NOTE: calibration_history appended AFTER betting evaluation
                 # to prevent temporal leak.
 
+                _exstats["markets_evaluated_total"] += 1
+
                 if not pd.isna(bookie_odds) and bookie_odds > 1.0:
                     if min_odds <= bookie_odds <= max_odds:
-                        effective_odds = bookie_odds * compute_slippage_factor(bookie_odds, mkt, slippage_base_pct)
+                        effective_odds = bookie_odds * compute_slippage_factor(bookie_odds, mkt, slippage_base_pct, league_code)
                         expected_value = model_prob * effective_odds
                         if expected_value >= value_threshold:
-                            return bookie_odds, model_prob, expected_value, bet_won
+                            return effective_odds, model_prob, expected_value, bet_won
+                        else:
+                            _exstats["markets_skipped_ev"] += 1
+                    else:
+                        _exstats["markets_skipped_filter"] += 1
+                else:
+                    _exstats["markets_skipped_nan"] += 1
                 # 3b. NOW store calibration history (after betting decision)
                 self.calibration_history[mkt]['probs'].append(raw_prob)
                 self.calibration_history[mkt]['outcomes'].append(1 if bet_won else 0)
@@ -2810,7 +2782,7 @@ class ChronologicalBacktester:
                 return None
                 
             # Run parallel updates
-            def process_bet_on_state(state_ref, p_mkt, p_odds, p_prob, p_ev, p_won):
+            def process_bet_on_state(state_ref, p_mkt, p_odds, p_prob, p_ev, p_won, staking_rule, stake_value):
                 date_str_check = match_date.strftime('%Y-%m-%d')
                 state_ref['daily_bet_count'][date_str_check] += 1
                 n_bets_today = state_ref['daily_bet_count'][date_str_check]
@@ -2820,24 +2792,36 @@ class ChronologicalBacktester:
                 elif staking_rule == 'proportional':
                     p_stake = state_ref['bankroll'] * (stake_value / 100.0)
                 elif staking_rule == 'kelly':
-                    if p_mkt.endswith('_ex'):
-                        p_f_star = p_prob - (1.0 - p_prob) / (p_odds - 1.0) if p_odds > 1.001 else 0.0
+                    if p_mkt.startswith('lay_'):
+                        p_f_star = p_prob / (p_odds - 1.0) - (1.0 - p_prob) if p_odds > 1.001 else 0.0
                     else:
                         p_f_star = (p_prob * p_odds - 1.0) / (p_odds - 1.0)
                     p_f_star = max(0.0, p_f_star)
                     p_stake = state_ref['bankroll'] * p_f_star * stake_value
-                    p_stake = min(p_stake, state_ref['bankroll'] * 0.10)
+                    cap_pct = compute_edge_scaled_cap(p_prob, p_odds, p_mkt, max_cap_pct=10.0)
+                    p_stake = min(p_stake, state_ref['bankroll'] * cap_pct / 100.0)
                 else:
                     p_stake = 0.0
-                    
+
+                # Liquidity cap by league tier × market type (all methods)
+                if staking_rule != 'fixed' and p_stake > 0:
+                    liq_cap_pct = get_liquidity_max_stake(league_code, p_mkt, base_stake_pct=10.0)
+                    p_stake = min(p_stake, state_ref['bankroll'] * liq_cap_pct / 100.0)
+
                 if staking_rule != 'fixed':
                     if n_bets_today > 1:
                         p_stake = p_stake / math.sqrt(n_bets_today)
-                        
+
                     if state_ref['daily_exposure'][date_str_check] + p_stake > state_ref['bankroll'] * 0.10:
                         p_stake = max(0, state_ref['bankroll'] * 0.10 - state_ref['daily_exposure'][date_str_check])
-                    
+
+                # Apply drawdown circuit breaker
+                dd_mult = compute_drawdown_multiplier(state_ref['bankroll'], state_ref['peak_bankroll'])
+                if dd_mult < 1.0:
+                    p_stake = p_stake * dd_mult
+
                 if p_stake > 0.01 and state_ref['bankroll'] >= p_stake:
+                    _exstats["bets_placed"] += 1
                     state_ref['daily_exposure'][date_str_check] += p_stake
                     state_ref['total_staked'] += p_stake
                     state_ref['total_bets'] += 1
@@ -2848,20 +2832,27 @@ class ChronologicalBacktester:
                         multiplier = float(p_won)
 
                     if multiplier > 0:
-                        if p_mkt.endswith('_ex'):
-                            p_profit = (p_stake / (p_odds - 1.0)) * multiplier if p_odds > 1.001 else 0.0
+                        if p_mkt.startswith('lay_'):
+                            p_profit = p_stake * multiplier
                         else:
                             p_profit = p_stake * (p_odds - 1.0) * multiplier
                         state_ref['bankroll'] += p_profit
                         if multiplier == 1.0:
                             state_ref['wins'] += 1
                     elif multiplier < 0:
-                        p_profit = p_stake * multiplier
+                        if p_mkt.startswith('lay_'):
+                            p_profit = p_stake * (p_odds - 1.0) * multiplier
+                        else:
+                            p_profit = p_stake * multiplier
                         state_ref['bankroll'] += p_profit
                     else:
                         p_profit = 0.0
-                        
-                        
+
+                    # Track peak bankroll for drawdown circuit breaker
+                    if state_ref['bankroll'] > state_ref['peak_bankroll']:
+                        state_ref['peak_bankroll'] = state_ref['bankroll']
+
+
                     p_clv = None
                     p_closing_odd = None
                     if p_mkt in ('home', '1x2_home'): p_closing_odd = closing_odds_h
@@ -2899,19 +2890,32 @@ class ChronologicalBacktester:
                     for mkt in markets_list:
                         res = eval_market(mkt)
                         if res:
-                            process_bet_on_state(states[mkt], mkt, res[0], res[1], res[2], res[3])
+                            process_bet_on_state(states[mkt], mkt, res[0], res[1], res[2], res[3], staking_rule, stake_value)
                 elif scan_type == 'leagues':
-                    res = eval_market(markets_list[0])
-                    if res and league_code in states:
-                        process_bet_on_state(states[league_code], markets_list[0], res[0], res[1], res[2], res[3])
+                    for mkt in markets_list:
+                        res = eval_market(mkt)
+                        if res and league_code in states:
+                            process_bet_on_state(states[league_code], mkt, res[0], res[1], res[2], res[3], staking_rule, stake_value)
                 elif scan_type == 'combinations':
                     for mkt in markets_list:
                         res = eval_market(mkt)
                         if res:
                             k = f"{league_code}|{mkt}"
                             if k in states:
-                                process_bet_on_state(states[k], mkt, res[0], res[1], res[2], res[3])
-                                
+                                process_bet_on_state(states[k], mkt, res[0], res[1], res[2], res[3], staking_rule, stake_value)
+                elif scan_type == 'staking':
+                    for mkt in markets_list:
+                        res = eval_market(mkt)
+                        if res:
+                            k = f"{league_code}|{mkt}"
+                            if k in states:
+                                for method, cfg in STAKING_CONFIGS.items():
+                                    process_bet_on_state(
+                                        states[k][method], mkt,
+                                        res[0], res[1], res[2], res[3],
+                                        cfg['staking_rule'], cfg['stake_value']
+                                    )
+
             self._update_form(team_home_scored, team_home_conceded, team_away_scored, team_away_conceded,
                               league_home_goals, league_away_goals, league_code, home_team, away_team, fthg, ftag,
                               team_home_sot, team_home_sot_conceded, team_away_sot, team_away_sot_conceded,
@@ -2929,7 +2933,7 @@ class ChronologicalBacktester:
             # Fit Calibration Periodically
             # NOTE: threshold raised from 50 → 200 (same fix as run() method)
             self.matches_since_calibration += 1
-            if self.matches_since_calibration >= 100:
+            if not models_frozen and self.matches_since_calibration >= 100:
                 self.matches_since_calibration = 0
                 for c_mkt, hist in self.calibration_history.items():
                     if len(hist['probs']) > 2000:
@@ -2941,23 +2945,23 @@ class ChronologicalBacktester:
                         self.calibrators[c_mkt].fit(hist['probs'], hist['outcomes'])
                         
             # Fit ML Ensemble Periodically
-            if use_ml:
+            if use_ml and not models_frozen:
                 self.matches_since_ml_fit += 1
-            if self.matches_since_ml_fit >= 300:
+            if not models_frozen and self.matches_since_ml_fit >= 300:
                 self.matches_since_ml_fit = 0
                 for c_mkt, hist in self.ml_history.items():
                     if len(hist['X']) > 3000:
                         hist['X'] = hist['X'][-3000:]
                         hist['y'] = hist['y'][-3000:]
-                    if len(hist['X']) >= 100:
+                    if len(hist['X']) >= 200:  # aligned with MLEnsemble.MIN_SAMPLES_TO_FIT
                         if c_mkt not in self.ml_ensembles:
                             self.ml_ensembles[c_mkt] = MLEnsemble(c_mkt)
                         self.ml_ensembles[c_mkt].fit(hist['X'], hist['y'])
 
             # Fit Stacking Meta-Learner Periodically
-            if use_ml:
+            if use_ml and not models_frozen:
                 self.matches_since_stacking_fit += 1
-            if self.matches_since_stacking_fit >= 500:
+            if not models_frozen and self.matches_since_stacking_fit >= 500:
                 self.matches_since_stacking_fit = 0
                 for s_mkt, s_hist in self.stacking_history.items():
                     if len(s_hist['poisson']) > 4000:
@@ -2969,20 +2973,31 @@ class ChronologicalBacktester:
                             self.stacking_learners[s_mkt] = StackingMetaLearner(s_mkt)
                         self.stacking_learners[s_mkt].history = s_hist
                         self.stacking_learners[s_mkt].fit()
-            elo_tracker.update(home_team, away_team, int(fthg), int(ftag))
-            
+            if not models_frozen:
+                elo_tracker.update(home_team, away_team, int(fthg), int(ftag))
+
             rho_data = league_goals_for_rho[league_code]
             rho_data['h'].append(int(fthg))
             rho_data['a'].append(int(ftag))
             rho_data['lh'].append(lambda_home if 'lambda_home' in dir() else 1.3)
             rho_data['la'].append(lambda_away if 'lambda_away' in dir() else 1.0)
-            if len(rho_data['h']) % 50 == 0:
+            if len(rho_data['h']) % RHO_CACHE_INVALIDATION_MATCHES == 0:
                 league_rho_cache.pop(league_code, None)
-        total_bets = sum([state['total_bets'] for state in states.values()])
+        if scan_type == 'staking':
+            total_bets = sum(
+                sub['total_bets']
+                for state in states.values()
+                for sub in state.values()
+            )
+        else:
+            total_bets = sum(state['total_bets'] for state in states.values())
         self.last_scan_diagnostics["total_bets_placed"] = total_bets
-        return compile_parallel_scan_summary(
-            states, initial_bankroll, value_threshold, staking_rule, stake_value
+        result = compile_parallel_scan_summary(
+            states, initial_bankroll, value_threshold, staking_rule, stake_value,
+            scan_type=scan_type
         )
+        result["exclusion_stats"] = _exstats
+        return result
 
     def _update_form(self, *args, **kwargs):
         return update_form(*args, **kwargs)
@@ -2992,6 +3007,37 @@ class ChronologicalBacktester:
 
     def _calculate_motivation(self, *args, **kwargs):
         return calculate_motivation(*args, **kwargs)
+
+    def _compute_match_probabilities(self, team_home_scored, team_home_conceded,
+        team_away_scored, team_away_conceded, league_home_goals, league_away_goals,
+        team_home_sot, team_home_sot_conceded, team_away_sot, team_away_sot_conceded,
+        league_home_sot, league_away_sot, team_home_xg, team_home_xg_conceded,
+        team_away_xg, team_away_xg_conceded, league_home_xg, league_away_xg,
+        team_home_scored_ht, team_home_conceded_ht, team_away_scored_ht,
+        team_away_conceded_ht, league_home_goals_ht, league_away_goals_ht,
+        home_team, away_team, league_code, _decay, league_rho_cache,
+        league_goals_for_rho, elo_tracker, max_goals=8):
+        """Compute all match probabilities via unified ProbabilityPipeline.
+
+        Delegates to ProbabilityPipeline.compute_all() — the single source of truth
+        for run() and run_parallel_scan().
+        """
+        return self.probability_pipeline.compute_all(
+            team_home_scored, team_home_conceded,
+            team_away_scored, team_away_conceded,
+            league_home_goals, league_away_goals,
+            team_home_sot, team_home_sot_conceded,
+            team_away_sot, team_away_sot_conceded,
+            league_home_sot, league_away_sot,
+            team_home_xg, team_home_xg_conceded,
+            team_away_xg, team_away_xg_conceded,
+            league_home_xg, league_away_xg,
+            team_home_scored_ht, team_home_conceded_ht,
+            team_away_scored_ht, team_away_conceded_ht,
+            league_home_goals_ht, league_away_goals_ht,
+            home_team, away_team, league_code, _decay,
+            league_rho_cache, league_goals_for_rho, elo_tracker,
+        ).to_dict()
 
     @staticmethod
     def _update_corners_form(team_home_corners_for, team_home_corners_against,

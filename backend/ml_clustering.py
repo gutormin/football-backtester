@@ -86,6 +86,8 @@ def cluster_leagues(features_list, n_clusters=None):
                 'avg_goals': float(cluster_data['avg_goals'].mean()),
                 'over25_pct': float(cluster_data['over25_pct'].mean()),
                 'home_win_pct': float(cluster_data['home_win_pct'].mean()),
+                'draw_pct': float(cluster_data['draw_pct'].mean()),
+                'btts_pct': float(cluster_data['btts_pct'].mean()),
                 'leagues': cluster_data['league'].tolist()
             })
         

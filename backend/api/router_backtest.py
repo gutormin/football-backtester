@@ -1,8 +1,11 @@
 import os
 import math
+import logging
 import numpy as np
 import pandas as pd
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 from typing import List, Optional, Union, Dict, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, validator
@@ -16,6 +19,7 @@ from ..models import PoissonModel, estimate_bookmaker_odds
 from ..elo_model import build_elo_tracker_from_history
 from ..ai_predictor import apply_fdr_correction, compute_edge_quality_score
 from ..portfolio_backtester import run_portfolio
+from ..constants import RHO_FALLBACK
 
 router = APIRouter()
 
@@ -50,6 +54,8 @@ class BacktestRequest(BaseModel):
     maxOddsOver25: Optional[float] = None
     minOddsUnder25: Optional[float] = None
     maxOddsUnder25: Optional[float] = None
+    walk_forward_folds: int = 0  # 0 = disabled, 2-10 = walk-forward folds
+    model_type: str = "poisson"  # "poisson" or "negative_binomial"
 
     @validator('startDate', 'endDate')
     def validate_date_format(cls, v):
@@ -162,12 +168,7 @@ class PortfolioRequest(BaseModel):
     strategy_ids: List[str]
     initial_bankroll: float = 1000.0
     risk_method: str = "kelly_quarter"
-
-    @validator('strategy_ids')
-    def validate_strategies_list(cls, v):
-        if not v:
-            raise ValueError("A lista de strategy_ids não pode estar vazia")
-        return v
+    strategies_inline: Optional[List[dict]] = None  # fallback when DB is empty (post-deploy)
 
     @validator('initial_bankroll')
     def validate_portfolio_bankroll(cls, v):
@@ -195,6 +196,49 @@ def trigger_sync(source: str = "csv"):
 def run_backtest(req: BacktestRequest):
     try:
         backtester = ChronologicalBacktester()
+
+        # Phase 2: Compute true OOS date cutoff from split percentage
+        oos_split_pct = req.oos_split if req.out_of_sample else 0.0
+        oos_date_cutoff = None
+        if req.out_of_sample and oos_split_pct > 0:
+            start_dt = pd.to_datetime(req.startDate)
+            end_dt = pd.to_datetime(req.endDate)
+            total_days = (end_dt - start_dt).days
+            if total_days > 0:
+                oos_offset_days = int(total_days * (oos_split_pct / 100.0))
+                oos_date_cutoff = (end_dt - pd.Timedelta(days=oos_offset_days)).strftime('%Y-%m-%d')
+
+        # Phase 8: Walk-Forward Validation
+        if req.walk_forward_folds >= 2:
+            wf_result = backtester.run_walk_forward(
+                leagues=req.leagues,
+                start_date=req.startDate,
+                end_date=req.endDate,
+                n_folds=req.walk_forward_folds,
+                market=req.market,
+                value_threshold=req.valueThreshold,
+                initial_bankroll=req.initialBankroll,
+                staking_rule=req.stakingRule,
+                stake_value=req.stakeValue,
+                odds_source=req.oddsSource,
+                odds_timing=req.odds_timing or 'closing',
+                min_odds=req.minOdds or 1.0,
+                max_odds=req.maxOdds or 2.50,
+                exchange_commission=req.exchange_commission,
+                use_ml=req.use_ml,
+                data_source=req.data_source,
+                futpython_api_key=req.futpython_api_key,
+                min_odds_h=req.minOddsH, max_odds_h=req.maxOddsH,
+                min_odds_d=req.minOddsD, max_odds_d=req.maxOddsD,
+                min_odds_a=req.minOddsA, max_odds_a=req.maxOddsA,
+                min_odds_over25=req.minOddsOver25, max_odds_over25=req.maxOddsOver25,
+                min_odds_under25=req.minOddsUnder25, max_odds_under25=req.maxOddsUnder25,
+                slippage=req.slippage,
+                model_type=req.model_type,
+            )
+            if "error" in wf_result:
+                raise HTTPException(status_code=400, detail=wf_result["error"])
+            return wf_result
 
         results = backtester.run(
             leagues=req.leagues,
@@ -224,7 +268,9 @@ def run_backtest(req: BacktestRequest):
             min_odds_under25=req.minOddsUnder25,
             max_odds_under25=req.maxOddsUnder25,
             slippage=req.slippage,
-            oos_split_pct=req.oos_split if req.out_of_sample else 0.0
+            oos_split_pct=oos_split_pct,
+            oos_date_cutoff=oos_date_cutoff,
+            model_type=req.model_type
         )
         if "error" in results:
             raise HTTPException(status_code=400, detail=results["error"])
@@ -323,35 +369,18 @@ def predict_matchup(req: PredictRequest):
         lambda_h = pred['lambda_home']
         lambda_a = pred['lambda_away']
         
-        max_g = 5
-        home_probs = [math.exp(-lambda_h) * (lambda_h**i) / math.factorial(i) for i in range(max_g + 1)]
-        away_probs = [math.exp(-lambda_a) * (lambda_a**i) / math.factorial(i) for i in range(max_g + 1)]
-        
+        prob_matrix = pred.get('prob_matrix')
+        max_g = min(prob_matrix.shape[0] - 1, 5) if prob_matrix is not None else 5
         score_grid = []
-        rho = -0.085
-        tau_00 = 1.0 - lambda_h * lambda_a * rho
-        tau_10 = 1.0 + lambda_a * rho
-        tau_01 = 1.0 + lambda_h * rho
-        tau_11 = 1.0 - rho
-        
-        matrix = np.outer(home_probs, away_probs)
-        matrix[0, 0] *= max(0.0, tau_00)
-        matrix[1, 0] *= max(0.0, tau_10)
-        matrix[0, 1] *= max(0.0, tau_01)
-        matrix[1, 1] *= max(0.0, tau_11)
-        
-        m_sum = np.sum(matrix)
-        if m_sum > 0:
-            matrix = matrix / m_sum
-            
-        for h in range(max_g + 1):
-            row_probs = []
-            for a in range(max_g + 1):
-                row_probs.append({
-                    'score': f"{h}-{a}",
-                    'prob': round(float(matrix[h, a]) * 100, 1)
-                })
-            score_grid.append(row_probs)
+        if prob_matrix is not None:
+            for h in range(max_g + 1):
+                row_probs = []
+                for a in range(max_g + 1):
+                    row_probs.append({
+                        'score': f"{h}-{a}",
+                        'prob': round(float(prob_matrix[h, a]) * 100, 1)
+                    })
+                score_grid.append(row_probs)
             
         home_att, home_def, away_att, away_def, avg_h, avg_a = poisson.compute_team_ratings(df, latest_date + pd.Timedelta(days=1))
         h_att = home_att.get(req.homeTeam, 1.0)
@@ -528,11 +557,11 @@ def get_upcoming_predicted_matches(
                 df_fixtures = load_upcoming_from_api(token)
                 if not df_fixtures.empty:
                     used_api = True
-                    print("[API] Loaded upcoming matches from DataFootball API webhook.")
+                    logger.info("Loaded upcoming matches from DataFootball API webhook.")
                 else:
-                    print("[API Fallback] DataFootball API returned no matches, falling back to CSV.")
+                    logger.warning("DataFootball API returned no matches, falling back to CSV.")
             else:
-                print("[API Fallback] No API token found, falling back to CSV.")
+                logger.warning("No API token found, falling back to CSV.")
                 
         # 2. Fallback to standard CSV if needed
         if df_fixtures.empty:
@@ -541,7 +570,7 @@ def get_upcoming_predicted_matches(
             if os.path.exists(fixtures_path):
                 df_fixtures = pd.read_csv(fixtures_path, encoding='latin1')
                 df_fixtures.columns = [c.replace('', '').replace('\ufeff', '').strip() for c in df_fixtures.columns]
-                print("[CSV] Loaded upcoming matches from local fixtures.csv.")
+                logger.info("Loaded upcoming matches from local fixtures.csv.")
             else:
                 return []
                 
@@ -592,7 +621,7 @@ def get_upcoming_predicted_matches(
             odds_under25 = float(row.get('B365<2.5', np.nan))
             
             # Estimate other bookmaker odds
-            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, pred['lambda_home'], pred['lambda_away'])
+            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, pred['lambda_home'], pred['lambda_away'], pred.get('rho', RHO_FALLBACK))
             
             league_name = row.get('LeagueName') or LEAGUES_SEASONAL.get(league_code, league_code)
             
@@ -780,7 +809,10 @@ def get_upcoming_predicted_matches(
 @router.post("/portfolio_backtest")
 def api_run_portfolio(req: PortfolioRequest):
     try:
-        res = run_portfolio(req.strategy_ids, req.initial_bankroll, req.risk_method)
+        if not req.strategy_ids and not req.strategies_inline:
+            raise HTTPException(status_code=400, detail="A lista de strategy_ids não pode estar vazia")
+        res = run_portfolio(req.strategy_ids, req.initial_bankroll, req.risk_method,
+                            strategies_inline=req.strategies_inline)
         if "error" in res:
             raise HTTPException(status_code=400, detail=res["error"])
         return res

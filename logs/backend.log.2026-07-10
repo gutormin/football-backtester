@@ -1,0 +1,1274 @@
+2026-07-10 00:02:18 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:03:15 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:03:43 [ERROR] backend.live_odds_tracker: API Error 422: {"message":"Markets not supported by this endpoint: btts, draw_no_bet","error_code":"INVALID_MARKET","details_url":"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#invalid-market"}
+
+2026-07-10 00:04:49 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:05:49 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:07:17 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:08:20 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:09:46 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:10:49 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:12:15 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:13:16 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:14:45 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:15:44 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:17:12 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:18:17 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:19:39 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:20:47 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:22:10 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:23:16 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:24:39 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:25:45 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:27:12 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:28:42 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:30:10 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:31:44 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:33:11 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:33:43 [ERROR] backend.live_odds_tracker: API Error 422: {"message":"Markets not supported by this endpoint: btts, draw_no_bet","error_code":"INVALID_MARKET","details_url":"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#invalid-market"}
+
+2026-07-10 00:34:37 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:36:06 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:37:34 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:39:03 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:40:31 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:41:59 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:43:27 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:44:55 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:46:24 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:47:52 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:49:18 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:50:48 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:52:18 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:53:46 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:55:15 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 00:56:45 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 09:50:19 [ERROR] backend.live_odds_tracker: API Error 422: {"message":"Markets not supported by this endpoint: btts, draw_no_bet","error_code":"INVALID_MARKET","details_url":"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#invalid-market"}
+
+2026-07-10 09:51:28 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 09:51:29 [ERROR] asyncio: Task exception was never retrieved
+future: <Task finished name='Task-39' coro=<IocpProactor.accept.<locals>.accept_coro() done, defined at C:\Python314\Lib\asyncio\windows_events.py:564> exception=OSError(22, 'O nome da rede especificado não está mais disponível', None, 64, None)>
+Traceback (most recent call last):
+  File "C:\Python314\Lib\asyncio\windows_events.py", line 567, in accept_coro
+    await future
+  File "C:\Python314\Lib\asyncio\windows_events.py", line 804, in _poll
+    value = callback(transferred, key, ov)
+  File "C:\Python314\Lib\asyncio\windows_events.py", line 556, in finish_accept
+    ov.getresult()
+    ~~~~~~~~~~~~^^
+OSError: [WinError 64] O nome da rede especificado não está mais disponível
+2026-07-10 09:51:29 [ERROR] asyncio: Accept failed on a socket
+socket: <asyncio.TransportSocket fd=956, family=2, type=1, proto=6, laddr=('127.0.0.1', 8000)>
+Traceback (most recent call last):
+  File "C:\Python314\Lib\asyncio\proactor_events.py", line 845, in loop
+    conn, addr = f.result()
+                 ~~~~~~~~^^
+OSError: [WinError 64] O nome da rede especificado não está mais disponível
+2026-07-10 09:52:59 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 09:54:32 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 09:56:03 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 09:57:32 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 09:59:03 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:00:34 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:02:05 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:03:36 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:05:52 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:07:22 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:08:53 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:10:23 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:11:52 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:13:23 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:14:52 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:16:25 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:17:52 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:19:24 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:20:58 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:21:29 [ERROR] backend.live_odds_tracker: API Error 422: {"message":"Markets not supported by this endpoint: btts, draw_no_bet","error_code":"INVALID_MARKET","details_url":"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#invalid-market"}
+
+2026-07-10 10:22:32 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:24:09 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:25:41 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:27:18 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:28:51 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:30:26 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:32:00 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:33:32 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:35:06 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:36:41 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:38:11 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:39:43 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:41:17 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:42:54 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:44:28 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:46:03 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:47:40 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:49:16 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:50:49 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:51:30 [ERROR] backend.live_odds_tracker: API Error 422: {"message":"Markets not supported by this endpoint: btts, draw_no_bet","error_code":"INVALID_MARKET","details_url":"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#invalid-market"}
+
+2026-07-10 10:52:20 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:53:52 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:55:24 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:56:57 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:58:27 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 10:59:54 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:01:24 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:02:56 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:04:25 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:06:29 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:07:59 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:09:31 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:11:03 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:12:37 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:14:06 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:15:39 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:17:08 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:18:39 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:20:12 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:21:41 [ERROR] backend.live_odds_tracker: API Error 422: {"message":"Markets not supported by this endpoint: btts, draw_no_bet","error_code":"INVALID_MARKET","details_url":"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#invalid-market"}
+
+2026-07-10 11:21:46 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:23:16 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:24:48 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:26:18 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:27:51 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:29:24 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:30:56 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:32:27 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:33:58 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:35:26 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:36:54 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:38:24 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:39:52 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:41:22 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:42:49 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:44:18 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:45:51 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:47:20 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:48:50 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:50:19 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:51:42 [ERROR] backend.live_odds_tracker: API Error 422: {"message":"Markets not supported by this endpoint: btts, draw_no_bet","error_code":"INVALID_MARKET","details_url":"https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html#invalid-market"}
+
+2026-07-10 11:51:49 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:53:18 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:54:48 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:56:17 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:57:51 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 11:59:19 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:00:46 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:02:16 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:03:45 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:05:14 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:06:55 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:08:25 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:09:54 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:11:23 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:12:54 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:14:23 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:15:50 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:17:19 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'
+2026-07-10 12:18:47 [ERROR] backend.scheduler: Arbitrage scan falhou: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 586, in _run_generic_scheduler_loop
+    res = await scan_func()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Gustavo\.gemini\antigravity\scratch\football-backtester\backend\scheduler.py", line 674, in run_automatic_arbitrage_scan
+    gross_profit = opp.get('profit_margin', 0)
+                   ^^^^^^^
+AttributeError: 'str' object has no attribute 'get'

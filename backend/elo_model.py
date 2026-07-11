@@ -12,6 +12,11 @@ import os
 import pickle
 import hashlib
 
+from .constants import (
+    RHO_FALLBACK, RHO_MLE_BOUNDS, RHO_MLE_WINDOW, RHO_MLE_MIN_MATCHES,
+    ELO_K_FACTOR, ELO_HOME_ADVANTAGE,
+)
+
 class EloRatingsDict(dict):
     """Pickle-serializable dict subclass that mimics defaultdict(lambda: initial_rating)"""
     def __init__(self, initial_rating: float):
@@ -38,8 +43,8 @@ class EloTracker:
 
     def __init__(
         self,
-        k_factor: float = 20,
-        home_advantage: float = 65,
+        k_factor: float = ELO_K_FACTOR,
+        home_advantage: float = ELO_HOME_ADVANTAGE,
         initial_rating: float = 1500,
     ) -> None:
         """Inicializa o rastreador Elo.
@@ -164,9 +169,9 @@ def estimate_dynamic_rho(
         Retorna -0.085 como fallback se não houver dados suficientes
         ou se a otimização falhar.
     """
-    MIN_MATCHES = 50
-    WINDOW = 200
-    FALLBACK_RHO = -0.085
+    MIN_MATCHES = RHO_MLE_MIN_MATCHES
+    WINDOW = RHO_MLE_WINDOW
+    FALLBACK_RHO = RHO_FALLBACK
 
     n = len(home_goals_list)
     if n < MIN_MATCHES:
@@ -206,7 +211,7 @@ def estimate_dynamic_rho(
 
         result = minimize_scalar(
             _neg_log_likelihood,
-            bounds=(-0.20, 0.05),
+            bounds=RHO_MLE_BOUNDS,
             method="bounded",
         )
 
@@ -250,11 +255,11 @@ def build_elo_tracker_from_history(df: pd.DataFrame, league_code: str = "") -> E
         Um objeto EloTracker com as pontuações atualizadas.
     """
     if df.empty or 'FTHG' not in df.columns or 'FTAG' not in df.columns:
-        return EloTracker(k_factor=20, home_advantage=65)
-        
+        return EloTracker(k_factor=ELO_K_FACTOR, home_advantage=ELO_HOME_ADVANTAGE)
+
     cache_key = get_df_cache_key(df, league_code)
     cache_file = os.path.join(CACHE_DIR, f"{cache_key}.pkl")
-    
+
     # Try reading cache
     if os.path.exists(cache_file):
         try:
@@ -263,8 +268,8 @@ def build_elo_tracker_from_history(df: pd.DataFrame, league_code: str = "") -> E
                 return tracker
         except Exception:
             pass # fallback to rebuild if pickling fails
-            
-    tracker = EloTracker(k_factor=20, home_advantage=65)
+
+    tracker = EloTracker(k_factor=ELO_K_FACTOR, home_advantage=ELO_HOME_ADVANTAGE)
     try:
         # Tenta ordenar. Assumindo que Date já pode ser datetime ou string.
         # Se 'Time' estiver disponível, deveríamos ordenar também por Time, mas Date basta para Elo diário.

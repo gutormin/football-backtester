@@ -1,8 +1,8 @@
 import os
 import json
-import urllib.request
-import urllib.parse
+import requests
 from .data_loader import DATA_DIR
+from .api_utils import retry_with_backoff
 
 CONFIG_PATH = os.path.join(DATA_DIR, 'telegram_config.json')
 
@@ -42,22 +42,18 @@ def send_telegram_message(message):
         "parse_mode": "HTML"
     }
     
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
+    def _send():
+        return requests.post(url, json=payload, timeout=10,
+                             headers={'User-Agent': 'Mozilla/5.0'})
+
     try:
-        data = json.dumps(payload).encode('utf-8')
-        req = urllib.request.Request(
-            url,
-            data=data,
-            headers={
-                'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0'
-            }
-        )
-        with urllib.request.urlopen(req, timeout=10) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            if res_data.get("ok"):
-                return True, "Mensagem enviada com sucesso!"
-            else:
-                return False, f"Erro do Telegram: {res_data.get('description')}"
+        response = _send()
+        if response.status_code == 200 and response.json().get("ok"):
+            return True, "Mensagem enviada com sucesso!"
+        else:
+            res_data = response.json()
+            return False, f"Erro do Telegram: {res_data.get('description')}"
     except Exception as e:
         return False, f"Erro de conexão com API do Telegram: {str(e)}"
 
@@ -84,7 +80,7 @@ def format_telegram_tip(league_name, date_str, time_str, home_team, away_team, m
     )
     return message
 
-def format_telegram_arbitrage_tip(match_name, match_date, bookies_dict, profit_margin, market_name="Match Odds (1X2)", is_2_way=False, labels_dict=None, odds_dict=None):
+def format_telegram_arbitrage_tip(match_name, match_date, bookies_dict, profit_margin, market_name="Match Odds (1X2)", is_2_way=False, labels_dict=None, odds_dict=None, net_profit=None, quality_score=None, sport_key=''):
     # Calculate stakes for a R$ 100 total investment
     stakes_str = ""
     if odds_dict:
@@ -92,7 +88,7 @@ def format_telegram_arbitrage_tip(match_name, match_date, bookies_dict, profit_m
             total_implied = sum(1.0 / float(o) for o in odds_dict.values() if float(o) > 0)
             total_return = 100.0 / total_implied
             stakes = {k: round(total_return / float(v), 2) for k, v in odds_dict.items() if float(v) > 0}
-            
+
             stakes_str = "\n💰 <b>SUGESTÃO DE ENTRADA (Banca Total: R$ 100)</b>:\n"
             if is_2_way and labels_dict:
                 stakes_str += f"🔸 <b>{labels_dict.get('1', 'Seleção 1')}</b>: Aposte R$ {stakes.get('1', 0):.2f}\n"
@@ -105,12 +101,36 @@ def format_telegram_arbitrage_tip(match_name, match_date, bookies_dict, profit_m
         except Exception:
             pass
 
+    # Betfair commission warning
+    bf_warning = ""
+    for bookie_name in bookies_dict.values():
+        if 'betfair' in str(bookie_name).lower():
+            bf_warning = "\n⚠️ <b>Betfair Exchange detectada!</b> Lembre-se da comissão de 2-5% sobre o lucro.\n"
+            break
+
+    # Net profit line
+    net_line = ""
+    if net_profit is not None:
+        net_line = f"\n📊 <b>Lucro Líquido Estimado (após custos):</b> <b>+{net_profit}%</b>"
+
+    # Quality score
+    qs_line = ""
+    if quality_score is not None:
+        qs_emoji = "🟢" if quality_score >= 70 else "🟡" if quality_score >= 50 else "🟠"
+        qs_line = f"\n🏷️ <b>Score de Qualidade:</b> {qs_emoji} {quality_score}/100"
+
+    # League info
+    league_line = ""
+    if sport_key:
+        league_name = sport_key.replace('soccer_', '').replace('_', ' ').title()
+        league_line = f"\n🏟️ <b>Liga:</b> {league_name}"
+
     # Formats a beautiful alert for surebets
     message = (
         f"<b>🚨 OPORTUNIDADE DE ARBITRAGEM DETECTADA (SUREBET)</b>\n\n"
         f"⚔️ <b>Jogo:</b> {match_name}\n"
-        f"📅 <b>Data:</b> {match_date}\n\n"
-        f"⚖️ <b>Lucro Garantido Estimado:</b> <b>+{profit_margin}%</b>\n\n"
+        f"📅 <b>Data:</b> {match_date}{league_line}\n\n"
+        f"⚖️ <b>Lucro Bruto Estimado:</b> <b>+{profit_margin}%</b>{net_line}{qs_line}{bf_warning}\n\n"
         f"🎯 <b>ODDS PARA COMBINAR ({market_name}):</b>\n"
     )
     if is_2_way and labels_dict:
@@ -125,7 +145,7 @@ def format_telegram_arbitrage_tip(match_name, match_date, bookies_dict, profit_m
         message += f"🔹 <b>Mandante (1):</b> {bookies_dict.get('1', '-')}{o1}\n"
         message += f"🔹 <b>Empate (X):</b> {bookies_dict.get('X', '-')}{ox}\n"
         message += f"🔹 <b>Visitante (2):</b> {bookies_dict.get('2', '-')}{o2}\n\n"
-        
+
     if stakes_str:
         message += stakes_str
 
@@ -152,7 +172,17 @@ def save_telegram_tips(tips):
     return tips
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+
+MAX_TIPS_AGE_DAYS = 30
+MAX_TIPS_COUNT = 500
+
+def _prune_old_tips(tips, max_age_days=MAX_TIPS_AGE_DAYS, max_count=MAX_TIPS_COUNT):
+    cutoff = (datetime.now() - timedelta(days=max_age_days)).strftime('%Y-%m-%d %H:%M:%S')
+    pruned = [t for t in tips if t.get('created_at', '') >= cutoff]
+    if len(pruned) > max_count:
+        pruned = pruned[-max_count:]
+    return pruned
 
 def add_telegram_tip(league_name, date_str, time_str, home_team, away_team, market_label, bookie_odds, stake_pct):
     tips = get_telegram_tips()
@@ -170,6 +200,7 @@ def add_telegram_tip(league_name, date_str, time_str, home_team, away_team, mark
         "created_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     tips.append(new_tip)
+    tips = _prune_old_tips(tips)
     save_telegram_tips(tips)
     return new_tip
 
@@ -216,6 +247,7 @@ def add_telegram_arbitrage_tip(match_name, match_date, profit_margin):
         "created_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     tips.append(new_tip)
+    tips = _prune_old_tips(tips, max_age_days=MAX_TIPS_AGE_DAYS, max_count=MAX_TIPS_COUNT)
     save_telegram_arbitrage_tips(tips)
     return new_tip
 
@@ -299,16 +331,60 @@ def format_contrarian_tip(league_name, match_name, match_date, time_str, market_
     )
     return message
 
-def format_dna_shift_alert(league_name, old_cluster_desc, new_cluster_desc, recommended_markets):
+def _compute_min_odds_for_market(market, stats, ev_threshold=0.05):
+    """Given a market label and cluster stats, return the minimum odds for EV+ threshold."""
+    prob = None
+    m = market.lower()
+
+    if 'over 2.5' in m or m == 'over 2.5':
+        prob = stats.get('over25_pct', 0.5)
+    elif 'under 2.5' in m or m == 'under 2.5':
+        prob = 1.0 - stats.get('over25_pct', 0.5)
+    elif 'over 0.5 ht' in m or m == 'over 0.5 ht':
+        prob = min(0.80, max(0.55, stats.get('avg_goals', 2.5) / 4.0))
+    elif 'under 0.5 ht' in m or m == 'under 0.5 ht':
+        prob_ht = min(0.80, max(0.55, stats.get('avg_goals', 2.5) / 4.0))
+        prob = 1.0 - prob_ht
+    elif 'btts yes' in m or m == 'btts yes' or 'ambas marcam' in m:
+        prob = stats.get('btts_pct', 0.5)
+    elif 'back home' in m or m == 'back home' or 'back mandante' in m:
+        prob = stats.get('home_win_pct', 0.4)
+    elif 'lay home' in m or m == 'lay home':
+        prob = 1.0 - stats.get('home_win_pct', 0.4)
+    elif 'empate ht' in m or m == 'empate ht':
+        prob = stats.get('draw_pct', 0.28)
+    elif 'handicap' in m:
+        prob = stats.get('home_win_pct', 0.4)
+    elif 'match odds' in m:
+        return None  # too complex for a single odd line
+
+    if prob is None or prob <= 0 or prob >= 1:
+        return None
+    min_odd = round((1.0 + ev_threshold) / prob, 2)
+    return min_odd
+
+
+def format_dna_shift_alert(league_name, old_cluster_desc, new_cluster_desc, markets, stats):
+    # Build per-market odds lines
+    odds_lines = []
+    for mkt in markets:
+        min_odd = _compute_min_odds_for_market(mkt, stats)
+        if min_odd:
+            odds_lines.append(f"  • {mkt}: <b>@≥{min_odd:.2f}</b>")
+        else:
+            odds_lines.append(f"  • {mkt}")
+
     message = (
         f"🔄 <b>MUDANÇA DE COMPORTAMENTO DETECTADA!</b> 🔄\n\n"
-        f"🏆 <b>Liga:</b> {league_name}\n\n"
+        f"🏆 <b>Liga:</b> {league_name}\n"
+        f"📊 <b>Gols/Jogo:</b> {stats.get('avg_goals', '?')}\n\n"
         f"O motor de IA detectou que esta liga sofreu uma mutação matemática nesta temporada:\n"
         f"📉 <b>Saiu de:</b> {old_cluster_desc}\n"
         f"📈 <b>Entrou em:</b> {new_cluster_desc}\n\n"
         f"💡 <b>Dica da IA:</b> Os robôs das casas de aposta demoram semanas para corrigir seus modelos de preço após uma mudança de cluster.\n\n"
-        f"🎯 <b>Foque o Scanner em:</b> {recommended_markets}\n"
-        f"<i>Fique de olho em oportunidades de valor esmagador nestes mercados para as próximas rodadas!</i>\n"
+        f"🎯 <b>Mercados com Odds Mínimas (EV+5%):</b>\n"
+        + "\n".join(odds_lines) + "\n\n"
+        f"<i>Foque o Scanner nestes mercados com odds >= às listadas para as próximas rodadas!</i>\n"
     )
     return message
 

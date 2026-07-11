@@ -1,8 +1,34 @@
 import json
+import logging
+import math
 import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
+
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+
+def _sanitize_for_json(obj):
+    """Recursively walk obj, converting numpy types to native Python and NaN/Inf to None."""
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_sanitize_for_json(item) for item in obj]
+    if isinstance(obj, np.ndarray):
+        return _sanitize_for_json(obj.tolist())
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        f = float(obj)
+        return None if (math.isnan(f) or math.isinf(f)) else f
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    return obj
 
 DB_FILE = "data/backtester.db"
 HISTORY_FILE = "data/history_strategies.json"
@@ -38,7 +64,7 @@ def init_db():
                 """)
                 conn.commit()
         except Exception as e:
-            print(f"Erro ao inicializar banco PostgreSQL: {e}")
+            logger.error(f"Erro ao inicializar banco PostgreSQL: {e}", exc_info=True)
         finally:
             conn.close()
         return
@@ -64,7 +90,7 @@ def init_db():
                     history = json.load(f)
                 
                 if isinstance(history, list) and len(history) > 0:
-                    print(f"Migrando {len(history)} estratégias legadas de {HISTORY_FILE} para o SQLite...")
+                    logger.info(f"Migrando {len(history)} estratégias legadas de {HISTORY_FILE} para o SQLite...")
                     with conn:
                         for s in history:
                             provided_id = s.get("id") or str(uuid.uuid4())
@@ -85,7 +111,7 @@ def init_db():
                                 INSERT OR IGNORE INTO strategies (id, name, type, created_at, is_tg_active, parameters)
                                 VALUES (?, ?, ?, ?, ?, ?)
                             """, (provided_id, name, stype, created_at, is_tg_active, parameters_blob))
-                    print("Migração concluída com sucesso no SQLite.")
+                    logger.info("Migração concluída com sucesso no SQLite.")
                 
                 # Rename legacy file to avoid migrating again
                 bak_file = HISTORY_FILE + ".bak"
@@ -95,10 +121,10 @@ def init_db():
                     except Exception:
                         pass
                 os.rename(HISTORY_FILE, bak_file)
-                print(f"Arquivo legado renomeado para {bak_file}")
+                logger.info(f"Arquivo legado renomeado para {bak_file}")
                 
             except Exception as e:
-                print(f"Erro durante a migração do histórico legado: {e}")
+                logger.error(f"Erro durante a migração do histórico legado: {e}", exc_info=True)
     finally:
         conn.close()
 
@@ -131,7 +157,7 @@ def load_history():
                     })
                 return history
         except Exception as e:
-            print(f"Erro ao carregar histórico do PostgreSQL: {e}")
+            logger.error(f"Erro ao carregar histórico do PostgreSQL: {e}", exc_info=True)
             return []
         finally:
             conn.close()
@@ -173,7 +199,7 @@ def load_history():
             
         return history
     except Exception as e:
-        print(f"Erro ao carregar histórico: {e}")
+        logger.error(f"Erro ao carregar histórico: {e}", exc_info=True)
         return []
     finally:
         conn.close()
@@ -207,10 +233,10 @@ def add_strategy(data: dict):
         "summary": data.get("summary", {})
     }
     
-    parameters_blob = json.dumps({
+    parameters_blob = json.dumps(_sanitize_for_json({
         "params": entry["params"],
         "summary": entry["summary"]
-    }, ensure_ascii=False)
+    }), ensure_ascii=False)
 
     if DATABASE_URL:
         conn = get_pg_connection()
@@ -235,7 +261,7 @@ def add_strategy(data: dict):
                 ))
                 conn.commit()
         except Exception as e:
-            print(f"Erro ao salvar estratégia no PostgreSQL: {e}")
+            logger.error(f"Erro ao salvar estratégia no PostgreSQL: {e}", exc_info=True)
         finally:
             conn.close()
         return entry
@@ -273,10 +299,10 @@ def save_history(history: list):
                     created_at = s.get("created_at") or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
                     is_tg_active = 1 if s.get("is_tg_active", False) else 0
                     
-                    parameters_blob = json.dumps({
+                    parameters_blob = json.dumps(_sanitize_for_json({
                         "params": s.get("params", {}),
                         "summary": s.get("summary", {})
-                    }, ensure_ascii=False)
+                    }), ensure_ascii=False)
                     
                     cur.execute("""
                         INSERT INTO strategies (id, name, type, created_at, is_tg_active, parameters)
@@ -284,7 +310,7 @@ def save_history(history: list):
                     """, (provided_id, name, stype, created_at, is_tg_active, parameters_blob))
                 conn.commit()
         except Exception as e:
-            print(f"Erro ao re-salvar histórico no PostgreSQL: {e}")
+            logger.error(f"Erro ao re-salvar histórico no PostgreSQL: {e}", exc_info=True)
         finally:
             conn.close()
         return
@@ -300,10 +326,10 @@ def save_history(history: list):
                 created_at = s.get("created_at") or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
                 is_tg_active = 1 if s.get("is_tg_active", False) else 0
                 
-                parameters_blob = json.dumps({
+                parameters_blob = json.dumps(_sanitize_for_json({
                     "params": s.get("params", {}),
                     "summary": s.get("summary", {})
-                }, ensure_ascii=False)
+                }), ensure_ascii=False)
                 
                 conn.execute("""
                     INSERT INTO strategies (id, name, type, created_at, is_tg_active, parameters)
@@ -321,7 +347,7 @@ def delete_strategy(strategy_id: str):
                 cur.execute("DELETE FROM strategies WHERE id = %s", (strategy_id,))
                 conn.commit()
         except Exception as e:
-            print(f"Erro ao deletar estratégia no PostgreSQL: {e}")
+            logger.error(f"Erro ao deletar estratégia no PostgreSQL: {e}", exc_info=True)
         finally:
             conn.close()
         return True

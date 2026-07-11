@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './api.js';
+
 window.runLiveSteamScan = async function() {
     try {
         const tbody = document.querySelector('#steam-live-table tbody');
@@ -9,7 +11,7 @@ window.runLiveSteamScan = async function() {
         const profileFilter = document.getElementById('val-drop-profile') ? document.getElementById('val-drop-profile').value : 'all';
         
         if (markets.length === 0) {
-            alert("Por favor, selecione pelo menos um mercado.");
+            showToast("Por favor, selecione pelo menos um mercado.", "warning");
             return;
         }
 
@@ -241,15 +243,15 @@ window.renderLiveSteamTable = function(results) {
         }
 
         let profileHTML = '';
-        if (item.profile === 'sharps') {
+        if (item.profile_type === 'Sharps') {
             profileHTML = `<div style="display:flex; align-items:center; gap:4px; font-size:9px; font-weight:800; color:#34d399; background:rgba(52, 211, 153, 0.1); padding:2px 6px; border-radius:4px; text-transform:uppercase;"><i class="fa-solid fa-user-ninja"></i> Sharps (Sindicato)</div>`;
-        } else if (item.profile === 'squares') {
+        } else if (item.profile_type === 'Squares') {
             profileHTML = `<div style="display:flex; align-items:center; gap:4px; font-size:9px; font-weight:800; color:#f87171; background:rgba(248, 113, 113, 0.1); padding:2px 6px; border-radius:4px; text-transform:uppercase;"><i class="fa-solid fa-users"></i> Squares (Público)</div>`;
         } else {
             profileHTML = `<div style="display:flex; align-items:center; gap:4px; font-size:9px; font-weight:800; color:#9ca3af; background:rgba(156, 163, 175, 0.1); padding:2px 6px; border-radius:4px; text-transform:uppercase;"><i class="fa-solid fa-user-secret"></i> Desconhecido</div>`;
         }
 
-        const velocity = item.velocity_pct_per_hour || 0;
+        const velocity = item.velocity || 0;
         const accelRatio = item.acceleration_ratio || 1;
         let accelText = 'Normal';
         let accelIcon = 'fa-arrow-trend-up';
@@ -334,7 +336,7 @@ window.toggleSteamMode = function(mode) {
         if (liveTable) liveTable.style.display = 'none';
         
         const btnScan = document.getElementById('btn-scan-steam');
-        if (btnScan) btnScan.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest';
+        if (btnScan) btnScan.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Value Scanner';
     } else {
         if (btnLive) {
             btnLive.classList.add('active');
@@ -366,15 +368,34 @@ window.switchRadarTab = function(mode) {
     window.toggleSteamMode(mode);
 };
 
-// Wait for DOMContentLoaded to capture the original runSteamScan from window object and override it
-window.addEventListener('DOMContentLoaded', () => {
-    const originalRunSteamScan = window.runSteamScan;
-    window.runSteamScan = function() {
-        if (currentSteamMode === 'live') {
-            runLiveSteamScan();
-        } else if (typeof originalRunSteamScan === 'function') {
-            originalRunSteamScan();
+// Intercept runSteamScan so the lab/live toggle routes to the correct function.
+// history.js sets window.runSteamScan after it loads, which may happen AFTER this module.
+// Poll until it's available, then wrap it.
+(function installInterceptor() {
+    if (typeof window.runSteamScan === 'function') {
+        const originalRunSteamScan = window.runSteamScan;
+        window.runSteamScan = function () {
+            if (currentSteamMode === 'live') {
+                return window.runLiveSteamScan();
+            } else if (typeof originalRunSteamScan === 'function') {
+                return originalRunSteamScan();
+            }
+        };
+        return;
+    }
+    // Not ready yet — poll every 50ms until history.js sets it
+    const interval = setInterval(() => {
+        if (typeof window.runSteamScan === 'function') {
+            clearInterval(interval);
+            const originalRunSteamScan = window.runSteamScan;
+            window.runSteamScan = function () {
+                if (currentSteamMode === 'live') {
+                    return window.runLiveSteamScan();
+                } else if (typeof originalRunSteamScan === 'function') {
+                    return originalRunSteamScan();
+                }
+            };
         }
-    };
-});
+    }, 50);
+})();
 

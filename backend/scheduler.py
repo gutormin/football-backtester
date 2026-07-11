@@ -1,61 +1,74 @@
 import os
 import json
 import asyncio
+import logging
 import time
+import tempfile
+import threading
+
+logger = logging.getLogger(__name__)
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
 STATE_FILE = os.path.join(DATA_DIR, 'scheduler_state.json')
 
-def get_last_run(task_name):
+_state_lock = threading.Lock()
+
+def _read_state():
+    """Read scheduler state dict. Returns {} if file missing or corrupt."""
     if not os.path.exists(STATE_FILE):
-        return 0.0
+        return {}
     try:
-        with open(STATE_FILE, 'r') as f:
-            import json
-            state = json.load(f)
-            return state.get(task_name, 0.0)
-    except:
-        return 0.0
+        with open(STATE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        logger.warning("scheduler_state.json corrompido, resetando estado.")
+        return {}
+
+def _write_state(state):
+    """Atomic write: temp file + os.replace to prevent corruption on crash."""
+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+    try:
+        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(STATE_FILE), suffix='.tmp')
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(state, f)
+            os.replace(tmp_path, STATE_FILE)
+        except Exception:
+            os.unlink(tmp_path)
+            raise
+    except OSError:
+        # Fallback: direct write if tempfile fails
+        with open(STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(state, f)
+
+def get_last_run(task_name):
+    """Return last successful run timestamp for task_name (0.0 if never)."""
+    with _state_lock:
+        return _read_state().get(task_name, 0.0)
 
 def set_last_run(task_name, timestamp):
-    import json
-    state = {}
-    if os.path.exists(STATE_FILE):
-        try:
-            with open(STATE_FILE, 'r') as f:
-                state = json.load(f)
-        except:
-            pass
-    state[task_name] = timestamp
-    with open(STATE_FILE, 'w') as f:
-        json.dump(state, f)
-import time
+    """Record successful run timestamp (atomic, thread-safe)."""
+    with _state_lock:
+        state = _read_state()
+        state[task_name] = timestamp
+        _write_state(state)
 
-STATE_FILE = os.path.join(DATA_DIR, 'scheduler_state.json')
+def mark_scan_attempt(task_name):
+    """Record attempt timestamp BEFORE running scan. Used for crash recovery.
+    Returns (can_run: bool, last_success: float).
+    """
+    with _state_lock:
+        state = _read_state()
+        last_attempt = state.get(f"{task_name}_attempt", 0.0)
+        last_success = state.get(task_name, 0.0)
+        now = time.time()
+        # Only block if an attempt was made recently (< 60s ago) without success
+        if last_attempt > last_success and (now - last_attempt) < 60:
+            return False, last_success
+        state[f"{task_name}_attempt"] = now
+        _write_state(state)
+        return True, last_success
 
-def get_last_run(task_name):
-    if not os.path.exists(STATE_FILE):
-        return 0.0
-    try:
-        with open(STATE_FILE, 'r') as f:
-            import json
-            state = json.load(f)
-            return state.get(task_name, 0.0)
-    except:
-        return 0.0
-
-def set_last_run(task_name, timestamp):
-    import json
-    state = {}
-    if os.path.exists(STATE_FILE):
-        try:
-            with open(STATE_FILE, 'r') as f:
-                state = json.load(f)
-        except:
-            pass
-    state[task_name] = timestamp
-    with open(STATE_FILE, 'w') as f:
-        json.dump(state, f)
 from datetime import datetime
 import pandas as pd
 import numpy as np
@@ -65,6 +78,7 @@ from .data_loader import (
     get_api_token, load_upcoming_from_api, auto_detect_data_source
 )
 from .models import PoissonModel, estimate_bookmaker_odds
+from .constants import RHO_FALLBACK
 from .telegram_bot import (
     get_telegram_tips, add_telegram_tip, send_telegram_message, format_telegram_tip,
     get_telegram_arbitrage_tips, add_telegram_arbitrage_tip, format_telegram_arbitrage_tip,
@@ -78,7 +92,9 @@ DEFAULT_CONFIG = {
     "enabled": False,
     "mode": "manual",
     "check_interval_hours": 6,
-    "leagues": ["E0", "SP1", "I1", "D1", "F1", "BRA"],
+    "leagues": ["E0", "SP1", "I1", "D1", "F1", "E1", "E2", "E3", "SP2", "I2",
+                "D2", "F2", "N1", "B1", "P1", "T1", "G1", "SC0", "SC1",
+                "BRA", "ARG", "USA", "MEX", "JPN", "SWEDEN_ALLSVENSKAN", "NORWAY_ELITESERIEN"],
     "market": "home",
     "value_threshold": 1.05,
     "min_odds": 1.0,
@@ -125,27 +141,27 @@ async def run_automatic_tips_scan():
             try:
                 df_fixtures = await loop.run_in_executor(None, lambda: load_upcoming_from_api(token))
                 if not df_fixtures.empty:
-                    print("[Scheduler API] Loaded upcoming matches from DataFootball API webhook.")
+                    logger.info("Loaded upcoming matches from DataFootball API webhook.")
                 else:
-                    print("[Scheduler API Fallback] DataFootball API returned no matches, falling back to CSV.")
+                    logger.warning("DataFootball API returned no matches, falling back to CSV.")
             except Exception as e:
-                print(f"[Scheduler API Error] {e}. Falling back to CSV.")
+                logger.error(f"DataFootball API error: {e}. Falling back to CSV.", exc_info=True)
         else:
-            print("[Scheduler API Fallback] No API token found, falling back to CSV.")
+            logger.warning("No API token found, falling back to CSV.")
             
     # 2. Fallback to standard CSV if needed
     if df_fixtures.empty:
         try:
             await loop.run_in_executor(None, lambda: sync_fixtures(force=True))
         except Exception as e:
-            print(f"[Scheduler Error] Falha ao sincronizar calendário de jogos: {e}")
+            logger.error(f"Falha ao sincronizar calendário de jogos: {e}", exc_info=True)
             
         fixtures_path = os.path.join(DATA_DIR, "fixtures.csv")
         if os.path.exists(fixtures_path):
             try:
                 df_fixtures = pd.read_csv(fixtures_path, encoding='latin1')
                 df_fixtures.columns = [c.replace('ï»¿', '').replace('\ufeff', '').strip() for c in df_fixtures.columns]
-                print("[Scheduler CSV] Loaded upcoming matches from local fixtures.csv.")
+                logger.info("Loaded upcoming matches from local fixtures.csv.")
             except Exception as e:
                 return {"status": "error", "message": f"Erro ao ler arquivo de jogos: {str(e)}"}
         else:
@@ -181,7 +197,7 @@ async def run_automatic_tips_scan():
                     'stake_pct': m['stake_pct']
                 })
         except Exception as e:
-            print(f"[Scheduler Autopilot Error] {e}")
+            logger.error(f"Autopilot error: {e}", exc_info=True)
 
     # Gather active strategies and portfolios from history database
     from .history_manager import load_history
@@ -356,7 +372,7 @@ async def run_automatic_tips_scan():
             odds_over25 = float(row.get('B365>2.5', np.nan))
             odds_under25 = float(row.get('B365<2.5', np.nan))
             
-            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, pred['lambda_home'], pred['lambda_away'])
+            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, pred['lambda_home'], pred['lambda_away'], pred.get('rho', RHO_FALLBACK))
             
             # Sub-run 1: Manual Scan
             if run_manual_scan and league_code in target_leagues_manual:
@@ -517,7 +533,7 @@ async def run_automatic_tips_scan():
             sent_count += 1
             await asyncio.sleep(1.0)
         else:
-            print(f"[Scheduler Telegram Alert Error]: {msg}")
+            logger.error(f"Telegram alert failed: {msg}")
             
     return {
         "status": "success",
@@ -526,35 +542,81 @@ async def run_automatic_tips_scan():
         "sent_tips": sent_count
     }
 
-async def run_scheduler_loop():
-    print("[Scheduler Startup] Iniciando robô automático de tips...")
+async def _run_generic_scheduler_loop(task_name, scan_func, get_config_func=None,
+                                       interval_seconds=None, error_sleep=600,
+                                       log_labels=None):
+    """Generic scheduler loop — single implementation for all 4 scheduler types.
+
+    Args:
+        task_name: key for mark_scan_attempt / set_last_run (e.g. "tips_scan")
+        scan_func: async callable that runs the scan
+        get_config_func: callable returning dict with "enabled" and "check_interval_hours" keys.
+                         If None, the scheduler is always enabled with the given interval_seconds.
+        interval_seconds: fallback interval when get_config_func is None
+        error_sleep: seconds to sleep on unexpected Exception
+        log_labels: dict of log strings with keys: startup, scanning, done, scan_error, loop_error, cancelled
+    """
+    if log_labels is None:
+        log_labels = {}
+    startup = log_labels.get('startup', f'{task_name} scheduler iniciado.')
+    scanning = log_labels.get('scanning', f'Iniciando {task_name}...')
+    done = log_labels.get('done', f'{task_name} concluída:')
+    scan_error = log_labels.get('scan_error', f'{task_name} falhou:')
+    loop_error = log_labels.get('loop_error', f'Erro no loop {task_name}:')
+    cancelled = log_labels.get('cancelled', f'{task_name} scheduler finalizado.')
+
+    logger.info(startup)
     while True:
         try:
-            config = get_scheduler_config()
-            enabled = config.get("enabled", False)
-            interval_hours = config.get("check_interval_hours", 6)
-            interval_seconds = interval_hours * 3600
-            last_run = get_last_run("tips_scan")
-            time_since_last = time.time() - last_run
-            
+            if get_config_func is not None:
+                config = get_config_func()
+                enabled = config.get("enabled", False)
+                interval_hours = config.get("check_interval_hours", 6)
+                interval = interval_hours * 3600
+            else:
+                enabled = True
+                interval = interval_seconds or 1800
+
             if enabled:
-                if time_since_last >= interval_seconds:
-                    print(f"[Scheduler Run] Iniciando varredura agendada de novos jogos...")
-                    res = await run_automatic_tips_scan()
-                    set_last_run("tips_scan", time.time())
-                    print(f"[Scheduler Complete] Resultado: {res}")
-                    await asyncio.sleep(interval_seconds)
+                can_run, last_success = mark_scan_attempt(task_name)
+                time_since_last = time.time() - last_success
+                if can_run and time_since_last >= interval:
+                    logger.info(scanning)
+                    try:
+                        res = await scan_func()
+                        set_last_run(task_name, time.time())
+                        if res is not None:
+                            logger.info(f"{done} {res}")
+                    except Exception as e:
+                        logger.error(f"{scan_error} {e}", exc_info=True)
+                    await asyncio.sleep(max(interval - (time.time() - last_success), 60))
                 else:
-                    await asyncio.sleep(interval_seconds - time_since_last)
+                    remaining = max(interval - time_since_last, 60)
+                    await asyncio.sleep(remaining)
             else:
                 await asyncio.sleep(60)
-            
+
         except asyncio.CancelledError:
-            print("[Scheduler Shutdown] Robô automático de tips finalizado.")
+            logger.info(cancelled)
             break
         except Exception as e:
-            print(f"[Scheduler Exception] Ocorreu um erro no loop: {e}")
-            await asyncio.sleep(600)
+            logger.error(f"{loop_error} {e}", exc_info=True)
+            await asyncio.sleep(error_sleep)
+
+async def run_scheduler_loop():
+    await _run_generic_scheduler_loop(
+        task_name="tips_scan",
+        scan_func=run_automatic_tips_scan,
+        get_config_func=get_scheduler_config,
+        log_labels={
+            "startup": "Scheduler iniciado.",
+            "scanning": "Iniciando varredura agendada...",
+            "done": "Varredura concluída:",
+            "scan_error": "Varredura falhou:",
+            "loop_error": "Erro no loop do scheduler:",
+            "cancelled": "Scheduler finalizado.",
+        }
+    )
 
 ARB_CONFIG_PATH = os.path.join(DATA_DIR, 'telegram_arbitrage_config.json')
 
@@ -609,28 +671,34 @@ async def run_automatic_arbitrage_scan():
     sent_count = 0
     
     for opp in opps:
-        profit = opp.get('profit_margin', 0)
-        if profit < min_profit:
+        gross_profit = opp.get('profit_margin', 0)
+        net_profit = opp.get('profit_margin_net', gross_profit)
+
+        # Use net profit (after slippage + commission) for the filter
+        if net_profit < min_profit:
             continue
-            
+
         match_name = opp.get('match')
         match_date = opp.get('date')
-        
+
         dup_key = (match_name, match_date)
         if dup_key in sent_lookup:
             continue
-            
+
         msg_text = format_telegram_arbitrage_tip(
-            match_name, match_date, opp.get('bookmakers', {}), profit,
+            match_name, match_date, opp.get('bookmakers', {}), gross_profit,
             market_name=opp.get('market', 'Match Odds (1X2)'),
             is_2_way=opp.get('is_2_way', False),
             labels_dict=opp.get('labels', None),
-            odds_dict=opp.get('odds', {})
+            odds_dict=opp.get('odds', {}),
+            net_profit=round(net_profit, 2),
+            quality_score=opp.get('quality_score'),
+            sport_key=opp.get('sport_key', ''),
         )
         
         ok, msg = send_telegram_message(msg_text)
         if ok:
-            add_telegram_arbitrage_tip(match_name, match_date, profit)
+            add_telegram_arbitrage_tip(match_name, match_date, round(net_profit, 2))
             sent_lookup.add(dup_key)
             sent_count += 1
             await asyncio.sleep(1.0)
@@ -642,58 +710,38 @@ async def run_automatic_arbitrage_scan():
     }
 
 async def run_arbitrage_scheduler_loop():
-    print("[Arbitrage Scheduler Startup] Iniciando robô de arbitragem...")
-    while True:
-        try:
-            config = get_arbitrage_scheduler_config()
-            enabled = config.get("enabled", False)
-            interval_hours = config.get("check_interval_hours", 1.0)
-            interval_seconds = interval_hours * 3600
-            last_run = get_last_run("arbitrage_scan")
-            time_since_last = time.time() - last_run
-            
-            if enabled:
-                if time_since_last >= interval_seconds:
-                    print(f"[Arbitrage Scheduler Run] Buscando novas surebets...")
-                    res = await run_automatic_arbitrage_scan()
-                    set_last_run("arbitrage_scan", time.time())
-                    print(f"[Arbitrage Scheduler Complete] Resultado: {res}")
-                    await asyncio.sleep(interval_seconds)
-                else:
-                    await asyncio.sleep(interval_seconds - time_since_last)
-            else:
-                await asyncio.sleep(60)
-            
-        except asyncio.CancelledError:
-            print("[Arbitrage Scheduler Shutdown] Robô de arbitragem finalizado.")
-            break
-        except Exception as e:
-            print(f"[Arbitrage Scheduler Exception] Erro no loop: {e}")
-            await asyncio.sleep(600)
+    await _run_generic_scheduler_loop(
+        task_name="arbitrage_scan",
+        scan_func=run_automatic_arbitrage_scan,
+        get_config_func=get_arbitrage_scheduler_config,
+        log_labels={
+            "startup": "Arbitrage scheduler iniciado.",
+            "scanning": "Buscando novas surebets...",
+            "done": "Arbitrage varredura concluída:",
+            "scan_error": "Arbitrage scan falhou:",
+            "loop_error": "Erro no loop de arbitragem:",
+            "cancelled": "Arbitrage scheduler finalizado.",
+        }
+    )
 
 
 
 async def run_live_odds_tracker_loop():
-    import asyncio
     from .live_odds_tracker import fetch_and_update_live_odds
-    while True:
-        try:
-            interval_seconds = 1800
-            last_run = get_last_run("live_odds_scan")
-            time_since_last = time.time() - last_run
-            
-            if time_since_last >= interval_seconds:
-                await asyncio.to_thread(fetch_and_update_live_odds)
-                set_last_run("live_odds_scan", time.time())
-                await asyncio.sleep(interval_seconds)
-            else:
-                await asyncio.sleep(interval_seconds - time_since_last)
-        except asyncio.CancelledError:
-            print('[Live Odds Tracker] Cancelado.')
-            break
-        except Exception as e:
-            print(f'[Live Odds Tracker] Erro no loop: {e}')
-            await asyncio.sleep(60)
+    await _run_generic_scheduler_loop(
+        task_name="live_odds_scan",
+        scan_func=lambda: asyncio.to_thread(fetch_and_update_live_odds),
+        interval_seconds=1800,
+        error_sleep=60,
+        log_labels={
+            "startup": "Live Odds Tracker iniciado.",
+            "scanning": "Atualizando odds ao vivo...",
+            "done": "Live Odds atualizados com sucesso.",
+            "scan_error": "Live Odds scan falhou:",
+            "loop_error": "Erro no Live Odds Tracker:",
+            "cancelled": "Live Odds Tracker cancelado.",
+        }
+    )
 
 
 DUTCH_CONFIG_PATH = os.path.join(DATA_DIR, 'telegram_dutching_config.json')
@@ -796,31 +844,16 @@ async def run_automatic_dutching_scan():
     }
 
 async def run_dutching_scheduler_loop():
-    print("[Dutching Scheduler Startup] Iniciando robô de Dutching...")
-    while True:
-        try:
-            config = get_dutching_scheduler_config()
-            enabled = config.get("enabled", False)
-            interval_hours = config.get("check_interval_hours", 1.0)
-            interval_seconds = interval_hours * 3600
-            last_run = get_last_run("dutching_scan")
-            time_since_last = time.time() - last_run
-            
-            if enabled:
-                if time_since_last >= interval_seconds:
-                    print(f"[Dutching Scheduler Run] Buscando novas oportunidades de Dutching...")
-                    res = await run_automatic_dutching_scan()
-                    set_last_run("dutching_scan", time.time())
-                    print(f"[Dutching Scheduler Complete] Resultado: {res}")
-                    await asyncio.sleep(interval_seconds)
-                else:
-                    await asyncio.sleep(interval_seconds - time_since_last)
-            else:
-                await asyncio.sleep(60)
-            
-        except asyncio.CancelledError:
-            print("[Dutching Scheduler Shutdown] Robô de Dutching finalizado.")
-            break
-        except Exception as e:
-            print(f"[Dutching Scheduler Exception] Erro no loop: {e}")
-            await asyncio.sleep(600)
+    await _run_generic_scheduler_loop(
+        task_name="dutching_scan",
+        scan_func=run_automatic_dutching_scan,
+        get_config_func=get_dutching_scheduler_config,
+        log_labels={
+            "startup": "Dutching scheduler iniciado.",
+            "scanning": "Buscando novas oportunidades de Dutching...",
+            "done": "Dutching varredura concluída:",
+            "scan_error": "Dutching scan falhou:",
+            "loop_error": "Erro no loop de Dutching:",
+            "cancelled": "Dutching scheduler finalizado.",
+        }
+    )

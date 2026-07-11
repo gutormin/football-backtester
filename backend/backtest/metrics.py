@@ -1,8 +1,13 @@
 import math
+import logging
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 from ..data_loader import get_all_available_leagues
+
+logger = logging.getLogger(__name__)
+
+MODEL_VERSION = "3.2.0"  # Poisson Bivariado + Dixon-Coles + Elo + XGBoost ensemble + calibração isotônica
 
 
 def _benjamini_hochberg(p_values):
@@ -49,7 +54,9 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
                              slippage_pct=0.0):
     total_bets = len(bets_record)
     wins = sum(1 for b in bets_record if b['profit'] > 0)
-    win_rate = (wins / total_bets * 100) if total_bets > 0 else 0.0
+    losses = sum(1 for b in bets_record if b['profit'] < 0)
+    pushes = total_bets - wins - losses
+    win_rate = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0.0
     net_profit = bankroll - initial_bankroll
     yield_roi = (net_profit / total_staked * 100) if total_staked > 0 else 0.0
     profit_in_stakes = sum(b['profit'] / b['stake'] for b in bets_record) if bets_record else 0.0
@@ -70,13 +77,13 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
         std_ret = np.std(daily_returns)
         
         if std_ret > 0:
-            sharpe_ratio = float((mean_ret / std_ret) * math.sqrt(252))
+            sharpe_ratio = float((mean_ret / std_ret) * math.sqrt(156))  # ~3 matches/week, not daily trading
             
         downside_returns = [r for r in daily_returns if r < 0]
         if downside_returns:
             downside_std = np.std(downside_returns)
             if downside_std > 0:
-                sortino_ratio = float((mean_ret / downside_std) * math.sqrt(252))
+                sortino_ratio = float((mean_ret / downside_std) * math.sqrt(156))  # ~3 matches/week
         else:
             sortino_ratio = sharpe_ratio
             
@@ -143,7 +150,7 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
                     'volatility_pct': round(float(math.sqrt(np.dot(best_weights.T, np.dot(cov_matrix, best_weights))) * 100), 2)
                 }
         except Exception as e:
-            print(f"[Markowitz Error] {e}")
+            logger.error(f"Markowitz Error: {e}", exc_info=True)
     
     # Group by league for performance breakdowns
     league_performance = defaultdict(float)
@@ -295,7 +302,8 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
         'profit_in_stakes': round(profit_in_stakes, 2),
         'total_bets': total_bets,
         'wins': wins,
-        'losses': total_bets - wins,
+        'losses': losses,
+        'pushes': pushes,
         'win_rate': round(win_rate, 1),
         'roi': round(yield_roi, 2),
         'max_drawdown': round(max_drawdown * 100, 2),
@@ -325,16 +333,22 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
             summary['brier_improvement'] = None
 
         try:
-            bootstrap = compute_bootstrap_ci(bets_record)
+            bootstrap = compute_bootstrap_ci(bets_record, initial_bankroll=initial_bankroll)
             summary['bootstrap_roi_ci_lower'] = bootstrap['bootstrap_roi_ci_lower']
             summary['bootstrap_roi_ci_upper'] = bootstrap['bootstrap_roi_ci_upper']
             summary['bootstrap_roi_median'] = bootstrap['bootstrap_roi_median']
             summary['prob_positive_roi'] = bootstrap['prob_positive_roi']
+            summary['bootstrap_drawdown_median'] = bootstrap['bootstrap_drawdown_median']
+            summary['bootstrap_drawdown_ci_lower'] = bootstrap['bootstrap_drawdown_ci_lower']
+            summary['bootstrap_drawdown_ci_upper'] = bootstrap['bootstrap_drawdown_ci_upper']
         except Exception:
             summary['bootstrap_roi_ci_lower'] = None
             summary['bootstrap_roi_ci_upper'] = None
             summary['bootstrap_roi_median'] = None
             summary['prob_positive_roi'] = None
+            summary['bootstrap_drawdown_median'] = None
+            summary['bootstrap_drawdown_ci_lower'] = None
+            summary['bootstrap_drawdown_ci_upper'] = None
 
         try:
             power = compute_power_analysis(summary['roi'], summary.get('avg_odds', 2.0), summary['total_bets'])
@@ -356,11 +370,14 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
             summary['edge_decay_pct'] = None
             summary['edge_decay_alert'] = None
 
-    # EQS Score Dinamicamente
+    # EQS Score Dinamicamente — Phase 2: usa flag is_oos (true OOS) com fallback legado
     oos_summary = None
-    if len(bets_record) >= 20 and oos_split_pct > 0:
+    oos_bets = [b for b in bets_record if b.get('is_oos', False)]
+    if not oos_bets and len(bets_record) >= 20 and oos_split_pct > 0:
+        # Fallback legado: slice cronológico (pré-Phase 2 ou portfolio backtester)
         n_oos = max(10, int(len(bets_record) * (oos_split_pct / 100.0)))
         oos_bets = bets_record[-n_oos:]
+    if oos_bets:
         oos_staked = sum([b['stake'] for b in oos_bets])
         oos_profit = sum([b['profit'] for b in oos_bets])
         oos_roi = (oos_profit / oos_staked * 100) if oos_staked > 0 else 0.0
@@ -370,7 +387,8 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
             'net_profit': round(oos_profit, 2),
             'roi': round(oos_roi, 2),
             'win_rate': round(oos_win_rate, 1),
-            'total_bets': len(oos_bets)
+            'total_bets': len(oos_bets),
+            'from_is_oos_flag': any(b.get('is_oos', False) for b in oos_bets)
         }
 
     # OOS Robustness Matrix (Stress Test)
@@ -421,7 +439,32 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
     summary['oos_split_pct'] = oos_split_pct
     summary['oos_robustness_matrix'] = oos_robustness_matrix
     summary['slippage_sensitivity'] = slippage_sensitivity
-    
+
+    # Phase 2: Real Odds Only Summary (apostas com odds de mercado, sem sintéticas)
+    real_bets = [b for b in bets_record if not b.get('is_synthetic', False)]
+    if real_bets:
+        real_wins = sum(1 for b in real_bets if b['profit'] > 0)
+        real_losses = sum(1 for b in real_bets if b['profit'] < 0)
+        real_staked = sum(b['stake'] for b in real_bets)
+        real_profit = sum(b['profit'] for b in real_bets)
+        real_roi = (real_profit / real_staked * 100) if real_staked > 0 else 0.0
+        real_oos = [b for b in real_bets if b.get('is_oos', False)]
+        summary['summary_real_odds'] = {
+            'total_bets': len(real_bets),
+            'wins': real_wins,
+            'losses': real_losses,
+            'pushes': len(real_bets) - real_wins - real_losses,
+            'net_profit': round(real_profit, 2),
+            'roi': round(real_roi, 2),
+            'win_rate': round((real_wins / (real_wins + real_losses) * 100) if (real_wins + real_losses) > 0 else 0.0, 1),
+            'total_staked': round(real_staked, 2),
+            'oos_bets': len(real_oos),
+            'oos_roi': round(
+                (sum(b['profit'] for b in real_oos) / sum(b['stake'] for b in real_oos) * 100)
+                if real_oos and sum(b['stake'] for b in real_oos) > 0 else 0.0, 2
+            ) if real_oos else None
+        }
+
     eqs_data = compute_edge_quality_score(summary, oos_summary)
     
     if isinstance(ai_res, dict):
@@ -433,6 +476,7 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
         ai_res['oos_summary'] = oos_summary
 
     return {
+        'model_version': MODEL_VERSION,
         'summary': summary,
         'summary_fixed': summary_fixed,
         'summary_proportional': summary_proportional,
@@ -450,113 +494,131 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
         'portfolio_optimization': portfolio_opt
     }
 
-def compile_parallel_scan_summary(states, initial_bankroll, value_threshold, staking_rule, stake_value):
+def _compile_single_summary(state, initial_bankroll, value_threshold, staking_rule, stake_value):
+    """Compile summary metrics for a single backtest state."""
+    net_profit = state['bankroll'] - initial_bankroll
+    roi = (net_profit / state['total_staked'] * 100) if state['total_staked'] > 0 else 0.0
+    win_rate = (state['wins'] / state['total_bets'] * 100) if state['total_bets'] > 0 else 0.0
+
+    ai_score = 0.0
+    if len(state['bets_for_ai']) >= 20:
+        try:
+            ai_res = predict_strategy_sustainability(
+                state['bets_for_ai'],
+                initial_bankroll=initial_bankroll,
+                value_threshold=value_threshold,
+                staking_rule=staking_rule,
+                stake_value=stake_value,
+                run_monte_carlo=False
+            )
+            ai_score = ai_res.get('ml_probability', 0.0)
+        except Exception as e:
+            logger.error(f"Error computing AI score: {e}", exc_info=True)
+
+    avg_odds = 2.0
+    avg_expected_value = 0.0
+    if state['bets_for_ai']:
+        avg_odds = float(np.mean([float(b['odds']) for b in state['bets_for_ai']]))
+        avg_expected_value = float(np.mean([float(b.get('ev', 1.0)) for b in state['bets_for_ai']]))
+    p_value = compute_pvalue_binomial(state['wins'], state['total_bets'], avg_odds)
+
+    oos_summary = None
+    if len(state['bets_for_ai']) >= 20:
+        n_oos = max(10, int(len(state['bets_for_ai']) * 0.2))
+        oos_bets = state['bets_for_ai'][-n_oos:]
+        oos_staked = sum([b['stake'] for b in oos_bets])
+        oos_profit = sum([b['profit'] for b in oos_bets])
+        oos_roi = (oos_profit / oos_staked * 100) if oos_staked > 0 else 0.0
+        oos_wins = sum([1 for b in oos_bets if b['profit'] > 0])
+        oos_win_rate = (oos_wins / len(oos_bets) * 100) if oos_bets else 0.0
+        oos_summary = {
+            'net_profit': round(oos_profit, 2),
+            'roi': round(oos_roi, 2),
+            'win_rate': round(oos_win_rate, 1),
+            'total_bets': len(oos_bets)
+        }
+
+    max_drawdown = 0.0
+    peak = initial_bankroll
+    current_bank = initial_bankroll
+    for b in state['bets_for_ai']:
+        current_bank += b['profit']
+        if current_bank > peak:
+            peak = current_bank
+        dd = (peak - current_bank) / peak if peak > 0 else 0
+        if dd > max_drawdown:
+            max_drawdown = dd
+
+    brier_improvement = None
+    power_ratio = None
+    bootstrap_roi_ci_lower = None
+    edge_decay_pct = None
+
+    if len(state['bets_for_ai']) >= 20:
+        power_res = compute_power_analysis(roi, avg_odds, state['total_bets'])
+        power_ratio = power_res.get('power_ratio')
+        brier_res = compute_brier_score(state['bets_for_ai'])
+        brier_improvement = brier_res.get('improvement_pct')
+        boot_res = compute_bootstrap_ci(state['bets_for_ai'], n_resamples=100)
+        bootstrap_roi_ci_lower = boot_res.get('bootstrap_roi_ci_lower')
+        window = max(10, min(100, int(len(state['bets_for_ai']) * 0.2)))
+        roll_res = compute_rolling_roi(state['bets_for_ai'], window=window)
+        edge_decay_pct = roll_res.get('edge_decay_pct')
+
+    valid_clvs = [b.get('clv') for b in state['bets_for_ai'] if b.get('clv') is not None]
+    avg_clv = float(np.mean(valid_clvs)) if valid_clvs else None
+    bcl_percent = round(len([clv for clv in valid_clvs if clv > 0]) / len(valid_clvs) * 100, 1) if valid_clvs else None
+
+    return {
+        'net_profit': round(net_profit, 2),
+        'roi': round(roi, 2),
+        'win_rate': round(win_rate, 1),
+        'total_bets': state['total_bets'],
+        'ai_score': ai_score,
+        'p_value': p_value,
+        'avg_odds': round(avg_odds, 2),
+        'avg_expected_value': round(avg_expected_value, 3),
+        'max_drawdown': round(max_drawdown * 100, 2),
+        'oos_summary': oos_summary,
+        'power_ratio': power_ratio,
+        'brier_improvement': brier_improvement,
+        'bootstrap_roi_ci_lower': bootstrap_roi_ci_lower,
+        'edge_decay_pct': edge_decay_pct,
+        'avg_clv': round(avg_clv, 2) if avg_clv is not None else None,
+        'bcl_percent': bcl_percent
+    }
+
+
+def _compile_staking_summary(states, initial_bankroll, value_threshold):
+    """Compile comparison matrix: for each league|market, produce per-method summaries."""
+    summaries = {}
+    for key, sub_states in states.items():
+        summaries[key] = {}
+        for method in ('fixed', 'proportional', 'kelly'):
+            if method == 'fixed':
+                sr, sv = 'fixed', 10.0
+            elif method == 'proportional':
+                sr, sv = 'proportional', 2.0
+            else:
+                sr, sv = 'kelly', 0.25
+            summaries[key][method] = _compile_single_summary(
+                sub_states[method], initial_bankroll, value_threshold, sr, sv
+            )
+    summaries['model_version'] = MODEL_VERSION
+    return summaries
+
+
+def compile_parallel_scan_summary(states, initial_bankroll, value_threshold, staking_rule, stake_value, scan_type='markets'):
+    if scan_type == 'staking':
+        return _compile_staking_summary(states, initial_bankroll, value_threshold)
+
     summaries = {}
     for key, state in states.items():
-        net_profit = state['bankroll'] - initial_bankroll
-        roi = (net_profit / state['total_staked'] * 100) if state['total_staked'] > 0 else 0.0
-        win_rate = (state['wins'] / state['total_bets'] * 100) if state['total_bets'] > 0 else 0.0
-        
-        # Compute AI score if we have enough bets
-        ai_score = 0.0
-        if len(state['bets_for_ai']) >= 20:
-            try:
-                ai_res = predict_strategy_sustainability(
-                    state['bets_for_ai'],
-                    initial_bankroll=initial_bankroll,
-                    value_threshold=value_threshold,
-                    staking_rule=staking_rule,
-                    stake_value=stake_value,
-                    run_monte_carlo=False
-                )
-                ai_score = ai_res.get('ml_probability', 0.0)
-            except Exception as e:
-                print(f"Error computing AI score for {key}: {e}")
-                
-        # Calcular p-value para significância estatística
-        avg_odds = 2.0
-        avg_expected_value = 0.0
-        if state['bets_for_ai']:
-            avg_odds = float(np.mean([float(b['odds']) for b in state['bets_for_ai']]))
-            avg_expected_value = float(np.mean([float(b.get('ev', 1.0)) for b in state['bets_for_ai']]))
-        p_value = compute_pvalue_binomial(state['wins'], state['total_bets'], avg_odds)
-
-        # --- Out-of-Sample (OOS) Summary for EQS ---
-        oos_summary = None
-        if len(state['bets_for_ai']) >= 20:
-            n_oos = max(10, int(len(state['bets_for_ai']) * 0.2))
-            oos_bets = state['bets_for_ai'][-n_oos:]
-            
-            oos_staked = sum([b['stake'] for b in oos_bets])
-            oos_profit = sum([b['profit'] for b in oos_bets])
-            oos_roi = (oos_profit / oos_staked * 100) if oos_staked > 0 else 0.0
-            oos_wins = sum([1 for b in oos_bets if b['profit'] > 0])
-            oos_win_rate = (oos_wins / len(oos_bets) * 100) if oos_bets else 0.0
-            
-            oos_summary = {
-                'net_profit': round(oos_profit, 2),
-                'roi': round(oos_roi, 2),
-                'win_rate': round(oos_win_rate, 1),
-                'total_bets': len(oos_bets)
-            }
-
-        # Simular o max_drawdown (simplificado)
-        max_drawdown = 0.0
-        peak = initial_bankroll
-        current_bank = initial_bankroll
-        for b in state['bets_for_ai']:
-            current_bank += b['profit']
-            if current_bank > peak:
-                peak = current_bank
-            dd = (peak - current_bank) / peak if peak > 0 else 0
-            if dd > max_drawdown:
-                max_drawdown = dd
-                
-        # --- Advanced Metrics for EQS ---
-        brier_improvement = None
-        power_ratio = None
-        bootstrap_roi_ci_lower = None
-        edge_decay_pct = None
-
-        if len(state['bets_for_ai']) >= 20:
-            power_res = compute_power_analysis(roi, avg_odds, state['total_bets'])
-            power_ratio = power_res.get('power_ratio')
-
-            brier_res = compute_brier_score(state['bets_for_ai'])
-            brier_improvement = brier_res.get('improvement_pct')
-
-            boot_res = compute_bootstrap_ci(state['bets_for_ai'], n_resamples=100)
-            bootstrap_roi_ci_lower = boot_res.get('bootstrap_roi_ci_lower')
-
-            window = max(10, min(100, int(len(state['bets_for_ai']) * 0.2)))
-            roll_res = compute_rolling_roi(state['bets_for_ai'], window=window)
-            edge_decay_pct = roll_res.get('edge_decay_pct')
-            
-        valid_clvs = [b.get('clv') for b in state['bets_for_ai'] if b.get('clv') is not None]
-        avg_clv = float(np.mean(valid_clvs)) if valid_clvs else None
-        bcl_percent = round(len([clv for clv in valid_clvs if clv > 0]) / len(valid_clvs) * 100, 1) if valid_clvs else None
-
-        summaries[key] = {
-            'net_profit': round(net_profit, 2),
-            'roi': round(roi, 2),
-            'win_rate': round(win_rate, 1),
-            'total_bets': state['total_bets'],
-            'ai_score': ai_score,
-            'p_value': p_value,
-            'avg_odds': round(avg_odds, 2),
-            'avg_expected_value': round(avg_expected_value, 3),
-            'max_drawdown': round(max_drawdown * 100, 2),
-            'oos_summary': oos_summary,
-            'power_ratio': power_ratio,
-            'brier_improvement': brier_improvement,
-            'bootstrap_roi_ci_lower': bootstrap_roi_ci_lower,
-            'edge_decay_pct': edge_decay_pct,
-            'avg_clv': round(avg_clv, 2) if avg_clv is not None else None,
-            'bcl_percent': bcl_percent
-        }
+        summaries[key] = _compile_single_summary(state, initial_bankroll, value_threshold, staking_rule, stake_value)
         
         # --- Nível 2: Otimização de Faixa de Odds ---
         base_summary = summaries[key]
+        oos_summary = base_summary.get('oos_summary')
         base_eqs_data = compute_edge_quality_score(base_summary, oos_summary)
         base_eqs_score = base_eqs_data.get('score', 0)
         
@@ -665,5 +727,11 @@ def compile_parallel_scan_summary(states, initial_bankroll, value_threshold, sta
         if best_opt_range and best_opt_score >= base_eqs_score + 5:
             summaries[key]['optimized_odds_range'] = best_opt_range
             summaries[key]['optimized_eqs_score'] = best_opt_score
+            summaries[key]['optimized_odds_warning'] = (
+                "Otimização de odds aplicou correção FDR intra-state (Benjamini-Hochberg, α=0.10), "
+                "mas não corrigiu globalmente entre os múltiplos states/mercados do scan. "
+                "Validar faixa otimizada em OOS temporal independente antes de operar."
+            )
 
+    summaries['model_version'] = MODEL_VERSION
     return summaries

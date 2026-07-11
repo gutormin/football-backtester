@@ -1,16 +1,45 @@
 import os
 import urllib.request
+import logging
+import threading
 import pandas as pd
 from datetime import datetime
+import requests
+
+from .api_utils import retry_with_backoff
+
+logger = logging.getLogger(__name__)
 
 def read_csv_robust(path):
+    """Read CSV with automatic encoding detection.
+
+    Tries UTF-8-sig (handles BOM), then UTF-8, then Latin1.
+    Only logs warnings for genuine encoding issues, not other parse errors.
+    """
+    for encoding in ('utf-8-sig', 'utf-8', 'latin1'):
+        try:
+            df = pd.read_csv(path, encoding=encoding)
+            return translate_custom_csv(df)
+        except UnicodeDecodeError:
+            continue  # Try next encoding
+        except Exception:
+            # Not an encoding error — try next encoding anyway, but don't warn yet
+            continue
+    # Last resort: try with on_bad_lines='skip' for files with a few malformed rows
     try:
-        df = pd.read_csv(path, encoding='utf-8')
+        df = pd.read_csv(path, encoding='latin1', on_bad_lines='skip')
+        logger.warning(f"Fallback forçado Latin1 + skip bad lines para {os.path.basename(path)}")
+        return translate_custom_csv(df)
     except Exception:
-        print(f"[Data Loader Warning] Encoding UTF-8 falhou para {path}. Fazendo fallback silencioso para Latin1 (ISO-8859-1).")
+        pass
+    # Absolute last resort
+    try:
         df = pd.read_csv(path, encoding='latin1')
-        
-    return translate_custom_csv(df)
+        logger.warning(f"Fallback forçado Latin1 para {os.path.basename(path)}")
+        return translate_custom_csv(df)
+    except Exception as e:
+        logger.error(f"Nao foi possivel ler CSV {os.path.basename(path)}: {e}")
+        raise
 
 def translate_custom_csv(df):
     """
@@ -132,10 +161,12 @@ def translate_custom_csv(df):
 
 # In-memory cache for loaded league dataframes
 _LEAGUE_DATA_CACHE = {}
+_cache_lock = threading.Lock()
 
 def clear_league_data_cache():
     global _LEAGUE_DATA_CACHE
-    _LEAGUE_DATA_CACHE.clear()
+    with _cache_lock:
+        _LEAGUE_DATA_CACHE.clear()
 
 # Directory to save downloaded CSV files
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
@@ -182,7 +213,76 @@ SOUTH_AMERICAN_LEAGUES = {'ARG', 'BRA', 'MEX', 'USA'}
 
 def auto_detect_data_source(league_code):
     """Returns the appropriate data source for a league code."""
-    return 'futpython' if league_code in SOUTH_AMERICAN_LEAGUES else 'footballdata'
+    if '/' in league_code:
+        return 'futpython'  # pais/liga format from FutPythonTrader
+    if league_code in SOUTH_AMERICAN_LEAGUES:
+        return 'futpython'
+    return 'footballdata'
+
+
+def startup_data_quality_check():
+    """
+    Lightweight data quality check at application startup.
+    Scans data/ CSV files and logs warnings for leagues with >10% missing data
+    in key columns (odds 1X2, match results).
+    Also reports encoding status of all CSV files.
+    """
+    import glob
+    issues_found = 0
+    encoding_issues = 0
+
+    for csv_path in glob.glob(os.path.join(DATA_DIR, '*.csv')):
+        fname = os.path.basename(csv_path)
+        if fname in ('fixtures.csv', 'telegram_tips_sent.json',
+                      'telegram_arbitrage_tips_sent.json', 'telegram_dutching_tips_sent.json'):
+            continue
+
+        # Encoding check: verify file is readable as UTF-8
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                f.read(1024)
+        except UnicodeDecodeError:
+            encoding_issues += 1
+            try:
+                with open(csv_path, 'r', encoding='latin1') as f:
+                    content = f.read()
+                # Convert to UTF-8 in-place
+                with open(csv_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                logger.info(f"data_quality: {fname} convertido de Latin1 para UTF-8")
+            except Exception as e:
+                logger.warning(f"data_quality: {fname} encoding problemático: {e}")
+
+        # Column completeness check
+        try:
+            df = read_csv_robust(csv_path)
+        except Exception:
+            logger.warning(f"data_quality: não foi possível ler {fname}")
+            continue
+
+        if df.empty or 'Date' not in df.columns:
+            continue
+
+        total = len(df)
+
+        # Check core odds columns
+        for col in ['B365H', 'B365D', 'B365A', 'FTHG', 'FTAG']:
+            if col in df.columns:
+                missing_pct = df[col].isna().mean() * 100
+                if missing_pct > 10:
+                    logger.warning(
+                        f"data_quality: {fname} — {col} com {missing_pct:.1f}% ausentes "
+                        f"({total} linhas)"
+                    )
+                    issues_found += 1
+
+    if issues_found or encoding_issues:
+        if encoding_issues:
+            logger.info(f"data_quality: {encoding_issues} arquivos convertidos de Latin1 para UTF-8")
+        if issues_found:
+            logger.warning(f"data_quality: {issues_found} problemas de completude encontrados nos CSVs")
+    else:
+        logger.info("data_quality: verificação de CSVs concluída sem problemas críticos")
 
 def ensure_data_dir():
     if not os.path.exists(DATA_DIR):
@@ -190,7 +290,7 @@ def ensure_data_dir():
 
 def download_file(url, local_path):
     """Downloads a file setting a User-Agent to bypass Cloudflare/503 limits."""
-    print(f"Downloading {url} to {local_path}...")
+    logger.info(f"Downloading {url} to {local_path}...")
     try:
         req = urllib.request.Request(
             url, 
@@ -200,7 +300,7 @@ def download_file(url, local_path):
             out_file.write(response.read())
         return True
     except Exception as e:
-        print(f"Failed to download {url}: {e}")
+        logger.error(f"Failed to download {url}: {e}", exc_info=True)
         return False
 
 def sync_data(force=False, source="csv"):
@@ -283,13 +383,19 @@ def sync_single_league_from_api(league_code, force=False):
             return True
             
     # Fetch seasons
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
+    def _get_seasons():
+        return requests.get(f"{base_api_url}/seasons", headers=headers, timeout=15)
+
     try:
-        res_seasons = requests.get(f"{base_api_url}/seasons", headers=headers, timeout=15)
+        res_seasons = _get_seasons()
         if res_seasons.status_code != 200:
             return False
         seasons_list = res_seasons.json()
         
-        api_league_name = league_info['api_name']
+        api_league_name = league_info.get('api_name')
+        if not api_league_name:
+            return False
         
         def fetch_matches(api_season_name):
             season_id = None
@@ -306,7 +412,10 @@ def sync_single_league_from_api(league_code, force=False):
                 "temporada": season_id
             }
             try:
-                res = requests.get(f"{base_api_url}/matches", headers=headers, params=params, timeout=20)
+                @retry_with_backoff(max_retries=2, base_delay=1.0)
+                def _get_matches():
+                    return requests.get(f"{base_api_url}/matches", headers=headers, params=params, timeout=20)
+                res = _get_matches()
                 if res.status_code != 200:
                     return pd.DataFrame()
                 data = res.json()
@@ -438,7 +547,7 @@ def sync_single_league_from_api(league_code, force=False):
                 df = fetch_matches(api_season)
                 if not df.empty:
                     df.to_csv(local_path, index=False, encoding='utf-8')
-                    print(f"[On-Demand Sync] Saved seasonal {local_filename}")
+                    logger.info(f"[On-Demand Sync] Saved seasonal {local_filename}")
         else:
             local_filename = f"{league_code}_all.csv"
             local_path = os.path.join(DATA_DIR, local_filename)
@@ -458,15 +567,15 @@ def sync_single_league_from_api(league_code, force=False):
             if dfs:
                 combined = pd.concat(dfs, ignore_index=True)
                 combined.to_csv(local_path, index=False, encoding='utf-8')
-                print(f"[On-Demand Sync] Saved aggregate {local_filename}")
+                logger.info(f"[On-Demand Sync] Saved aggregate {local_filename}")
             else:
                 if not os.path.exists(local_path) or os.path.getsize(local_path) <= 250:
                     with open(local_path, 'w', encoding='utf-8') as f:
                         f.write("Date,Time,HomeTeam,AwayTeam,FTHG,FTAG,FTR\n")
-                    print(f"[On-Demand Sync] Created placeholder for empty aggregate {local_filename}")
+                    logger.info(f"[On-Demand Sync] Created placeholder for empty aggregate {local_filename}")
         return True
     except Exception as e:
-        print(f"Error syncing league {league_code} on-demand: {e}")
+        logger.error(f"Error syncing league {league_code} on-demand: {e}", exc_info=True)
         return False
 
 def sync_data_from_api(force=False):
@@ -480,7 +589,7 @@ def sync_data_from_api(force=False):
         try:
             sync_single_league_from_api(l['code'], force=force)
         except Exception as e:
-            print(f"Error syncing league {l['code']}: {e}")
+            logger.error(f"Error syncing league {l['code']}: {e}", exc_info=True)
 
 def load_league_data(league_code, start_date='2021-01-01', data_source="footballdata", api_key=""):
     """Loads and standardizes data for a given league starting from a specific date."""
@@ -522,126 +631,134 @@ def load_league_data(league_code, start_date='2021-01-01', data_source="football
         return fetch_futpython_data(league_code, start_date, api_key)
         
     global _LEAGUE_DATA_CACHE
-    
-    if league_code not in _LEAGUE_DATA_CACHE:
-        ensure_data_dir()
-        dfs = []
-        
-        # Get list of all available leagues to find type and name dynamically
-        all_leagues = get_all_available_leagues()
-        league_info = next((l for l in all_leagues if l['code'] == league_code), None)
-        
-        if league_info:
-            # Check if dynamic / aggregate files are missing, if so auto-download on-demand
-            token = get_api_token()
-            if token:
-                file_missing = False
-                if league_info['type'] == 'seasonal':
-                    for season in SEASONS:
-                        local_filename = f"{league_code}_{season}.csv"
+
+    with _cache_lock:
+        if league_code not in _LEAGUE_DATA_CACHE:
+            ensure_data_dir()
+            dfs = []
+
+            # Get list of all available leagues to find type and name dynamically
+            all_leagues = get_all_available_leagues()
+            league_info = next((l for l in all_leagues if l['code'] == league_code), None)
+
+            if league_info:
+                # Check if dynamic / aggregate files are missing, if so auto-download on-demand
+                token = get_api_token()
+                if token:
+                    file_missing = False
+                    if league_info['type'] == 'seasonal':
+                        for season in SEASONS:
+                            local_filename = f"{league_code}_{season}.csv"
+                            local_path = os.path.join(DATA_DIR, local_filename)
+                            if not os.path.exists(local_path) or os.path.getsize(local_path) <= 250:
+                                file_missing = True
+                                break
+                    else:
+                        local_filename = f"{league_code}_all.csv"
                         local_path = os.path.join(DATA_DIR, local_filename)
                         if not os.path.exists(local_path) or os.path.getsize(local_path) <= 250:
                             file_missing = True
-                            break
-                else:
+
+                    if file_missing:
+                        logger.info(f"[On-Demand Auto-Sync] File for league {league_code} is missing. Triggering sync...")
+                        try:
+                            sync_single_league_from_api(league_code, force=False)
+                        except Exception as e:
+                            logger.error(f"Error on-demand syncing {league_code}: {e}", exc_info=True)
+
+                league_type = league_info['type']
+                league_name = league_info['name']
+
+                # Check if league is seasonal
+                if league_type == 'seasonal':
+                    for season in SEASONS:
+                        local_filename = f"{league_code}_{season}.csv"
+                        local_path = os.path.join(DATA_DIR, local_filename)
+
+                        if os.path.exists(local_path) and os.path.getsize(local_path) > 250:
+                            try:
+                                df = read_csv_robust(local_path)
+                                if len(df) > 0:
+                                    # Validate that required columns exist
+                                    required = ['Date', 'HomeTeam', 'AwayTeam']
+                                    if all(col in df.columns for col in required):
+                                        df['Season'] = season
+                                        dfs.append(df)
+                                    else:
+                                        logger.warning(f"{local_filename} is missing required columns. Skipping corrupted file.")
+                            except Exception as e:
+                                logger.error(f"Error loading {local_filename}: {e}", exc_info=True)
+
+                # Check if league is aggregate
+                elif league_type == 'aggregate':
                     local_filename = f"{league_code}_all.csv"
                     local_path = os.path.join(DATA_DIR, local_filename)
-                    if not os.path.exists(local_path) or os.path.getsize(local_path) <= 250:
-                        file_missing = True
-                
-                if file_missing:
-                    print(f"[On-Demand Auto-Sync] File for league {league_code} is missing. Triggering sync...")
-                    try:
-                        sync_single_league_from_api(league_code, force=False)
-                    except Exception as e:
-                        print(f"Error on-demand syncing {league_code}: {e}")
+                    # Fallback: use original filename from disk scan if code-based name doesn't exist
+                    if not os.path.exists(local_path):
+                        orig_fn = league_info.get('original_filename')
+                        if orig_fn:
+                            local_path = os.path.join(DATA_DIR, orig_fn)
 
-            league_type = league_info['type']
-            league_name = league_info['name']
-            
-            # Check if league is seasonal
-            if league_type == 'seasonal':
-                for season in SEASONS:
-                    local_filename = f"{league_code}_{season}.csv"
-                    local_path = os.path.join(DATA_DIR, local_filename)
-                    
                     if os.path.exists(local_path) and os.path.getsize(local_path) > 250:
                         try:
                             df = read_csv_robust(local_path)
                             if len(df) > 0:
-                                # Validate that required columns exist
-                                required = ['Date', 'HomeTeam', 'AwayTeam']
+                                # Map aggregate columns to seasonal standard columns
+                                rename_dict = {
+                                    'Home': 'HomeTeam',
+                                    'Away': 'AwayTeam',
+                                    'HG': 'FTHG',
+                                    'AG': 'FTAG',
+                                    'Res': 'FTR',
+                                    'B365CH': 'B365H',
+                                    'B365CD': 'B365D',
+                                    'B365CA': 'B365A',
+                                    'AvgCH': 'AvgH',
+                                    'AvgCD': 'AvgD',
+                                    'AvgCA': 'AvgA',
+                                    'MaxCH': 'MaxH',
+                                    'MaxCD': 'MaxD',
+                                    'MaxCA': 'MaxA'
+                                }
+                                rename_dict = {k: v for k, v in rename_dict.items() if k in df.columns}
+                                df = df.rename(columns=rename_dict)
+
+                                required = ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'FTR']
                                 if all(col in df.columns for col in required):
-                                    df['Season'] = season
+                                    df['Season'] = 'All'
                                     dfs.append(df)
                                 else:
-                                    print(f"Warning: {local_filename} is missing required columns. Skipping corrupted file.")
+                                    missing = [c for c in required if c not in df.columns]
+                                    logger.warning(f"{local_filename} is missing required columns {missing}. Skipping corrupted file.")
                         except Exception as e:
-                            print(f"Error loading {local_filename}: {e}")
-                            
-            # Check if league is aggregate
-            elif league_type == 'aggregate':
-                local_filename = f"{league_code}_all.csv"
-                local_path = os.path.join(DATA_DIR, local_filename)
-                
-                if os.path.exists(local_path) and os.path.getsize(local_path) > 250:
-                    try:
-                        df = read_csv_robust(local_path)
-                        if len(df) > 0:
-                            # Map aggregate columns to seasonal standard columns
-                            rename_dict = {
-                                'Home': 'HomeTeam',
-                                'Away': 'AwayTeam',
-                                'HG': 'FTHG',
-                                'AG': 'FTAG',
-                                'Res': 'FTR',
-                                'B365CH': 'B365H',
-                                'B365CD': 'B365D',
-                                'B365CA': 'B365A',
-                                'AvgCH': 'AvgH',
-                                'AvgCD': 'AvgD',
-                                'AvgCA': 'AvgA',
-                                'MaxCH': 'MaxH',
-                                'MaxCD': 'MaxD',
-                                'MaxCA': 'MaxA'
-                            }
-                            rename_dict = {k: v for k, v in rename_dict.items() if k in df.columns}
-                            df = df.rename(columns=rename_dict)
-                            
-                            required = ['Date', 'HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'FTR']
-                            if all(col in df.columns for col in required):
-                                df['Season'] = 'All'
-                                dfs.append(df)
-                            else:
-                                missing = [c for c in required if c not in df.columns]
-                                print(f"Warning: {local_filename} is missing required columns {missing}. Skipping corrupted file.")
-                    except Exception as e:
-                        print(f"Error loading {local_filename}: {e}")
-                        
-        if not dfs:
-            _LEAGUE_DATA_CACHE[league_code] = pd.DataFrame()
-        else:
-            # Combine all loaded seasons
-            combined_df = pd.concat(dfs, ignore_index=True)
-            
-            # Clean dataframe
-            combined_df = combined_df.dropna(subset=['Date', 'HomeTeam', 'AwayTeam'])
-            
-            # Parse Dates robustly
-            combined_df['Date'] = pd.to_datetime(combined_df['Date'], format='mixed', dayfirst=True)
-            
-            # Sort by date
-            combined_df = combined_df.sort_values(by='Date').reset_index(drop=True)
-            
-            # Standardize names
-            combined_df['LeagueCode'] = league_code
-            combined_df['LeagueName'] = league_info['name'] if league_info else league_code
-            
-            _LEAGUE_DATA_CACHE[league_code] = combined_df
-            
-    cached_df = _LEAGUE_DATA_CACHE[league_code]
-    if cached_df.empty:
-        return cached_df
+                            logger.error(f"Error loading {local_filename}: {e}", exc_info=True)
+
+            if not dfs:
+                # Don't cache empty DataFrames — allows retry on next request
+                # (files may have been repaired, sync may have completed, etc.)
+                pass
+            else:
+                # Combine all loaded seasons
+                combined_df = pd.concat(dfs, ignore_index=True)
+
+                # Clean dataframe
+                combined_df = combined_df.dropna(subset=['Date', 'HomeTeam', 'AwayTeam'])
+
+                # Parse Dates robustly
+                combined_df['Date'] = pd.to_datetime(combined_df['Date'], format='mixed', dayfirst=True)
+
+                # Sort by date
+                combined_df = combined_df.sort_values(by='Date').reset_index(drop=True)
+
+                # Standardize names
+                combined_df['LeagueCode'] = league_code
+                combined_df['LeagueName'] = league_info['name'] if league_info else league_code
+
+                _LEAGUE_DATA_CACHE[league_code] = combined_df
+
+        cached_df = _LEAGUE_DATA_CACHE.get(league_code)
+    if cached_df is None or cached_df.empty:
+        return pd.DataFrame()
         
     # Filter and return a copy to prevent in-place modification of cached dataframe
     return cached_df[cached_df['Date'] >= pd.to_datetime(start_date)].copy()
@@ -702,6 +819,40 @@ def clean_league_code(league_name):
     cleaned = re.sub(r'[\s\-]+', '_', cleaned)
     return cleaned.upper()
 
+def _scan_disk_for_aggregate_leagues():
+    """Scan data/ for *_all.csv files not yet in hardcoded lists."""
+    import glob
+    import re
+    existing = set()
+    existing.update(LEAGUES_SEASONAL.keys())
+    existing.update(LEAGUES_AGGREGATE.keys())
+
+    leagues = []
+    for filepath in glob.glob(os.path.join(DATA_DIR, '*_all.csv')):
+        filename = os.path.basename(filepath)
+        # Skip empty/corrupt placeholder files (<= 5000 bytes)
+        if os.path.getsize(filepath) <= 5000:
+            continue
+        # Skip old-format footystats files (mixed-case names like "Argentina_all.csv", "Austria_all.csv")
+        code_raw = filename.replace('_all.csv', '')
+        if code_raw != code_raw.upper():
+            continue
+        original_filename = filename
+        code = code_raw
+        if ' ' in code:
+            code = re.sub(r'\s+', '_', code.strip()).upper()
+        if code in existing:
+            continue
+        name = code.replace('_', ' ').title()
+        league_entry = {'code': code, 'name': name, 'type': 'aggregate'}
+        if original_filename != f"{code}_all.csv":
+            league_entry['original_filename'] = original_filename
+        leagues.append(league_entry)
+        existing.add(code)
+
+    return leagues
+
+
 def get_api_leagues():
     """Loads or fetches the list of leagues from the DataFootball API."""
     token = get_api_token()
@@ -716,13 +867,17 @@ def get_api_leagues():
             with open(config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"Error loading api_leagues_list.json: {e}")
+            logger.error(f"Error loading api_leagues_list.json: {e}", exc_info=True)
             
     # If not exists or error, fetch from API
     try:
-        import requests
         headers = {"Authorization": f"Bearer {token}"}
-        res = requests.get("https://webhook.datafootball.com.br/webhook/leagues", headers=headers, timeout=10)
+
+        @retry_with_backoff(max_retries=2, base_delay=1.0)
+        def _get_leagues():
+            return requests.get("https://webhook.datafootball.com.br/webhook/leagues", headers=headers, timeout=10)
+
+        res = _get_leagues()
         if res.status_code == 200:
             leagues = res.json()
             league_names = []
@@ -736,10 +891,10 @@ def get_api_leagues():
                 with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(league_names, f, indent=2, ensure_ascii=False)
             except Exception as e:
-                print(f"Error saving api_leagues_list.json: {e}")
+                logger.error(f"Error saving api_leagues_list.json: {e}", exc_info=True)
             return league_names
     except Exception as e:
-        print(f"Error fetching leagues from DataFootball API: {e}")
+        logger.error(f"Error fetching leagues from DataFootball API: {e}", exc_info=True)
         
     return []
 
@@ -777,7 +932,13 @@ def get_all_available_leagues(source="footballdata"):
                     'api_name': api_name
                 })
                 seen_codes.add(code)
-                
+
+    # Scan disk for additional aggregate CSV files (works even without API token)
+    for league in _scan_disk_for_aggregate_leagues():
+        if league['code'] not in seen_codes:
+            all_leagues.append(league)
+            seen_codes.add(league['code'])
+
     return all_leagues
 
 def get_api_token():
@@ -790,7 +951,7 @@ def get_api_token():
                 config = json.load(f)
                 return config.get('token')
         except Exception as e:
-            print(f"Error loading API token from config: {e}")
+            logger.error(f"Error loading API token from config: {e}", exc_info=True)
     return None
 
 def get_futpython_api_key():
@@ -805,8 +966,8 @@ def get_futpython_api_key():
                 if key and key.strip():
                     return key.strip()
         except Exception as e:
-            print(f"Error loading FutPythonTrader API key: {e}")
-    return "cmqa6oz0p01i1wq6lzxknltmd"
+            logger.error(f"Error loading FutPythonTrader API key: {e}", exc_info=True)
+    return os.getenv('FUTPYTHON_API_KEY', 'cmqa6oz0p01i1wq6lzxknltmd')
 
 def load_upcoming_from_api(token):
     """
@@ -821,16 +982,19 @@ def load_upcoming_from_api(token):
         "Authorization": f"Bearer {token}"
     }
     
-    print(f"Fetching upcoming matches from DataFootball API: {url}...")
+    logger.info(f"Fetching upcoming matches from DataFootball API: {url}...")
     try:
-        response = requests.get(url, headers=headers, timeout=15)
+        @retry_with_backoff(max_retries=2, base_delay=1.0)
+        def _get_upcoming():
+            return requests.get(url, headers=headers, timeout=15)
+        response = _get_upcoming()
         if response.status_code != 200:
-            print(f"DataFootball API returned status code {response.status_code}")
+            logger.error(f"DataFootball API returned status code {response.status_code}")
             return pd.DataFrame()
             
         matches = response.json()
         if not isinstance(matches, list):
-            print("DataFootball API did not return a list of matches")
+            logger.error("DataFootball API did not return a list of matches")
             return pd.DataFrame()
             
         mapped_records = []
@@ -936,7 +1100,7 @@ def load_upcoming_from_api(token):
         df = pd.DataFrame(mapped_records)
         return df
     except Exception as e:
-        print(f"Error loading upcoming matches from DataFootball API: {e}")
+        logger.error(f"Error loading upcoming matches from DataFootball API: {e}", exc_info=True)
         return pd.DataFrame()
 
 def get_futpython_leagues():
@@ -960,7 +1124,7 @@ def get_futpython_leagues():
                         'api_name': code
                     })
     except Exception as e:
-        print(f"Error loading futpython leagues: {e}")
+        logger.error(f"Error loading futpython leagues: {e}", exc_info=True)
     return leagues_list
 
 def fetch_futpython_data(league_code, start_date, api_key):
@@ -1014,14 +1178,17 @@ def fetch_futpython_data(league_code, start_date, api_key):
                 pass
                 
         try:
-            res = requests.get(url, timeout=12, proxies=proxies)
+            @retry_with_backoff(max_retries=2, base_delay=1.0)
+            def _get_futpython():
+                return requests.get(url, timeout=12, proxies=proxies)
+            res = _get_futpython()
             if res.status_code == 200 and not res.text.strip().startswith("{"):
                 # Write to local cache
                 try:
                     with open(cache_path, 'w', encoding='utf-8') as f:
                         f.write(res.text)
                 except Exception as cache_err:
-                    print(f"Error caching {cache_filename}: {cache_err}")
+                    logger.error(f"Error caching {cache_filename}: {cache_err}", exc_info=True)
                 return temp, res.status_code, res.text
             else:
                 # If status code is not 200 or there is a JSON error, fall back to cache if available
@@ -1029,10 +1196,10 @@ def fetch_futpython_data(league_code, start_date, api_key):
                     try:
                         with open(cache_path, 'r', encoding='utf-8') as f:
                             cached_text = f.read()
-                        print(f"Using cached file for {cache_filename} due to API response status {res.status_code}")
+                        logger.info(f"Using cached file for {cache_filename} due to API response status {res.status_code}")
                         return temp, 200, cached_text
                     except Exception as cache_err:
-                        print(f"Error reading cache {cache_filename}: {cache_err}")
+                        logger.error(f"Error reading cache {cache_filename}: {cache_err}", exc_info=True)
                 return temp, res.status_code, res.text
         except Exception as e:
             # If exception (network connection error/timeout), fall back to cache if available
@@ -1040,10 +1207,10 @@ def fetch_futpython_data(league_code, start_date, api_key):
                 try:
                     with open(cache_path, 'r', encoding='utf-8') as f:
                         cached_text = f.read()
-                    print(f"Using cached file for {cache_filename} due to connection error: {e}")
+                    logger.warning(f"Using cached file for {cache_filename} due to connection error: {e}")
                     return temp, 200, cached_text
                 except Exception as cache_err:
-                    print(f"Error reading cache {cache_filename}: {cache_err}")
+                    logger.error(f"Error reading cache {cache_filename}: {cache_err}", exc_info=True)
             return temp, None, str(e)
             
     with ThreadPoolExecutor(max_workers=6) as executor:
@@ -1108,7 +1275,7 @@ def fetch_futpython_data(league_code, start_date, api_key):
                             if col not in ['HomeTeam', 'AwayTeam', 'League', 'Date', 'Time']:
                                 if df[col].dtype == 'object':
                                     df[col] = df[col].astype(str).str.replace(',', '.')
-                                    df[col] = pd.to_numeric(df[col], errors='ignore')
+                                    df[col] = pd.to_numeric(df[col], errors='coerce')
                                     
                         # Validate and correct Double Chance odds (corrupted or missing)
                         dc_cols = ['DC_1X', 'DC_X2', 'DC_12']
@@ -1193,12 +1360,12 @@ def fetch_futpython_data(league_code, start_date, api_key):
         
                         dataframes.append(df)
                     except Exception as e:
-                        print(f"Error parsing csv for temp {temp}: {e}")
+                        logger.error(f"Error parsing csv for temp {temp}: {e}", exc_info=True)
                 elif status_code == 401:
-                    print("FutPythonTrader API Key inválida.")
+                    logger.error("FutPythonTrader API Key inválida.")
                     break
             else:
-                print(f"Error fetching FutPythonTrader temp {temp}: {response_text}")
+                logger.error(f"Error fetching FutPythonTrader temp {temp}: {response_text}")
                 
     if not dataframes:
         if status_codes:

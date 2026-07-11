@@ -73,10 +73,10 @@ def calculate_xg_ratings(team_home_xg, team_home_xg_conceded, team_away_xg, team
         a_xg_att = (weighted_mean(a_xg_scored, _decay) / avg_a_xg) if a_xg_scored else 1.0
         a_xg_def = (weighted_mean(a_xg_conceded, _decay) / avg_h_xg) if a_xg_conceded else 1.0
         
-        h_xg_att = 1.0 if pd.isna(h_xg_att) else max(0.2, min(4.0, h_xg_att))
-        h_xg_def = 1.0 if pd.isna(h_xg_def) else max(0.2, min(4.0, h_xg_def))
-        a_xg_att = 1.0 if pd.isna(a_xg_att) else max(0.2, min(4.0, a_xg_att))
-        a_xg_def = 1.0 if pd.isna(a_xg_def) else max(0.2, min(4.0, a_xg_def))
+        h_xg_att = 1.0 if pd.isna(h_xg_att) else max(0.4, min(2.5, h_xg_att))
+        h_xg_def = 1.0 if pd.isna(h_xg_def) else max(0.4, min(2.5, h_xg_def))
+        a_xg_att = 1.0 if pd.isna(a_xg_att) else max(0.4, min(2.5, a_xg_att))
+        a_xg_def = 1.0 if pd.isna(a_xg_def) else max(0.4, min(2.5, a_xg_def))
         
         return h_xg_att, h_xg_def, a_xg_att, a_xg_def
     else:

@@ -1,12 +1,13 @@
 pandas
 numpy
 fastapi
-uvicorn
+uvicorn[standard]
 requests
 xgboost
 scikit-learn
-
 psycopg2-binary
 python-dotenv
 pydantic
 scipy
+rapidfuzz
+python-multipart

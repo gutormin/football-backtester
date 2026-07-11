@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
 import math
+import logging
+
+logger = logging.getLogger(__name__)
 
 def beta_posterior_probability(alpha, beta_param, threshold):
     """
@@ -224,10 +227,13 @@ def predict_strategy_sustainability(bets_record, initial_bankroll=1000.0, value_
     total_wins_float = float(total_wins)
     wr = total_wins_float / total_bets if total_bets > 0 else 0.0
     
-    # Expected longest run of losses with 95% confidence
+    # Expected longest run of losses (IID Bernoulli formula)
+    # Apply 2× safety factor: real betting sequences exhibit serial dependence
+    # (form cycles, model miscalibration clusters) that produce streaks
+    # 1.5-2× longer than the IID theoretical value.
     if wr > 0.0 and wr < 1.0:
         consec_losses = int(math.ceil(math.log(total_bets) / -math.log(1.0 - wr)))
-        consec_losses = max(3, min(30, consec_losses))
+        consec_losses = max(3, min(30, consec_losses * 2))
     else:
         consec_losses = 10  # Default fallback
         
@@ -459,11 +465,11 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
                     best_max_odds = max_o
                     best_flat_res = flat_res
                     best_sub_df = df_sub
-                    print(f"Grid Update: ev={ev_t}, min={min_o}, max={max_o}, fitness={fitness:.4f}, bets={flat_res['total_bets']}")
+                    logger.debug(f"Grid Update: ev={ev_t}, min={min_o}, max={max_o}, fitness={fitness:.4f}, bets={flat_res['total_bets']}")
 
     # Let's check if we found a better setup
     improved = best_fitness > baseline_fitness + 0.05
-    print(f"DEBUG MDO: improved={improved}, best_ev={best_ev_thresh}, best_min={best_min_odds}, min={min_odds}, best_max={best_max_odds}, max={max_odds}, baseline_fit={baseline_fitness:.3f}, best_fit={best_fitness:.3f}, best_roi={best_flat_res['roi']:.2f}%, best_dd={best_flat_res['max_drawdown']*100:.2f}%, best_bets={best_flat_res['total_bets']}, ev_115_count={len(df[df['ev'] >= 1.15])}, ev_115_sub_count={len(df[(df['ev'] >= 1.15) & (df['odds'] >= 1.0) & (df['odds'] <= 50.0)])}")
+    logger.debug(f"MDO: improved={improved}, best_ev={best_ev_thresh}, best_min={best_min_odds}, best_max={best_max_odds}, baseline_fit={baseline_fitness:.3f}, best_fit={best_fitness:.3f}, best_roi={best_flat_res['roi']:.2f}%, best_dd={best_flat_res['max_drawdown']*100:.2f}%, best_bets={best_flat_res['total_bets']}")
     
     # 1. EV trigger optimization suggestion
     if improved and best_ev_thresh > current_val_threshold:
@@ -477,6 +483,7 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
             suggestions.append({
                 "type": "ev",
                 "text": f"Subir o Gatilho EV de {current_val_threshold:.2f} para {best_ev_thresh:.2f} (otimização pura de sinal). Isso eleva o ROI para {opt_roi:.1f}% (+{roi_diff:.1f}%){dd_note} com base em {opt_res['summary']['total_bets']} apostas de maior qualidade.",
+                "warning": "Resultados exploratórios — otimização post-hoc na mesma amostra. Aplicar correção Bonferroni (~300 candidatos). Validar em OOS independente.",
                 "value": round(best_ev_thresh, 2),
                 "original_summary": original_summary,
                 "optimized_summary": opt_res['summary'],
@@ -497,6 +504,7 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
                 suggestions.append({
                     "type": "odds_warning",
                     "text": f"Limitar as odds ao intervalo de {best_min_odds:.2f} a {best_max_odds:.2f} (otimização pura de sinal). Filtra ruídos extremos de odds baixas ou variância alta. ROI previsto de {opt_roi:.1f}% (+{roi_diff:.1f}%){dd_note}.",
+                    "warning": "Resultados exploratórios — otimização post-hoc na mesma amostra. Aplicar correção Bonferroni (~300 candidatos). Validar em OOS independente.",
                     "value": f"{best_min_odds:.2f}-{best_max_odds:.2f}",
                     "original_summary": original_summary,
                     "optimized_summary": opt_res['summary'],
@@ -527,6 +535,7 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
                         suggestions.append({
                             "type": "leagues",
                             "text": f"Excluir os campeonatos {', '.join(bad_leagues)} (identificados com retorno negativo plano no laboratório). Eleva o lucro líquido real em +${profit_improvement:.2f} e o ROI para {opt_roi:.1f}%.",
+                            "warning": "Resultados exploratórios — otimização post-hoc na mesma amostra. Aplicar correção Bonferroni (~300 candidatos). Validar em OOS independente.",
                             "exclude_codes": bad_leagues,
                             "original_summary": original_summary,
                             "optimized_summary": opt_res['summary'],
@@ -615,6 +624,7 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
                                 sug = {
                                     "type": "odds_warning",
                                     "text": f"Evitar apostas quando o mercado de {mkt_name} estiver na faixa {r_name}. Ela gerou um prejuízo acumulado de -${abs(r_profit):.2f} no histórico, puxando o ROI geral para baixo.",
+                                    "warning": "Resultados exploratórios — otimização post-hoc na mesma amostra. Aplicar correção Bonferroni (~300 candidatos). Validar em OOS independente.",
                                     "value": f"{field}:{r_name}"
                                 }
                                 sug["original_summary"] = original_summary
@@ -730,20 +740,21 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
 
 
 
-def _build_daily_blocks(df, profits):
+def _build_daily_blocks(df):
     """
-    Groups bet profits by calendar day in chronological order.
-    Returns a list of 1-D numpy arrays, one per day.
+    Groups bets by calendar day in chronological order.
+    Returns a list of dict arrays, one per day, each with keys: odds, prob, won.
     Falls back to individual-bet blocks if date parsing fails.
     """
     try:
         dates = pd.to_datetime(df['date'], errors='coerce')
         if dates.isna().any():
             raise ValueError("Unparseable dates in bet record")
-        # Stable sort by date to preserve chronological order within day
         order = np.argsort(dates)
         sorted_dates = dates.iloc[order]
-        sorted_profits = profits[order]
+        sorted_odds = df['odds'].values[order].astype(float)
+        sorted_probs = df['prob'].values[order].astype(float)
+        sorted_won = df['won'].values[order].astype(bool)
         daily_blocks = []
         i = 0
         while i < len(sorted_dates):
@@ -751,113 +762,185 @@ def _build_daily_blocks(df, profits):
             j = i
             while j < len(sorted_dates) and sorted_dates.iloc[j] == day:
                 j += 1
-            daily_blocks.append(sorted_profits[i:j])
+            daily_blocks.append({
+                'odds': sorted_odds[i:j],
+                'prob': sorted_probs[i:j],
+                'won': sorted_won[i:j],
+            })
             i = j
         return daily_blocks
     except Exception:
-        # Fallback: treat each bet as its own "day" (IID)
-        return [np.array([p]) for p in profits]
+        return [{'odds': np.array([o]), 'prob': np.array([p]), 'won': np.array([w])}
+                for o, p, w in zip(df['odds'].values, df['prob'].values, df['won'].values)]
 
 
-def _block_bootstrap_sample(daily_blocks, n_bets, runs):
+def _simulate_path_dependent(day_blocks, n_bets, initial_bankroll, staking_rule, stake_value):
     """
-    Block bootstrap: sample whole days with replacement until n_bets are accumulated.
-    Returns a 2-D array of shape (runs, n_bets).
-    Preserves within-day correlation that IID bootstrap would destroy.
+    Simulate a single path with path-dependent stakes.
+    Block-bootstrap whole days with replacement until n_bets accumulated,
+    computing stakes from current bankroll at each step.
+    Returns (trajectory, ruined, half_ruined).
     """
-    n_days = len(daily_blocks)
+    n_days = len(day_blocks)
     if n_days == 0:
-        return np.zeros((runs, n_bets))
+        return [initial_bankroll], False, False
 
     rng = np.random.default_rng()
+    bankroll = initial_bankroll
+    ruined = False
+    half_ruined = False
+    trajectory = [initial_bankroll]
+    collected = 0
 
-    sampled = np.zeros((runs, n_bets))
-    for run in range(runs):
-        collected = 0
-        while collected < n_bets:
-            day_idx = rng.integers(0, n_days)
-            day_profits = daily_blocks[day_idx]
-            room = n_bets - collected
-            take = min(len(day_profits), room)
-            sampled[run, collected:collected + take] = day_profits[:take]
-            collected += take
-    return sampled
+    while collected < n_bets:
+        day = day_blocks[rng.integers(0, n_days)]
+        day_odds = day['odds']
+        day_prob = day['prob']
+        day_won = day['won']
+        take = min(len(day_odds), n_bets - collected)
+
+        for i in range(take):
+            odds_i = day_odds[i]
+            prob_i = day_prob[i]
+            won_i = day_won[i]
+
+            if staking_rule == 'fixed':
+                stake = stake_value
+            elif staking_rule == 'proportional':
+                stake = bankroll * (stake_value / 100.0)
+            elif staking_rule == 'kelly':
+                mult_k = stake_value
+                if odds_i > 1.0:
+                    f_star = (prob_i * odds_i - 1.0) / (odds_i - 1.0)
+                    f_star = max(0.0, min(f_star, 0.20))
+                    stake = bankroll * f_star * mult_k
+                else:
+                    stake = 0.0
+            else:
+                stake = 0.0
+
+            stake = min(stake, bankroll * 0.10)
+
+            if stake > 0.01 and bankroll >= stake:
+                profit = stake * (odds_i - 1.0) if won_i else -stake
+                bankroll += profit
+
+            if bankroll < initial_bankroll * 0.10:
+                ruined = True
+            if bankroll < initial_bankroll * 0.50:
+                half_ruined = True
+
+            trajectory.append(bankroll)
+
+        collected += take
+
+    return trajectory, ruined, half_ruined
 
 
 def run_monte_carlo_simulation(bets_record, initial_bankroll=1000.0, staking_rule='fixed', stake_value=10.0, runs=1000):
     """
-    Runs a Monte Carlo simulation (bootstrap resampling) to assess strategy reliability.
+    Runs a Monte Carlo simulation (block bootstrap) to assess strategy reliability.
+
+    For fixed staking: uses fast vectorized path (stakes don't depend on bankroll).
+    For proportional/kelly: simulates each path individually with path-dependent
+    stakes computed from current bankroll at each step.
     """
     if not bets_record or len(bets_record) < 10:
         return None
-        
+
     df = pd.DataFrame(bets_record)
     df['odds'] = df['odds'].astype(float)
     df['prob'] = df['prob'].astype(float) / 100.0
     df['won'] = df['profit'].astype(float) > 0.0
-    
+
     n_bets = len(df)
 
-    odds_arr = df['odds'].values
-    prob_arr = df['prob'].values
-    won_arr = df['won'].values
-    
-    # Pre-calculate profit array for each bet since stake only depends on initial_bankroll
-    profits = np.zeros(n_bets)
-    for i in range(n_bets):
-        bookie_odds = odds_arr[i]
-        model_prob = prob_arr[i]
-        won = won_arr[i]
+    # Build daily blocks (preserves within-day correlation)
+    daily_blocks = _build_daily_blocks(df)
 
-        if staking_rule == 'fixed':
-            stake = stake_value
-        elif staking_rule == 'proportional':
-            stake = initial_bankroll * (stake_value / 100.0)
-        elif staking_rule == 'kelly':
-            mult_k = stake_value
-            if bookie_odds > 1.0:
-                f_star = (model_prob * bookie_odds - 1.0) / (bookie_odds - 1.0)
-                f_star = max(0.0, min(f_star, 0.20))
-                stake = initial_bankroll * f_star * mult_k
-            else:
-                stake = 0.0
+    if staking_rule == 'fixed':
+        # Fast path: stakes are constant, pre-compute profits
+        profits = np.zeros(n_bets)
+        for i in range(n_bets):
+            stake = min(stake_value, initial_bankroll * 0.10)
+            if stake > 0.01:
+                profits[i] = stake * (df['odds'].values[i] - 1.0) if df['won'].values[i] else -stake
+
+        # Convert daily blocks to profit arrays for fast bootstrap
+        try:
+            profit_blocks = []
+            for block in daily_blocks:
+                block_profits = np.zeros(len(block['odds']))
+                for i in range(len(block['odds'])):
+                    stake_f = min(stake_value, initial_bankroll * 0.10)
+                    if stake_f > 0.01:
+                        block_profits[i] = stake_f * (block['odds'][i] - 1.0) if block['won'][i] else -stake_f
+                profit_blocks.append(block_profits)
+        except Exception:
+            profit_blocks = [np.array([p]) for p in profits]
+
+        # Fast block bootstrap with pre-computed profits
+        n_days = len(profit_blocks)
+        if n_days > 0:
+            rng = np.random.default_rng()
+            sampled = np.zeros((runs, n_bets))
+            for run in range(runs):
+                collected = 0
+                while collected < n_bets:
+                    day_idx = rng.integers(0, n_days)
+                    day_profits = profit_blocks[day_idx]
+                    room = n_bets - collected
+                    take = min(len(day_profits), room)
+                    sampled[run, collected:collected + take] = day_profits[:take]
+                    collected += take
+            trajectories = initial_bankroll + np.cumsum(sampled, axis=1)
         else:
-            stake = 0.0
+            trajectories = np.full((runs, n_bets), initial_bankroll)
 
-        stake = min(stake, initial_bankroll * 0.10)
+        ruined_mask = np.any(trajectories < (initial_bankroll * 0.10), axis=1)
+        half_ruined_mask = np.any(trajectories < (initial_bankroll * 0.50), axis=1)
+        final_bankrolls = trajectories[:, -1]
+        final_bankrolls[ruined_mask] = 0.0
+        ruined_runs = int(np.sum(ruined_mask))
+        half_ruined_runs = int(np.sum(half_ruined_mask))
+        profitable_runs = int(np.sum(final_bankrolls > initial_bankroll))
+        p95 = float(np.percentile(final_bankrolls, 95))
+        p50 = float(np.percentile(final_bankrolls, 50))
+        p5 = float(np.percentile(final_bankrolls, 5))
+        avg_final = float(np.mean(final_bankrolls))
+    else:
+        # Path-dependent simulation for proportional and Kelly staking
+        ruined_runs = 0
+        half_ruined_runs = 0
+        profitable_runs = 0
+        final_bankrolls_list = []
 
-        if stake > 0.01:
-            profits[i] = stake * (bookie_odds - 1.0) if won else -stake
+        for _ in range(runs):
+            trajectory, ruined, half_ruined = _simulate_path_dependent(
+                daily_blocks, n_bets, initial_bankroll, staking_rule, stake_value
+            )
+            final = trajectory[-1]
+            if ruined:
+                final_bankrolls_list.append(0.0)
+            else:
+                final_bankrolls_list.append(final)
+            if ruined:
+                ruined_runs += 1
+            if half_ruined:
+                half_ruined_runs += 1
+            if final > initial_bankroll:
+                profitable_runs += 1
 
-    # Block Bootstrap by day — preserves within-day correlation structure
-    # IID bootstrap (np.random.choice) under-estimates ruin probability by 5-15%
-    # because bets on the same day are correlated (multiple matches/markets)
-    daily_profits = _build_daily_blocks(df, profits)
-    sampled_profits = _block_bootstrap_sample(daily_profits, n_bets, runs)
+        final_bankrolls = np.array(final_bankrolls_list)
+        p95 = float(np.percentile(final_bankrolls, 95))
+        p50 = float(np.percentile(final_bankrolls, 50))
+        p5 = float(np.percentile(final_bankrolls, 5))
+        avg_final = float(np.mean(final_bankrolls))
 
-    # Cumulative bankroll trajectory: shape (runs, n_bets)
-    trajectories = initial_bankroll + np.cumsum(sampled_profits, axis=1)
-
-    # Calculate ruin states
-    ruined_mask = np.any(trajectories < (initial_bankroll * 0.10), axis=1)
-    half_ruined_mask = np.any(trajectories < (initial_bankroll * 0.50), axis=1)
-
-    final_bankrolls = trajectories[:, -1]
-    final_bankrolls[ruined_mask] = 0.0  # Cap ruined runs at 0
-
-    ruined_runs = int(np.sum(ruined_mask))
-    half_ruined_runs = int(np.sum(half_ruined_mask))
-    profitable_runs = int(np.sum(final_bankrolls > initial_bankroll))
-    
-    p5 = float(np.percentile(final_bankrolls, 5))
-    p50 = float(np.percentile(final_bankrolls, 50))
-    p95 = float(np.percentile(final_bankrolls, 95))
-    avg_final = float(np.mean(final_bankrolls))
-    
     profit_prob = float(profitable_runs / runs * 100.0)
     ruin_prob = float(ruined_runs / runs * 100.0)
     half_ruin_prob = float(half_ruined_runs / runs * 100.0)
-    
+
     return {
         "runs": runs,
         "profit_probability": round(profit_prob, 1),
@@ -892,8 +975,19 @@ def compute_brier_score(bets_history):
 
         bs_model += (prob_model - outcome) ** 2
 
-        # Probabilidade implícita do mercado
-        prob_market = 1.0 / odds if odds > 1.0 else 0.5
+        # Probabilidade implícita do mercado com correção de overround
+        prob_raw = 1.0 / odds if odds > 1.0 else 0.5
+
+        # Estimate overround from available odds when possible, otherwise use typical margin
+        odds_h = b.get('odds_h')
+        odds_d = b.get('odds_d')
+        odds_a = b.get('odds_a')
+        if odds_h and odds_d and odds_a and all(not pd.isna(x) and x > 1.0 for x in [odds_h, odds_d, odds_a]):
+            overround = (1.0 / odds_h + 1.0 / odds_d + 1.0 / odds_a)
+        else:
+            overround = 1.065  # typical football bookmaker margin ~6.5%
+
+        prob_market = prob_raw / overround if odds > 1.0 else 0.5
         bs_market += (prob_market - outcome) ** 2
 
     bs_model /= n
@@ -912,17 +1006,21 @@ def compute_brier_score(bets_history):
     }
 
 
-def compute_bootstrap_ci(bets_history, n_resamples=5000):
+def compute_bootstrap_ci(bets_history, n_resamples=5000, initial_bankroll=None):
     """
-    Calcula intervalo de confiança de 95% para o ROI via bootstrap.
-    Retorna mediana, limites do IC e probabilidade de ROI positivo.
+    Calcula intervalo de confianca de 95% para ROI e Drawdown via bootstrap.
+    Retorna mediana, limites do IC e probabilidade de ROI positivo,
+    mais CI para drawdown maximo.
     """
     if not bets_history or len(bets_history) < 5:
         return {
             'bootstrap_roi_median': None,
             'bootstrap_roi_ci_lower': None,
             'bootstrap_roi_ci_upper': None,
-            'prob_positive_roi': None
+            'prob_positive_roi': None,
+            'bootstrap_drawdown_median': None,
+            'bootstrap_drawdown_ci_lower': None,
+            'bootstrap_drawdown_ci_upper': None,
         }
 
     profits = np.array([float(b.get('profit', 0)) for b in bets_history])
@@ -933,7 +1031,11 @@ def compute_bootstrap_ci(bets_history, n_resamples=5000):
     if avg_stake <= 0:
         avg_stake = 1.0
 
-    # Bootstrap vetorizado: gera todos os índices de uma vez
+    # Estimate initial bankroll if not provided
+    if initial_bankroll is None:
+        initial_bankroll = max(float(np.sum(stakes)) * 1.5, 500.0)
+
+    # Bootstrap vetorizado: gera todos os indices de uma vez
     rng = np.random.default_rng(seed=42)
     indices = rng.choice(n, size=(n_resamples, n), replace=True)
 
@@ -946,11 +1048,23 @@ def compute_bootstrap_ci(bets_history, n_resamples=5000):
     ci_upper = float(np.percentile(roi_samples, 97.5))
     prob_positive = float(np.mean(roi_samples > 0))
 
+    # Drawdown bootstrap: max peak-to-trough decline per resample
+    cum_equity = initial_bankroll + np.cumsum(resampled_profits, axis=1)
+    peak_equity = np.maximum.accumulate(cum_equity, axis=1)
+    dd_samples = np.max((peak_equity - cum_equity) / np.maximum(peak_equity, 1.0), axis=1) * 100.0
+
+    dd_median = float(np.median(dd_samples))
+    dd_ci_lower = float(np.percentile(dd_samples, 2.5))
+    dd_ci_upper = float(np.percentile(dd_samples, 97.5))
+
     return {
         'bootstrap_roi_median': round(roi_median, 2),
         'bootstrap_roi_ci_lower': round(ci_lower, 2),
         'bootstrap_roi_ci_upper': round(ci_upper, 2),
-        'prob_positive_roi': round(prob_positive, 4)
+        'prob_positive_roi': round(prob_positive, 4),
+        'bootstrap_drawdown_median': round(dd_median, 2),
+        'bootstrap_drawdown_ci_lower': round(dd_ci_lower, 2),
+        'bootstrap_drawdown_ci_upper': round(dd_ci_upper, 2),
     }
 
 
@@ -1118,53 +1232,246 @@ def apply_fdr_correction(p_values):
 
     return adjusted
 
-def compute_edge_quality_score(summary, oos_summary=None):
-    """
-    Computes a composite Edge Quality Score (0-100) based on statistical metrics.
-    Weights: OOS (25%), Bootstrap CI (20%), CLV (15%), Edge Decay (12%), P-Value (13%), Power Ratio (10%), Brier (5%).
-    """
-    score = 0.0
-    details = []
+# Default EQS weights — calibrated against known strategy performance patterns.
+# Updated via calibrate_equity_weights() when >= 5 strategies with OOS data are available.
+DEFAULT_EQS_WEIGHTS = {
+    'oos': 25, 'bootstrap': 20, 'clv': 15, 'decay': 12,
+    'pvalue': 13, 'power': 10, 'brier': 5,
+}
 
-    # 1. Out-of-Sample (OOS) - 25 points
+
+def _pearson_r(x, y):
+    """Pure-numpy Pearson correlation (avoids scipy dependency)."""
+    x, y = np.array(x, dtype=float), np.array(y, dtype=float)
+    mask = ~(np.isnan(x) | np.isnan(y))
+    if mask.sum() < 3:
+        return 0.0
+    x, y = x[mask], y[mask]
+    xm, ym = x - x.mean(), y - y.mean()
+    denom = np.sqrt((xm * xm).sum() * (ym * ym).sum())
+    return float((xm * ym).sum() / denom) if denom > 1e-15 else 0.0
+
+
+def _eqs_metric_scores(summary, oos_summary=None):
+    """Compute normalized (0-1) scores for each EQS metric from a single strategy summary.
+
+    Returns dict with keys matching DEFAULT_EQS_WEIGHTS, each value in [0, 1].
+    """
+    scores = {}
+
+    # 1. OOS
     if oos_summary:
         in_sample_roi = summary.get('roi', 0)
         oos_roi = oos_summary.get('roi', 0)
-        
         if in_sample_roi > 0 and oos_roi > 0:
-            if oos_roi >= in_sample_roi * 0.8:
-                pts = 25
+            ratio = oos_roi / max(in_sample_roi, 0.001)
+            if ratio >= 0.8:
+                scores['oos'] = 1.0
+            elif ratio >= 0.4:
+                scores['oos'] = 17 / 25
+            else:
+                scores['oos'] = 8 / 25
+        elif oos_roi > 0:
+            scores['oos'] = 5 / 25
+        else:
+            scores['oos'] = 0.0
+    else:
+        scores['oos'] = 0.0
+
+    # 2. Bootstrap CI
+    ci_lower = summary.get('bootstrap_roi_ci_lower')
+    if ci_lower is not None:
+        if ci_lower > 1.0:
+            scores['bootstrap'] = 1.0
+        elif ci_lower > 0.0:
+            scores['bootstrap'] = 15 / 20
+        elif ci_lower > -2.0:
+            scores['bootstrap'] = 8 / 20
+        else:
+            scores['bootstrap'] = 0.0
+    else:
+        scores['bootstrap'] = 0.0
+
+    # 3. CLV
+    avg_clv = summary.get('avg_clv')
+    if avg_clv is not None:
+        if avg_clv > 2.0:
+            scores['clv'] = 1.0
+        elif avg_clv > 0.5:
+            scores['clv'] = 10 / 15
+        elif avg_clv > 0.0:
+            scores['clv'] = 5 / 15
+        else:
+            scores['clv'] = 0.0
+    else:
+        scores['clv'] = 0.0
+
+    # 4. Edge Decay
+    decay = summary.get('edge_decay_pct')
+    if decay is not None:
+        if decay > -10.0:
+            scores['decay'] = 1.0
+        elif decay > -25.0:
+            scores['decay'] = 6 / 12
+        else:
+            scores['decay'] = 0.0
+    else:
+        scores['decay'] = 0.0
+
+    # 5. P-Value
+    wins = summary.get('wins', 0)
+    total = summary.get('total_bets', 1)
+    avg_odds = summary.get('avg_odds', 2.0)
+    try:
+        p_val = compute_pvalue_binomial(wins, total, avg_odds)
+        if p_val < 0.01:
+            scores['pvalue'] = 1.0
+        elif p_val < 0.05:
+            scores['pvalue'] = 9 / 13
+        elif p_val < 0.10:
+            scores['pvalue'] = 4 / 13
+        else:
+            scores['pvalue'] = 0.0
+    except Exception:
+        scores['pvalue'] = 0.0
+
+    # 6. Power Ratio
+    pr = summary.get('power_ratio')
+    if pr is not None:
+        if pr >= 1.0:
+            scores['power'] = 1.0
+        elif pr >= 0.5:
+            scores['power'] = 5 / 10
+        else:
+            scores['power'] = 0.0
+    else:
+        scores['power'] = 0.0
+
+    # 7. Brier
+    brier_imp = summary.get('brier_improvement')
+    if brier_imp is not None:
+        if brier_imp > 2.0:
+            scores['brier'] = 1.0
+        elif brier_imp > 0.0:
+            scores['brier'] = 3 / 5
+        else:
+            scores['brier'] = 0.0
+    else:
+        scores['brier'] = 0.0
+
+    return scores
+
+
+def calibrate_equity_weights(strategy_results, min_strategies=5):
+    """Learn EQS weights from strategy performance data via correlation with OOS ROI.
+
+    Args:
+        strategy_results: list of dicts, each with 'summary' and optional 'oos_summary'
+        min_strategies: minimum number of strategies required to override defaults
+
+    Returns:
+        dict of {metric_name: weight_pct} summing to 100.
+        Falls back to DEFAULT_EQS_WEIGHTS if insufficient data or no signal.
+    """
+    if len(strategy_results) < min_strategies:
+        logger.info(f"EQS calibration: {len(strategy_results)} strategies < {min_strategies}, using defaults")
+        return dict(DEFAULT_EQS_WEIGHTS)
+
+    metrics = list(DEFAULT_EQS_WEIGHTS.keys())
+    # Collect normalized scores and OOS ROI for each strategy
+    rows = {m: [] for m in metrics}
+    oos_rois = []
+
+    for sr in strategy_results:
+        summary = sr.get('summary', {})
+        oos = sr.get('oos_summary')
+        scores = _eqs_metric_scores(summary, oos)
+        oos_roi = (oos or {}).get('roi', summary.get('roi', 0))
+        oos_rois.append(oos_roi)
+        for m in metrics:
+            rows[m].append(scores[m])
+
+    # Pearson correlation of each metric with OOS ROI
+    correlations = {}
+    for m in metrics:
+        r = _pearson_r(rows[m], oos_rois)
+        correlations[m] = abs(r)
+
+    total_corr = sum(correlations.values())
+    if total_corr < 1e-10:
+        logger.info("EQS calibration: all correlations near zero, using defaults")
+        return dict(DEFAULT_EQS_WEIGHTS)
+
+    # Normalize to sum to 100
+    calibrated = {m: round(correlations[m] / total_corr * 100) for m in metrics}
+    # Fix rounding so it sums exactly to 100
+    diff = 100 - sum(calibrated.values())
+    if diff != 0:
+        # Adjust the largest weight
+        largest = max(calibrated, key=calibrated.get)
+        calibrated[largest] += diff
+
+    logger.info(f"EQS weights calibrated from {len(strategy_results)} strategies: {calibrated}")
+    return calibrated
+
+
+def compute_edge_quality_score(summary, oos_summary=None, weights=None):
+    """Computes a composite Edge Quality Score (0-100) based on statistical metrics.
+
+    Args:
+        summary: dict with backtest summary metrics
+        oos_summary: optional OOS validation summary
+        weights: optional custom weight dict from calibrate_equity_weights().
+                 If None, uses DEFAULT_EQS_WEIGHTS.
+
+    Phase 2: The OOS section now receives true out-of-sample data (models frozen after cutoff date)
+    rather than a simple chronological tail slice, eliminating data leakage from the calibration/ML pipeline.
+    """
+    w = weights if weights is not None else DEFAULT_EQS_WEIGHTS
+    score = 0.0
+    details = []
+
+    # 1. Out-of-Sample (OOS) — weight-driven
+    w_oos = w.get('oos', 25)
+    if oos_summary:
+        in_sample_roi = summary.get('roi', 0)
+        oos_roi = oos_summary.get('roi', 0)
+        if in_sample_roi > 0 and oos_roi > 0:
+            ratio = oos_roi / max(in_sample_roi, 0.001)
+            if ratio >= 0.8:
+                pts = w_oos
                 msg = f"OOS Excelente: ROI {oos_roi:.1f}% (Mantido)"
-            elif oos_roi >= in_sample_roi * 0.4:
-                pts = 17
+            elif ratio >= 0.4:
+                pts = int(round(w_oos * 17 / 25))
                 msg = f"OOS Bom: ROI {oos_roi:.1f}% (Degradado)"
             else:
-                pts = 8
+                pts = int(round(w_oos * 8 / 25))
                 msg = f"OOS Fraco: ROI {oos_roi:.1f}% (Queda forte)"
         elif oos_roi > 0:
-            pts = 5
+            pts = int(round(w_oos * 5 / 25))
             msg = f"OOS Positivo ({oos_roi:.1f}%), mas In-Sample Negativo"
         else:
             pts = 0
             msg = f"OOS Falhou: ROI negativo {oos_roi:.1f}%"
     else:
         pts = 0
-        msg = "OOS Não Calculado (0/25 pts)"
-    
-    score += pts
-    details.append({'metric': 'Validação OOS', 'points': pts, 'max': 25, 'message': msg})
+        msg = f"OOS Não Calculado (0/{w_oos} pts)"
 
-    # 2. Bootstrap CI Lower Bound - 20 points
+    score += pts
+    details.append({'metric': 'Validação OOS', 'points': pts, 'max': w_oos, 'message': msg})
+
+    # 2. Bootstrap CI Lower Bound
+    w_bs = w.get('bootstrap', 20)
     ci_lower = summary.get('bootstrap_roi_ci_lower')
     if ci_lower is not None:
         if ci_lower > 1.0:
-            pts = 20
+            pts = w_bs
             msg = f"Limite Inferior Forte: {ci_lower:.1f}%"
         elif ci_lower > 0.0:
-            pts = 15
+            pts = int(round(w_bs * 15 / 20))
             msg = f"Limite Inferior Positivo: {ci_lower:.1f}%"
         elif ci_lower > -2.0:
-            pts = 8
+            pts = int(round(w_bs * 8 / 20))
             msg = f"Risco Moderado: {ci_lower:.1f}%"
         else:
             pts = 0
@@ -1172,21 +1479,22 @@ def compute_edge_quality_score(summary, oos_summary=None):
     else:
         pts = 0
         msg = "CI Não Calculado"
-        
-    score += pts
-    details.append({'metric': 'Bootstrap CI (95%)', 'points': pts, 'max': 20, 'message': msg})
 
-    # 3. Closing Line Value (CLV) - 15 points
+    score += pts
+    details.append({'metric': 'Bootstrap CI (95%)', 'points': pts, 'max': w_bs, 'message': msg})
+
+    # 3. Closing Line Value (CLV)
+    w_clv = w.get('clv', 15)
     avg_clv = summary.get('avg_clv')
     if avg_clv is not None:
         if avg_clv > 2.0:
-            pts = 15
+            pts = w_clv
             msg = f"CLV Excelente: +{avg_clv:.1f}% (Bate a Linha de Fechamento)"
         elif avg_clv > 0.5:
-            pts = 10
+            pts = int(round(w_clv * 10 / 15))
             msg = f"CLV Positivo: +{avg_clv:.1f}% (Edge Confirmado)"
         elif avg_clv > 0.0:
-            pts = 5
+            pts = int(round(w_clv * 5 / 15))
             msg = f"CLV Marginal: +{avg_clv:.1f}%"
         else:
             pts = 0
@@ -1194,18 +1502,20 @@ def compute_edge_quality_score(summary, oos_summary=None):
     else:
         pts = 0
         msg = "CLV Não Disponível"
-        
-    score += pts
-    details.append({'metric': 'Closing Line Value (CLV)', 'points': pts, 'max': 15 if avg_clv is not None else 0, 'message': msg})
 
-    # 4. Edge Decay - 12 points
+    score += pts
+    details.append({'metric': 'Closing Line Value (CLV)', 'points': pts,
+                    'max': w_clv if avg_clv is not None else 0, 'message': msg})
+
+    # 4. Edge Decay
+    w_decay = w.get('decay', 12)
     decay = summary.get('edge_decay_pct')
     if decay is not None:
         if decay > -10.0:
-            pts = 12
+            pts = w_decay
             msg = f"Edge Estável ({decay:.1f}%)"
         elif decay > -25.0:
-            pts = 6
+            pts = int(round(w_decay * 6 / 12))
             msg = f"Decaimento Leve ({decay:.1f}%)"
         else:
             pts = 0
@@ -1213,44 +1523,46 @@ def compute_edge_quality_score(summary, oos_summary=None):
     else:
         pts = 0
         msg = "Decay Não Calculado"
-        
-    score += pts
-    details.append({'metric': 'Estabilidade Temporal', 'points': pts, 'max': 12, 'message': msg})
 
-    # 5. P-Value - 13 points
+    score += pts
+    details.append({'metric': 'Estabilidade Temporal', 'points': pts, 'max': w_decay, 'message': msg})
+
+    # 5. P-Value
+    w_pv = w.get('pvalue', 13)
     wins = summary.get('wins', 0)
     total = summary.get('total_bets', 1)
     avg_odds = summary.get('avg_odds', 2.0)
-    
+
     try:
         p_val = compute_pvalue_binomial(wins, total, avg_odds)
         if p_val < 0.01:
-            pts = 13
+            pts = w_pv
             msg = f"Significância Alta (p={p_val:.3f})"
         elif p_val < 0.05:
-            pts = 9
+            pts = int(round(w_pv * 9 / 13))
             msg = f"Significância Boa (p={p_val:.3f})"
         elif p_val < 0.10:
-            pts = 4
+            pts = int(round(w_pv * 4 / 13))
             msg = f"Significância Marginal (p={p_val:.3f})"
         else:
             pts = 0
             msg = f"Resultado Aleatório (p={p_val:.3f})"
-    except:
+    except Exception:
         pts = 0
         msg = "P-Valor Indisponível"
-        
-    score += pts
-    details.append({'metric': 'P-Valor Binomial', 'points': pts, 'max': 13, 'message': msg})
 
-    # 6. Power Ratio - 10 points
+    score += pts
+    details.append({'metric': 'P-Valor Binomial', 'points': pts, 'max': w_pv, 'message': msg})
+
+    # 6. Power Ratio
+    w_pwr = w.get('power', 10)
     pr = summary.get('power_ratio')
     if pr is not None:
         if pr >= 1.0:
-            pts = 10
+            pts = w_pwr
             msg = f"Amostra Suficiente ({pr:.1f}x)"
         elif pr >= 0.5:
-            pts = 5
+            pts = int(round(w_pwr * 5 / 10))
             msg = f"Amostra Parcial ({pr:.1f}x)"
         else:
             pts = 0
@@ -1258,18 +1570,19 @@ def compute_edge_quality_score(summary, oos_summary=None):
     else:
         pts = 0
         msg = "Power Ratio Não Calculado"
-        
-    score += pts
-    details.append({'metric': 'Power Analysis (Amostra)', 'points': pts, 'max': 10, 'message': msg})
 
-    # 7. Brier Score Improvement - 5 points
+    score += pts
+    details.append({'metric': 'Power Analysis (Amostra)', 'points': pts, 'max': w_pwr, 'message': msg})
+
+    # 7. Brier Score Improvement
+    w_brier = w.get('brier', 5)
     brier_imp = summary.get('brier_improvement')
     if brier_imp is not None:
         if brier_imp > 2.0:
-            pts = 5
+            pts = w_brier
             msg = f"Supera Mercado ({brier_imp:.1f}%)"
         elif brier_imp > 0.0:
-            pts = 3
+            pts = int(round(w_brier * 3 / 5))
             msg = f"Ligeira Vantagem ({brier_imp:.1f}%)"
         else:
             pts = 0
@@ -1277,15 +1590,15 @@ def compute_edge_quality_score(summary, oos_summary=None):
     else:
         pts = 0
         msg = "Brier Não Calculado"
-        
+
     score += pts
-    details.append({'metric': 'Precisão Brier', 'points': pts, 'max': 5, 'message': msg})
+    details.append({'metric': 'Precisão Brier', 'points': pts, 'max': w_brier, 'message': msg})
 
     # Final Verdict & Risk Recommendation
-    # Calculate max possible points based on what was available to avoid punishing missing data (like CLV for BTTS)
-    max_pts = 100
+    # Max possible points adjusts for missing data (CLV typically unavailable for BTTS)
+    max_pts = sum(w.values())
     if avg_clv is None:
-        max_pts -= 15
+        max_pts -= w_clv
         
     total_score = int(round((score / max_pts) * 100)) if max_pts > 0 else 0
     

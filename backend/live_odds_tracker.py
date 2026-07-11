@@ -1,13 +1,16 @@
 import os
 import json
+import logging
 import requests
 from datetime import datetime, timedelta, timezone
+from .api_utils import retry_with_backoff
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+logger = logging.getLogger(__name__)
+
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 TRACKER_FILE  = os.path.join(DATA_DIR, 'live_odds_tracker.json')
 BASELINE_FILE = os.path.join(DATA_DIR, 'odds_baseline.json')   # ← NOVO: imutável
 
-import os
 from dotenv import load_dotenv
 load_dotenv()
 API_KEY = os.getenv('THE_ODDS_API_KEY')
@@ -39,7 +42,7 @@ def _save_baseline(baseline: dict) -> None:
         with open(BASELINE_FILE, 'w', encoding='utf-8') as f:
             json.dump(baseline, f, indent=2, ensure_ascii=False)
     except Exception as e:
-        print(f"[Baseline] Erro ao salvar: {e}")
+        logger.error(f"Erro ao salvar baseline: {e}", exc_info=True)
 
 
 def get_or_set_opening(baseline: dict, match_id: str, comp_key: str,
@@ -99,56 +102,10 @@ def save_tracker_data(data: dict) -> None:
         with open(TRACKER_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        print(f"[Live Odds Tracker] Erro ao salvar tracker: {e}")
+        logger.error(f"Erro ao salvar tracker: {e}", exc_info=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  MAPEAMENTO CANÔNICO sport_key (The Odds API) → league_code interno do sistema
-#  Mantido alinhado com LEAGUES_SEASONAL + LEAGUES_AGGREGATE do data_loader.
-#  Este é o ÚNICO ponto de verdade. Ambas as pontas (coleta live e endpoint
-#  /live_steam_moves) DEVEM usar map_sport_to_league_code() para gerar o code,
-#  garantindo que a chave de cache (league_code|market) bata em todos os casos.
-# ─────────────────────────────────────────────────────────────────────────────
-SPORT_LEAGUE_MAP = {
-    # Inglaterra
-    'soccer_epl':                        'E0',
-    'soccer_england_efl_champ':          'E1',
-    'soccer_england_league1':            'E2',
-    'soccer_england_league2':            'E3',
-    # Espanha
-    'soccer_spain_la_liga':              'SP1',
-    'soccer_spain_segunda_division':     'SP2',
-    # Itália
-    'soccer_italy_serie_a':              'I1',
-    'soccer_italy_serie_b':              'I2',
-    # Alemanha
-    'soccer_germany_bundesliga':         'D1',
-    'soccer_germany_bundesliga2':        'D2',
-    # França
-    'soccer_france_ligue_one':           'F1',
-    'soccer_france_ligue_two':           'F2',
-    # Outros europeus
-    'soccer_netherlands_eredivisie':     'N1',
-    'soccer_belgium_first_div':          'B1',
-    'soccer_portugal_primeira_liga':     'P1',
-    'soccer_turkey_super_league':        'T1',
-    'soccer_greece_super_league':        'G1',
-    'soccer_spl':                        'SC0',
-    # Américas / Ásia
-    'soccer_brazil_campeonato':          'BRA',
-    'soccer_argentina_primera_division': 'ARG',
-    'soccer_usa_mls':                    'USA',
-    'soccer_mexico_ligamx':              'MEX',
-    'soccer_japan_j_league':             'JPN',
-    # Nórdicos
-    'soccer_sweden_allsvenskan':         'SWEDEN_ALLSVENSKAN',
-    'soccer_norway_eliteserien':         'NORWAY_ELITESERIEN',
-}
-
-# Fallback único e compartilhado para ligas fora do mapa. As DUAS pontas
-# usam este mesmo valor, de modo que a chave de cache seja determinística
-# e nunca divirja entre a coleta live e o endpoint de leitura.
-UNMAPPED_LEAGUE_CODE = 'OUTROS'
+from .odds_api_mappings import SPORT_TO_LEAGUE as SPORT_LEAGUE_MAP, UNMAPPED_LEAGUE_CODE
 
 
 def map_sport_to_league_code(sport_key: str) -> str:
@@ -170,6 +127,10 @@ def map_sport_to_league_code(sport_key: str) -> str:
     return SPORT_LEAGUE_MAP.get(sport_key, UNMAPPED_LEAGUE_CODE)
 
 
+MAX_STEAM_HISTORY_COUNT = 500
+MAX_STEAM_HISTORY_AGE_DAYS = 30
+
+
 def add_alert_to_history(alert_data: dict) -> None:
     history_file = os.path.join(DATA_DIR, 'live_steam_moves_history.json')
     history = []
@@ -186,13 +147,20 @@ def add_alert_to_history(alert_data: dict) -> None:
             return   # alerta já registrado — não duplicar
 
     alert_data['unique_id'] = unique_id
+    alert_data['created_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     history.append(alert_data)
+
+    # Prune: remove resolved alerts older than MAX_STEAM_HISTORY_AGE_DAYS, cap at MAX_STEAM_HISTORY_COUNT
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=MAX_STEAM_HISTORY_AGE_DAYS)).strftime('%Y-%m-%d %H:%M:%S')
+    history = [h for h in history if not (h.get('resolved') and h.get('created_at', '') < cutoff)]
+    if len(history) > MAX_STEAM_HISTORY_COUNT:
+        history = history[-MAX_STEAM_HISTORY_COUNT:]
 
     try:
         with open(history_file, 'w', encoding='utf-8') as f:
             json.dump(history, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        print(f"[Live Odds Tracker] Erro ao salvar histórico: {e}")
+        logger.error(f"Erro ao salvar histórico: {e}", exc_info=True)
 
 
 def cleanup_old_matches(data: dict) -> None:
@@ -238,8 +206,13 @@ def normalize_market_key(market_key: str, outcome_name: str,
 #  CICLO DE COLETA PRINCIPAL
 # ─────────────────────────────────────────────────────────────────────────────
 
+@retry_with_backoff(max_retries=3, base_delay=1.0)
+def _fetch_odds(url):
+    return requests.get(url, timeout=15)
+
+
 def fetch_and_update_live_odds() -> None:
-    print("[Live Odds Tracker] Iniciando varredura The Odds API...")
+    logger.info("Iniciando varredura The Odds API...")
 
     url = (
         f'https://api.the-odds-api.com/v4/sports/{SPORT}/odds/'
@@ -247,9 +220,9 @@ def fetch_and_update_live_odds() -> None:
     )
 
     try:
-        response = requests.get(url, timeout=15)
+        response = _fetch_odds(url)
         if response.status_code != 200:
-            print(f"[Live Odds Tracker] API Error {response.status_code}: {response.text}")
+            logger.error(f"API Error {response.status_code}: {response.text}")
             return
 
         matches = response.json()
@@ -451,6 +424,21 @@ def fetch_and_update_live_odds() -> None:
                                     }
                                     add_alert_to_history(alert_entry)
 
+                                    # CLV tracking — registra odd de detecção para calcular
+                                    # se batemos o fechamento quando o jogo começar
+                                    try:
+                                        from .smart_money import register_detection_for_clv
+                                        register_detection_for_clv(
+                                            harness_match_id=match_entry.get('title', match_id),
+                                            bookmaker=bookie_name,
+                                            market=norm_market,
+                                            detection_odd=current_in_entry,
+                                            detection_time=now_str,
+                                            league_code=mapped_league,
+                                        )
+                                    except Exception:
+                                        pass  # CLV tracking is non-critical
+
                                     # Telegram — envia apenas uma vez por par match+mercado
                                     if not bookie_entry[comp_key].get('telegram_sent', False):
                                         try:
@@ -481,17 +469,17 @@ def fetch_and_update_live_odds() -> None:
                                             send_telegram_message(msg)
                                             bookie_entry[comp_key]['telegram_sent'] = True
                                             alert_count += 1
-                                            print(
-                                                f"[Live Odds Tracker] 🚨 Telegram enviado: "
+                                            logger.info(
+                                                f"Telegram enviado: "
                                                 f"{match_entry.get('title')} | {norm_market.upper()} | "
                                                 f"Drop {drop_pct:.1f}% "
-                                                f"(Opening baseline: {opening} → Atual: {current_in_entry})"
+                                                f"(Opening: {opening} -> Atual: {current_in_entry})"
                                             )
                                         except Exception as tg_err:
-                                            print(f"[Live Odds Tracker] Telegram erro: {tg_err}")
+                                            logger.error(f"Telegram erro: {tg_err}")
 
                                 except Exception as e:
-                                    print(f"[Live Odds Tracker] Erro ao processar alerta: {e}")
+                                    logger.error(f"Erro ao processar alerta: {e}", exc_info=True)
 
         save_tracker_data(data)
 
@@ -499,8 +487,8 @@ def fetch_and_update_live_odds() -> None:
         if baseline_dirty:
             _save_baseline(baseline)
 
-        print(
-            f"[Live Odds Tracker] ✅ Concluído. "
+        logger.info(
+            f"Concluído. "
             f"{new_count} novos jogos | {updated_count} odds atualizadas | "
             f"{alert_count} alertas Telegram enviados."
         )
@@ -508,8 +496,17 @@ def fetch_and_update_live_odds() -> None:
         # Resolve resultados de steam moves históricos
         resolve_historical_steam_results()
 
+        # Atualiza CLV para jogos que já começaram
+        try:
+            from .smart_money import update_closing_odds_for_kickoffs
+            clv_resolved = update_closing_odds_for_kickoffs(data)
+            if clv_resolved > 0:
+                logger.info(f"CLV: {clv_resolved} entradas tiveram odd de fechamento registrada.")
+        except Exception:
+            pass
+
     except Exception as e:
-        print(f"[Live Odds Tracker] Exceção durante varredura: {e}")
+        logger.error(f"Exceção durante varredura: {e}", exc_info=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -552,7 +549,7 @@ def get_baseline_stats() -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def resolve_historical_steam_results() -> None:
-    print("[Live Odds Tracker] Iniciando resolução de resultados de Smart Money...")
+    logger.info("Iniciando resolução de resultados de Smart Money...")
     history_file = os.path.join(DATA_DIR, 'live_steam_moves_history.json')
     if not os.path.exists(history_file):
         return
@@ -617,46 +614,165 @@ def resolve_historical_steam_results() -> None:
         teams = item.get('match', '').split(' vs ')
         if len(teams) != 2:
             continue
-        home_target = teams[0].lower()
-        away_target = teams[1].lower()
+        home_target = teams[0].strip().lower()
+        away_target = teams[1].strip().lower()
 
         match_row = None
+        best_score = 0
         for _, row in df.iterrows():
-            h_local = str(row.get('HomeTeam', '')).lower()
-            a_local = str(row.get('AwayTeam', '')).lower()
-            if (
-                (h_local in home_target or home_target in h_local) and
-                (a_local in away_target or away_target in a_local)
-            ):
+            h_local = str(row.get('HomeTeam', '')).strip().lower()
+            a_local = str(row.get('AwayTeam', '')).strip().lower()
+
+            # Exact match (best)
+            if h_local == home_target and a_local == away_target:
                 match_row = row
                 break
 
+            # Score-based fuzzy matching
+            score = 0
+            # Check containment in both directions
+            if h_local in home_target or home_target in h_local:
+                score += 3
+            if a_local in away_target or away_target in a_local:
+                score += 3
+            # Partial word overlap
+            h_words = set(h_local.split())
+            ht_words = set(home_target.split())
+            a_words = set(a_local.split())
+            at_words = set(away_target.split())
+            h_overlap = len(h_words & ht_words)
+            a_overlap = len(a_words & at_words)
+            score += h_overlap + a_overlap
+
+            if score >= 4 and score > best_score:
+                best_score = score
+                match_row = row
+
+        # Second pass: exact match preferred over fuzzy
+        if match_row is not None and best_score < 6:
+            # Medium-confidence match — log it for audit
+            logger.info(
+                f"SmartMoney resolution fuzzy match (score={best_score}): "
+                f"'{home_target}' vs '{away_target}' -> "
+                f"'{str(match_row.get('HomeTeam', '')).strip().lower()}' vs "
+                f"'{str(match_row.get('AwayTeam', '')).strip().lower()}'"
+            )
+
         if match_row is not None:
             ftr        = match_row.get('FTR')
+            fthg       = match_row.get('FTHG')
+            ftag       = match_row.get('FTAG')
+            hthg       = match_row.get('HTHG')
+            htag       = match_row.get('HTAG')
             market     = item.get('market', '').lower()
             stake      = item.get('stake_value', 10.0)
             current_odd = item.get('current_odd', 1.0)
 
             won = False
-            if market == 'home' and ftr == 'H': won = True
-            elif market == 'draw' and ftr == 'D': won = True
-            elif market == 'away' and ftr == 'A': won = True
+            # ── 1X2 ──────────────────────────────────────────────────
+            if market in ('home', '1', 'home_dnb'):
+                won = (ftr == 'H')
+            elif market in ('draw', 'x'):
+                won = (ftr == 'D')
+            elif market in ('away', '2', 'away_dnb'):
+                won = (ftr == 'A')
+            elif market == 'lay_home':
+                won = (ftr in ('D', 'A'))  # X2
+            elif market == 'lay_away':
+                won = (ftr in ('H', 'D'))  # 1X
+            elif market == 'lay_draw':
+                won = (ftr in ('H', 'A'))  # 12
+
+            # ── Over/Under ───────────────────────────────────────────
+            elif 'over' in market or 'under' in market:
+                if pd.notna(fthg) and pd.notna(ftag):
+                    total_goals = fthg + ftag
+                    # Extract threshold from market name
+                    import re
+                    threshold_match = re.search(r'(\d+\.?\d*)', market)
+                    if threshold_match:
+                        threshold = float(threshold_match.group(1))
+                        if 'over' in market:
+                            won = total_goals > threshold
+                        else:
+                            won = total_goals < threshold
+                    else:
+                        # Fallback: assume Over/Under 2.5
+                        if 'over' in market:
+                            won = total_goals > 2.5
+                        else:
+                            won = total_goals < 2.5
+
+            # ── BTTS ─────────────────────────────────────────────────
+            elif 'btts' in market:
+                if pd.notna(fthg) and pd.notna(ftag):
+                    both_scored = (fthg > 0 and ftag > 0)
+                    if 'yes' in market or 'sim' in market:
+                        won = both_scored
+                    elif 'no' in market or 'nao' in market or 'não' in market:
+                        won = not both_scored
+
+            # ── HT (Half-Time) markets ────────────────────────────────
+            elif 'ht' in market or '_1h' in market:
+                ht_market = market.replace('ht_', '').replace('_1h', '')
+                if pd.notna(hthg) and pd.notna(htag):
+                    if ht_market in ('home', '1'):
+                        won = (hthg > htag)
+                    elif ht_market in ('draw', 'x'):
+                        won = (hthg == htag)
+                    elif ht_market in ('away', '2'):
+                        won = (hthg < htag)
+                    elif 'over' in ht_market:
+                        total_ht = hthg + htag
+                        won = total_ht > 0.5  # default Over 0.5 HT
+                    elif 'under' in ht_market:
+                        total_ht = hthg + htag
+                        won = total_ht < 1.5  # default Under 1.5 HT
+
+            # ── Correct Score ─────────────────────────────────────────
+            elif market.startswith('cs_'):
+                if pd.notna(fthg) and pd.notna(ftag):
+                    # cs_10 = home 1, away 0
+                    try:
+                        parts = market.replace('cs_', '')
+                        h_goals = int(parts[0])
+                        a_goals = int(parts[1])
+                        won = (fthg == h_goals and ftag == a_goals)
+                    except (ValueError, IndexError):
+                        pass
+
+            # ── AH (Asian Handicap) — simplified ─────────────────────
+            elif market.startswith('ah_'):
+                if pd.notna(fthg) and pd.notna(ftag):
+                    try:
+                        ah_val = float(market.replace('ah_home_', '').replace('ah_away_', '').replace('ah_', ''))
+                        if 'home' in market:
+                            won = (fthg - ftag + ah_val > 0)
+                        else:
+                            won = (ftag - fthg + ah_val > 0)
+                    except ValueError:
+                        pass
 
             item['won']      = won
             item['profit']   = round((current_odd - 1.0) * stake if won else -stake, 2)
             item['resolved'] = True
             updated = True
-            print(
-                f"[Live Odds Tracker] Resolvido: {item.get('match')} | "
-                f"Mercado: {market} | FTR: {ftr} | Ganhou: {won}"
+            logger.info(
+                f"Resolvido: {item.get('match')} | "
+                f"Mercado: {market} | FTR: {ftr} | FTHG: {fthg}-{ftag} | Ganhou: {won}"
             )
 
     if updated:
+        # Prune resolved old entries
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=MAX_STEAM_HISTORY_AGE_DAYS)).strftime('%Y-%m-%d %H:%M:%S')
+        history = [h for h in history if not (h.get('resolved') and h.get('created_at', '') < cutoff)]
+        if len(history) > MAX_STEAM_HISTORY_COUNT:
+            history = history[-MAX_STEAM_HISTORY_COUNT:]
         try:
             with open(history_file, 'w', encoding='utf-8') as f:
                 json.dump(history, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            print(f"[Live Odds Tracker] Erro ao salvar histórico resolvido: {e}")
+            logger.error(f"Erro ao salvar histórico resolvido: {e}", exc_info=True)
 
 
 if __name__ == '__main__':

@@ -1,11 +1,10 @@
-import './js/dutching.js';
+import './js/dutching.js?v=1';
 import './js/steam_live.js';
 
 // Import modular functions
-import { showToast, switchTab, toggleGroup, toggleStakeLabel, formatCurrency, formatPct } from './js/utils.js';
+import { showToast, switchTab, toggleGroup, toggleStakeLabel, formatCurrency, formatPct, createAbortController, animateValue } from './js/utils.js';
 import { checkDatabaseStatus, syncDatabase, loadLeagues, fetchServerHistory, saveToServer, deleteFromServer, toggleServerActiveState } from './js/api.js';
 import { updateCharts, renderPortfolioChart, clearCharts } from './js/charts.js';
-
 // Bind imports to window so index.html and dynamic elements can call them
 window.showToast = showToast;
 window.switchTab = switchTab;
@@ -17,20 +16,6 @@ window.loadLeagues = loadLeagues;
 window.updateCharts = updateCharts;
 window.renderPortfolioChart = renderPortfolioChart;
 window.clearCharts = clearCharts;
-
-let allBets = []; // Cache for filtering in table
-
-let allTelegramTips = []; // Cache for Telegram tips log
-
-let lastScanResults = null;
-
-let lastScanParams = null;
-
-let lastBacktestSummary = null;
-
-let lastBacktestParams = null;
-
-let appliedOptimizationSuggestions = new Set(); // Track applied suggestions to prevent re-rendering
 
 const API_BASE_URL = window.location.origin;
 window.API_BASE_URL = API_BASE_URL;
@@ -48,10 +33,12 @@ const LS_HISTORY_KEY = 'predictive_history_v3';
 function lsLoadHistory() {
     try { return JSON.parse(localStorage.getItem(LS_HISTORY_KEY) || '[]'); } catch { return []; }
 }
+window.lsLoadHistory = lsLoadHistory;
 
 function lsSaveHistory(data) {
     try { localStorage.setItem(LS_HISTORY_KEY, JSON.stringify(data)); } catch {}
 }
+window.lsSaveHistory = lsSaveHistory;
 
 function lsAddItem(item) {
     const h = lsLoadHistory();
@@ -59,49 +46,61 @@ function lsAddItem(item) {
     if (idx >= 0) h[idx] = item; else h.unshift(item);
     lsSaveHistory(h);
 }
+window.lsAddItem = lsAddItem;
 
 function lsDeleteItem(id) {
     lsSaveHistory(lsLoadHistory().filter(x => x.id !== id));
 }
+window.lsDeleteItem = lsDeleteItem;
 
 async function lsSyncToServer(localItems) {
     // Re-POST any local items not present on server (after Render redeployment)
+    // Fire-and-forget: failures are non-fatal; localStorage is the source of truth
     for (const item of localItems) {
         try {
-            await fetch(`${API_BASE_URL}/api/history`, {
+            const res = await fetch(`${API_BASE_URL}/api/history`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(item)
             });
-        } catch {}
+            if (!res.ok) {
+                console.warn('lsSyncToServer: POST falhou para', item.id || item.name, 'status', res.status);
+            }
+        } catch (e) {
+            console.warn('lsSyncToServer: servidor indisponível, sync adiada para', item.id || item.name);
+        }
     }
 }
+window.lsSyncToServer = lsSyncToServer;
 
 async function handleDataSourceChange() {
-    window.currentDataSource = document.getElementById('data-source-select').value;
-    const configDiv = document.getElementById('futpython-config');
-    if (window.currentDataSource === 'futpython') {
-        if (configDiv) configDiv.style.display = 'block';
-    } else {
+    try {
+        window.currentDataSource = document.getElementById('data-source-select').value;
+        // Sync topbar data source selector
+        const topbarSelect = document.getElementById('topbar-data-source');
+        if (topbarSelect) topbarSelect.value = window.currentDataSource;
+        // Key is hardcoded — no need to show the input field anymore
+        const configDiv = document.getElementById('futpython-config');
         if (configDiv) configDiv.style.display = 'none';
+        // Reload leagues
+        if (typeof loadLeagues === 'function') {
+            await loadLeagues();
+        }
+
+        // Also reload if there's a standalone select somewhere
+        const selects = document.querySelectorAll('.league-select');
+        selects.forEach(s => {
+            s.innerHTML = '';
+        });
+
+        // Also reload calculator leagues
+        if (typeof populateCalculatorLeagues === 'function') {
+            await populateCalculatorLeagues();
+        }
+        updateMarketBadgesUI();
+    } catch (e) {
+        console.error('handleDataSourceChange error:', e);
     }
-    // Reload leagues
-    if (typeof loadLeagues === 'function') {
-        await loadLeagues();
-    }
-    
-    // Also reload if there's a standalone select somewhere
-    const selects = document.querySelectorAll('.league-select');
-    selects.forEach(s => {
-        // Just empty it, it will be refetched
-        s.innerHTML = '';
-    });
-    
-    // Also reload calculator leagues
-    if (typeof populateCalculatorLeagues === 'function') {
-        await populateCalculatorLeagues();
-    }
-    updateMarketBadgesUI();
 }
 
 const MARKET_COLUMN_MAP = {
@@ -218,8 +217,8 @@ const MARKET_COLUMN_MAP = {
         'ht_under15': 'Under_HT_1_5',
         'ht_over25': 'Over_HT_2_5',
         'ht_under25': 'Under_HT_2_5',
-        'ht_over35': 'Indisponível',
-        'ht_under35': 'Indisponível',
+        'ht_over35': 'Over_HT_3_5',
+        'ht_under35': 'Under_HT_3_5',
         'sh_home': 'Indisponível',
         'sh_draw': 'Indisponível',
         'sh_away': 'Indisponível',
@@ -318,18 +317,21 @@ function runInitApp() {
     const sourceSelect = document.getElementById('data-source-select');
     if (sourceSelect) {
         window.currentDataSource = sourceSelect.value;
-        const configDiv = document.getElementById('futpython-config');
-        if (window.currentDataSource === 'futpython' && configDiv) {
-            configDiv.style.display = 'block';
-        }
+        const topbarSelect = document.getElementById('topbar-data-source');
+        if (topbarSelect) topbarSelect.value = window.currentDataSource;
+        // Key is hardcoded — no need to show the input field
     }
 
-    // Load FutPythonTrader API Key from LocalStorage
+    // Load FutPythonTrader API Key — default key já vem preenchida
+    const defaultFutpythonKey = 'cmqa6oz0p01i1wq6lzxknltmd';
     const savedKey = localStorage.getItem('futpython_api_key');
+    const keyInput = document.getElementById('futpython-api-key');
     if (savedKey) {
         window.futpythonApiKey = savedKey;
-        const keyInput = document.getElementById('futpython-api-key');
         if (keyInput) keyInput.value = savedKey;
+    } else {
+        window.futpythonApiKey = defaultFutpythonKey;
+        if (keyInput) keyInput.value = defaultFutpythonKey;
     }
     
     initApp();
@@ -353,6 +355,9 @@ if (document.readyState === 'loading') {
 }
 
 async function initApp() {
+    if (window._initAppRunning) return;
+    window._initAppRunning = true;
+    try {
     await checkDatabaseStatus();
     await loadLeagues();
     await populateCalculatorLeagues();
@@ -365,12 +370,20 @@ async function initApp() {
     toggleStakeLabel();
     onMarketSelectionChange(); // Initialize custom market multiselect label
     updateNotificationUi(); // Initialize notification permission state in UI
-    
-    // Register Service Worker for PWA
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/service-worker.js')
-            .then(() => console.log('Service Worker registrado.'))
-            .catch(err => console.error('Service Worker erro:', err));
+
+    // Register Service Worker for PWA (only once)
+    if ('serviceWorker' in navigator && !window._swRegistered) {
+        window._swRegistered = true;
+        // Unregister any existing service workers to prevent stale cache
+        navigator.serviceWorker.getRegistrations().then(regs => {
+            regs.forEach(r => r.unregister());
+        });
+        // Only register in production (not localhost)
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(() => console.log('Service Worker registrado.'))
+                .catch(err => console.error('Service Worker erro:', err));
+        }
     }
     
     // Inicializa a calculadora de Dutching com duas seleções padrão
@@ -380,6 +393,9 @@ async function initApp() {
             addDutchingRow("Placar 2-0", 7.50);
         }
     }, 100);
+    } finally {
+        window._initAppRunning = false;
+    }
 }
 
 
@@ -622,28 +638,28 @@ function renderProbValue(prob, barType) {
 
 // Populate bets table
 
-let currentBetsForPagination = [];
-let currentPage = 1;
-const rowsPerPage = 500;
-let betsAscending = true; // oldest first by default so opening bankroll ($1000) shows at top
+// currentBetsForPagination imported from state.js
+// currentPage imported from state.js
+// rowsPerPage imported from state.js
+// betsAscending imported from state.js
 
 function populateBetsTable(bets) {
     // Store bets in chronological order (oldest first). Reverse only if user chose newest-first.
     const sorted = bets.slice(); // already oldest-first from backend
-    currentBetsForPagination = betsAscending ? sorted : sorted.slice().reverse();
-    currentPage = 1;
+    window.currentBetsForPagination = betsAscending ? sorted : sorted.slice().reverse();
+    window.currentPage = 1;
     renderBetsPage();
 }
 
 function toggleBetsSort() {
-    betsAscending = !betsAscending;
+    window.betsAscending = !window.betsAscending;
     const btn = document.getElementById('sort-bets-btn');
-    if (btn) btn.innerHTML = betsAscending
+    if (btn) btn.innerHTML = window.betsAscending
         ? '<i class="fa-solid fa-arrow-up-1-9"></i> Mais Antigo Primeiro'
         : '<i class="fa-solid fa-arrow-down-9-1"></i> Mais Recente Primeiro';
     // Re-sort current data without re-fetching
-    currentBetsForPagination = currentBetsForPagination.slice().reverse();
-    currentPage = 1;
+    window.currentBetsForPagination = window.currentBetsForPagination.slice().reverse();
+    window.currentPage = 1;
     renderBetsPage();
 }
 
@@ -651,7 +667,7 @@ function renderBetsPage() {
     const tbody = document.getElementById('bets-table-body');
     tbody.innerHTML = '';
 
-    if (currentBetsForPagination.length === 0) {
+    if (window.currentBetsForPagination.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="10" class="text-center empty-state">
@@ -663,10 +679,10 @@ function renderBetsPage() {
         return;
     }
 
-    const totalPages = Math.ceil(currentBetsForPagination.length / rowsPerPage);
-    const start = (currentPage - 1) * rowsPerPage;
-    const end = start + rowsPerPage;
-    const pageBets = currentBetsForPagination.slice(start, end);
+    const totalPages = Math.ceil(window.currentBetsForPagination.length / window.rowsPerPage);
+    const start = (currentPage - 1) * window.rowsPerPage;
+    const end = start + window.rowsPerPage;
+    const pageBets = window.currentBetsForPagination.slice(start, end);
 
     pageBets.forEach(bet => {
         const tr = document.createElement('tr');
@@ -698,25 +714,25 @@ function renderBetsPage() {
     // Update pagination UI
     if (totalPages > 1) {
         document.getElementById('pagination-controls').style.display = 'flex';
-        document.getElementById('page-indicator').innerText = `Página ${currentPage} de ${totalPages}`;
-        document.getElementById('prev-page-btn').disabled = currentPage === 1;
-        document.getElementById('next-page-btn').disabled = currentPage === totalPages;
+        document.getElementById('page-indicator').innerText = `Página ${window.currentPage} de ${totalPages}`;
+        document.getElementById('prev-page-btn').disabled = window.currentPage === 1;
+        document.getElementById('next-page-btn').disabled = window.currentPage === totalPages;
     } else {
         document.getElementById('pagination-controls').style.display = 'none';
     }
 }
 
 function prevPage() {
-    if (currentPage > 1) {
-        currentPage--;
+    if (window.currentPage > 1) {
+        window.currentPage--;
         renderBetsPage();
     }
 }
 
 function nextPage() {
-    const totalPages = Math.ceil(currentBetsForPagination.length / rowsPerPage);
-    if (currentPage < totalPages) {
-        currentPage++;
+    const totalPages = Math.ceil(window.currentBetsForPagination.length / window.rowsPerPage);
+    if (window.currentPage < totalPages) {
+        window.currentPage++;
         renderBetsPage();
     }
 }
@@ -731,7 +747,7 @@ function filterTable() {
 
     
 
-    const filteredBets = allBets.filter(bet => 
+    const filteredBets = window.allBets.filter(bet => 
 
         bet.home_team.toLowerCase().includes(search) || 
 
@@ -867,10 +883,17 @@ async function runScanner(scanType) {
         maxOdds: parseFloat(document.getElementById('max-odds').value) || 2.50,
 
         use_ml: document.getElementById('use-ml-toggle')?.checked || false,
+        model_type: document.getElementById('model-type-select')?.value || 'poisson',
 
         data_source: window.currentDataSource,
 
-        futpython_api_key: window.futpythonApiKey
+        futpython_api_key: window.futpythonApiKey,
+
+        walk_forward_folds: (() => {
+            const wfToggle = document.getElementById("wf-toggle");
+            const wfFoldsEl = document.getElementById("wf-folds");
+            return (wfToggle && wfToggle.checked) ? (wfFoldsEl ? parseInt(wfFoldsEl.value) : 5) : 0;
+        })()
 
     };
 
@@ -884,11 +907,13 @@ async function runScanner(scanType) {
 
             headers: { 'Content-Type': 'application/json' },
 
-            body: JSON.stringify(requestData)
+            body: JSON.stringify(requestData),
+
+            cache: 'no-store'
 
         });
 
-        
+
 
         if (!res.ok) {
 
@@ -898,17 +923,17 @@ async function runScanner(scanType) {
 
         }
 
-        
+
 
         const data = await res.json();
 
         const results = data.results;
 
-        
 
-        lastScanResults = results;
 
-        lastScanParams = requestData;
+        window.lastScanResults = results;
+
+        window.lastScanParams = requestData;
 
         
 
@@ -1062,17 +1087,17 @@ async function runScanner(scanType) {
 
                     </div>
 
-                    <span class="scanner-item-profit ${profitClass}">${sign}$${item.net_profit.toFixed(2)}</span>
+                    <span class="scanner-item-profit ${profitClass}">${sign}$${(item.net_profit ?? 0).toFixed(2)}</span>
 
                 </div>
 
                 <div class="scanner-item-body">
 
-                    <span>ROI: <strong class="${profitClass}">${sign}${item.roi.toFixed(2)}%</strong></span>
+                    <span>ROI: <strong class="${profitClass}">${sign}${(item.roi ?? 0).toFixed(2)}%</strong></span>
 
-                    <span>Acertos: <strong>${item.win_rate.toFixed(1)}%</strong></span>
+                    <span>Acertos: <strong>${(item.win_rate ?? 0).toFixed(1)}%</strong></span>
 
-                    <span>Apostas: <strong>${item.total_bets}</strong></span>
+                    <span>Apostas: <strong>${item.total_bets ?? 0}</strong></span>
 
                 </div>
 
@@ -1098,13 +1123,13 @@ async function runScanner(scanType) {
 
                     }
 
-                    return pValAdj !== undefined ? `
+                    return pValAdj !== undefined && pValAdj !== null ? `
 
                     <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.05);" title="p-valor ajustado por FDR (Benjamini-Hochberg). Valores abaixo de 0,05 indicam significância estatística, ou seja, é improvável que o resultado seja fruto do acaso." onclick="showToast(this.title, 'info')">
 
                         <span style="color: var(--text-muted);">p-valor (FDR):</span>
 
-                        <span style="color: ${pColor}; font-weight: 600;"><i class="fa-solid ${pIcon}"></i> ${pValAdj.toFixed(3)} — ${pLabel}</span>
+                        <span style="color: ${pColor}; font-weight: 600;"><i class="fa-solid ${pIcon}"></i> ${(pValAdj ?? 0).toFixed(3)} — ${pLabel}</span>
 
                     </div>` : '';
 
@@ -1154,7 +1179,7 @@ async function runScanner(scanType) {
 
 function exportScannerResults() {
 
-    if (!lastScanResults || lastScanResults.length === 0) {
+    if (!window.lastScanResults || window.lastScanResults.length === 0) {
 
         showToast("Nenhum resultado de escaneamento para exportar.", "error");
 
@@ -1164,9 +1189,9 @@ function exportScannerResults() {
 
 
 
-    const params = lastScanParams;
+    const params = window.lastScanParams;
 
-    const results = lastScanResults;
+    const results = window.lastScanResults;
 
 
 
@@ -1364,7 +1389,7 @@ function exportScannerResults() {
 
 function exportBacktestReport() {
 
-    if (!lastBacktestSummary || !lastBacktestSummary.summary) {
+    if (!window.lastBacktestSummary || !window.lastBacktestSummary.summary) {
 
         showToast("Nenhum resultado de backtest disponível para exportar. Execute um backtest primeiro!", "error");
 
@@ -1374,17 +1399,17 @@ function exportBacktestReport() {
 
 
 
-    const params = lastBacktestParams;
+    const params = window.lastBacktestParams;
 
-    const summary = lastBacktestSummary.summary;
+    const summary = window.lastBacktestSummary.summary;
 
-    const summaryFixed = lastBacktestSummary.summary_fixed;
+    const summaryFixed = window.lastBacktestSummary.summary_fixed;
 
-    const summaryProp = lastBacktestSummary.summary_proportional;
+    const summaryProp = window.lastBacktestSummary.summary_proportional;
 
-    const summaryKelly = lastBacktestSummary.summary_kelly;
+    const summaryKelly = window.lastBacktestSummary.summary_kelly;
 
-    const bets = lastBacktestSummary.bets;
+    const bets = window.lastBacktestSummary.bets;
 
 
 
@@ -1544,7 +1569,15 @@ function exportBacktestReport() {
 
     if (summary.bootstrap_roi_ci_lower !== undefined) {
 
-        csvRows.push(`Intervalo Confiança ROI (95%);${summary.bootstrap_roi_ci_lower.toFixed(1).replace('.', ',')}% — ${summary.bootstrap_roi_ci_upper.toFixed(1).replace('.', ',')}%`);
+        csvRows.push(`Intervalo Confianca ROI (95%);${summary.bootstrap_roi_ci_lower.toFixed(1).replace('.', ',')}% — ${summary.bootstrap_roi_ci_upper.toFixed(1).replace('.', ',')}%`);
+
+    }
+
+    if (summary.bootstrap_drawdown_ci_lower !== undefined) {
+
+        csvRows.push(`Drawdown Bootstrap Mediana;${summary.bootstrap_drawdown_median.toFixed(1).replace('.', ',')}%`);
+
+        csvRows.push(`Drawdown Bootstrap IC (95%);${summary.bootstrap_drawdown_ci_lower.toFixed(1).replace('.', ',')}% — ${summary.bootstrap_drawdown_ci_upper.toFixed(1).replace('.', ',')}%`);
 
     }
 
@@ -2141,11 +2174,11 @@ function displayOptimizationSuggestions(suggestions, isPortfolio = false) {
 
     const filteredSuggestions = (suggestions || []).filter(sug => {
 
-        if (sug.type === 'odds_warning' && appliedOptimizationSuggestions.has(sug.value)) return false;
+        if (sug.type === 'odds_warning' && window.appliedOptimizationSuggestions.has(sug.value)) return false;
 
-        if (sug.type === 'ev' && appliedOptimizationSuggestions.has(`ev_${sug.value}`)) return false;
+        if (sug.type === 'ev' && window.appliedOptimizationSuggestions.has(`ev_${sug.value}`)) return false;
 
-        if (sug.type === 'leagues' && appliedOptimizationSuggestions.has(`leagues_${JSON.stringify(sug.exclude_codes)}`)) return false;
+        if (sug.type === 'leagues' && window.appliedOptimizationSuggestions.has(`leagues_${JSON.stringify(sug.exclude_codes)}`)) return false;
 
         return true;
 
@@ -2409,9 +2442,9 @@ function renderOptimizationTab(suggestions, results) {
     listContainer.innerHTML = '';
     
     const filteredSuggestions = (suggestions || []).filter(sug => {
-        if (sug.type === 'odds_warning' && appliedOptimizationSuggestions.has(sug.value)) return false;
-        if (sug.type === 'ev' && appliedOptimizationSuggestions.has(`ev_${sug.value}`)) return false;
-        if (sug.type === 'leagues' && appliedOptimizationSuggestions.has(`leagues_${JSON.stringify(sug.exclude_codes)}`)) return false;
+        if (sug.type === 'odds_warning' && window.appliedOptimizationSuggestions.has(sug.value)) return false;
+        if (sug.type === 'ev' && window.appliedOptimizationSuggestions.has(`ev_${sug.value}`)) return false;
+        if (sug.type === 'leagues' && window.appliedOptimizationSuggestions.has(`leagues_${JSON.stringify(sug.exclude_codes)}`)) return false;
         return true;
     });
     
@@ -2711,45 +2744,25 @@ function renderOptComparisonChart(sug, results) {
 function applyEvSuggestion(val) {
 
     const evInput = document.getElementById('val-threshold');
-
     if (evInput) {
-
         evInput.value = val;
-
         showToast(`Gatilho EV atualizado para ${val}. Rodando nova simulação...`, "success");
-
-        appliedOptimizationSuggestions.add(`ev_${val}`);
-
-        switchTab('tab-laboratory');
-
+        window.appliedOptimizationSuggestions.add(`ev_${val}`);
         runBacktest();
-
     }
-
 }
 
 
 
 function applyLeagueSuggestion(codes) {
-
     codes.forEach(code => {
-
         const cb = document.getElementById(`league-${code}`) || document.querySelector(`input[value="${code}"]`);
-
         if (cb) cb.checked = false;
-
     });
 
-    
-
     showToast(`Ligas problemáticas removidas. Reexecutando backtest...`, "success");
-
-    appliedOptimizationSuggestions.add(`leagues_${JSON.stringify(codes)}`);
-
-    switchTab('tab-laboratory');
-
+    window.appliedOptimizationSuggestions.add(`leagues_${JSON.stringify(codes)}`);
     runBacktest();
-
 }
 
 
@@ -2814,8 +2827,7 @@ function applyOddsSuggestion(rangeName) {
             if (minEl) minEl.value = bounds[0];
             if (maxEl) maxEl.value = bounds[1];
             showToast(`Filtro avançado de odds otimizado para ${bounds[0]} a ${bounds[1]}. Rodando simulação...`, "success");
-            appliedOptimizationSuggestions.add(rangeName);
-            switchTab('tab-laboratory');
+            window.appliedOptimizationSuggestions.add(rangeName);
             runBacktest();
             return;
         }
@@ -2843,8 +2855,7 @@ function applyOddsSuggestion(rangeName) {
         }
         
         showToast(`Filtro avançado de odds otimizado. Rodando simulação...`, "success");
-        appliedOptimizationSuggestions.add(rangeName);
-        switchTab('tab-laboratory');
+        window.appliedOptimizationSuggestions.add(rangeName);
         runBacktest();
         return;
     }
@@ -2858,8 +2869,7 @@ function applyOddsSuggestion(rangeName) {
         if (minInput) minInput.value = bounds[0];
         if (maxInput) maxInput.value = bounds[1];
         showToast(`Filtro de Odds otimizado para ${bounds[0]} a ${bounds[1]}. Rodando simulação...`, "success");
-        appliedOptimizationSuggestions.add(rangeName);
-        switchTab('tab-laboratory');
+        window.appliedOptimizationSuggestions.add(rangeName);
         runBacktest();
         return;
     }
@@ -2875,8 +2885,7 @@ function applyOddsSuggestion(rangeName) {
     }
     
     showToast(`Filtro de Odds otimizado para excluir ${rangeName}. Rodando simulação...`, "success");
-    appliedOptimizationSuggestions.add(rangeName);
-    switchTab('tab-laboratory');
+    window.appliedOptimizationSuggestions.add(rangeName);
     runBacktest();
 }
 
@@ -2903,6 +2912,8 @@ function clearDashboard() {
         safeSetText('metric-final-bankroll', '$0.00');
         safeSetText('metric-clv', '0.0%');
         safeSetText('metric-bcl', '0.0%');
+        safeSetText('metric-matches-analyzed', '0');
+        safeSetText('metric-seasons', '-');
 
         // Restore standard panels in case Portfolio was run
         safeSetDisplay('portfolio-results-panel', 'none');
@@ -2915,18 +2926,31 @@ function clearDashboard() {
         if (chartsGrid) chartsGrid.style.display = 'grid';
 
         // Reset Classes safely
-        ['metric-net-profit', 'metric-profit-stakes', 'metric-roi', 'metric-clv', 'metric-bcl'].forEach(id => {
-            const el = document.getElementById(id);
-            if(el && el.closest) {
-                const card = el.closest('.metric-card');
-                if(card) {
-                    if(id.includes('profit') && !id.includes('stakes')) card.className = 'metric-card card-profit';
-                    else if(id.includes('stakes')) card.className = 'metric-card card-stakes';
-                    else if(id.includes('roi')) card.className = 'metric-card card-roi';
-                    else if(id.includes('clv')) card.className = 'metric-card card-clv';
-                    else if(id.includes('bcl')) card.className = 'metric-card card-bcl';
+        resetMetricCard('metric-net-profit', 'card-profit');
+        resetMetricCard('metric-profit-stakes', 'card-stakes');
+        resetMetricCard('metric-roi', 'card-roi');
+        resetMetricCard('metric-clv', 'card-clv');
+        resetMetricCard('metric-bcl', 'card-bcl');
+
+        function resetMetricCard(h2Id, cardClass) {
+            var el = document.getElementById(h2Id);
+            if (el) {
+                el.style.color = '';
+                var card = el.closest('.metric-card');
+                if (card) {
+                    card.className = 'metric-card ' + cardClass;
                 }
             }
+        }
+        // Reset winrate
+        var wrEl = document.getElementById('metric-win-rate');
+        if (wrEl) { wrEl.style.color = ''; }
+        var wrCard = document.querySelector('.card-winrate');
+        if (wrCard) { wrCard.className = 'metric-card card-winrate'; }
+        // Reset profit/stakes cards that came through different path
+        ['card-profit', 'card-stakes'].forEach(function(cls) {
+            var card = document.querySelector('.' + cls);
+            if (card) { card.className = 'metric-card ' + cls; }
         });
 
         // Reset advanced metrics
@@ -2971,7 +2995,7 @@ function clearDashboard() {
         clearCharts();
 
         // 3. Clear bets cache and table
-        if (typeof allBets !== 'undefined') { allBets = []; }
+        if (typeof window.allBets !== 'undefined') { window.allBets = []; }
         safeSetHTML('bets-table-body', `<tr><td colspan="10" class="text-center empty-state"><i class="fa-solid fa-info-circle"></i> Configure os filtros ao lado e execute o backtest para ver os resultados.</td></tr>`);
 
         // 4. Hide AI & Optimization panels and reset Monte Carlo UI
@@ -3017,8 +3041,8 @@ function clearDashboard() {
         safeSetDisplay('rec-justification-box', 'none');
 
         // 5. Clear backtest state (excluding Scanner)
-        if (typeof lastBacktestSummary !== 'undefined') { lastBacktestSummary = null; }
-        if (typeof lastBacktestParams !== 'undefined') { lastBacktestParams = null; }
+        if (typeof window.lastBacktestSummary !== 'undefined') { window.lastBacktestSummary = null; }
+        if (typeof window.lastBacktestParams !== 'undefined') { window.lastBacktestParams = null; }
         
         safeSetDisplay('btn-export-backtest', 'none');
         safeSetHTML('eqs-table-container', '');
@@ -3048,8 +3072,8 @@ function clearScannerResults() {
         safeSetHTML('eqs-table-container', '');
         safeSetDisplay('scanner-results', 'none');
         
-        if (typeof lastScanResults !== 'undefined') { lastScanResults = null; }
-        if (typeof lastScanParams !== 'undefined') { lastScanParams = null; }
+        if (typeof window.lastScanResults !== 'undefined') { window.lastScanResults = null; }
+        if (typeof window.lastScanParams !== 'undefined') { window.lastScanParams = null; }
         
         showToast("Resultados do scanner limpos!", "info");
     } catch (err) {
@@ -3083,2258 +3107,12 @@ window.clearClusterResults = clearClusterResults;
 
 // ==========================================================================
 
-// Pre-Match Calculator and Match Details Modal Logic [NEW]
-
-// ==========================================================================
-
-
-
-async function populateCalculatorLeagues() {
-
-    const select = document.getElementById('calc-league');
-
-    select.innerHTML = '<option value="" disabled selected>Selecione uma liga...</option>';
-
-    
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/leagues?source=${window.currentDataSource}&t=${Date.now()}`, { cache: 'no-store' });
-
-        if (!res.ok) throw new Error("Failed to load leagues");
-
-        const leagues = await res.json();
-
-        
-
-        leagues.sort((a, b) => a.name.localeCompare(b.name));
-
-        leagues.forEach(league => {
-
-            const opt = document.createElement('option');
-
-            opt.value = league.code;
-
-            opt.innerText = league.name;
-
-            select.appendChild(opt);
-
-        });
-
-    } catch (err) {
-
-        console.error("Error populating calculator leagues:", err);
-
-    }
-
-}
-
-
-
-async function onCalculatorLeagueChange() {
-
-    const leagueCode = document.getElementById('calc-league').value;
-
-    const homeSelect = document.getElementById('calc-home-team');
-
-    const awaySelect = document.getElementById('calc-away-team');
-
-    
-
-    homeSelect.disabled = true;
-
-    awaySelect.disabled = true;
-
-    homeSelect.innerHTML = '<option value="" disabled selected>Carregando...</option>';
-
-    awaySelect.innerHTML = '<option value="" disabled selected>Carregando...</option>';
-
-    
-
-    try {
-        const source = document.getElementById('data-source-select').value;
-        const apiKey = document.getElementById('futpython-api-key').value;
-        const res = await fetch(`${API_BASE_URL}/api/teams?league=${leagueCode}&source=${source}&api_key=${apiKey}`);
-
-        if (!res.ok) throw new Error("Failed to load teams");
-
-        const teams = await res.json();
-
-        
-
-        homeSelect.innerHTML = '<option value="" disabled selected>Selecione...</option>';
-
-        awaySelect.innerHTML = '<option value="" disabled selected>Selecione...</option>';
-
-        
-
-        teams.forEach(team => {
-
-            const optHome = document.createElement('option');
-
-            optHome.value = team;
-
-            optHome.innerText = team;
-
-            
-
-            const optAway = document.createElement('option');
-
-            optAway.value = team;
-
-            optAway.innerText = team;
-
-            
-
-            homeSelect.appendChild(optHome);
-
-            awaySelect.appendChild(optAway);
-
-        });
-
-        
-
-        homeSelect.disabled = false;
-
-        awaySelect.disabled = false;
-
-    } catch (err) {
-
-        console.error("Error loading teams for calculator:", err);
-
-        showToast("Erro ao carregar os times desta liga.", "error");
-
-        homeSelect.innerHTML = '<option value="" disabled selected>Erro</option>';
-
-        awaySelect.innerHTML = '<option value="" disabled selected>Erro</option>';
-
-    }
-
-}
-
-
-
-async function runRealtimePrediction() {
-
-    const league = document.getElementById('calc-league').value;
-
-    const homeTeam = document.getElementById('calc-home-team').value;
-
-    const awayTeam = document.getElementById('calc-away-team').value;
-
-    
-
-    if (!league || !homeTeam || !awayTeam) {
-
-        showToast("Selecione o campeonato e ambos os times.", "error");
-
-        return;
-
-    }
-
-    
-
-    if (homeTeam === awayTeam) {
-
-        showToast("O time mandante e visitante não podem ser os mesmos.", "error");
-
-        return;
-
-    }
-
-    
-
-    const btn = document.getElementById('btn-calc-predict');
-
-    const origHtml = btn.innerHTML;
-
-    btn.disabled = true;
-
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calculando...';
-
-    
-
-    try {
-
-        const data_source = document.getElementById('data-source-select').value;
-        const futpython_api_key = document.getElementById('futpython-api-key').value;
-        const res = await fetch(`${API_BASE_URL}/api/predict`, {
-
-            method: 'POST',
-
-            headers: { 'Content-Type': 'application/json' },
-
-            body: JSON.stringify({ league, homeTeam, awayTeam, data_source, futpython_api_key })
-
-        });
-
-        
-
-        if (!res.ok) {
-
-            const err = await res.json();
-
-            throw new Error(err.detail || "Erro ao calcular previsões");
-
-        }
-
-        
-
-        const data = await res.json();
-
-        
-
-        document.getElementById('calc-results').style.display = 'block';
-
-        document.getElementById('calc-heatmap-container').style.display = 'block';
-
-        
-
-        // Expected Goals (lambda)
-
-        document.getElementById('calc-res-home-lambda').innerText = data.expectancy.home_lambda.toFixed(2);
-
-        document.getElementById('calc-res-home-att').innerText = `Ataque: ${data.expectancy.home_att.toFixed(2)} | Defesa: ${data.expectancy.home_def.toFixed(2)}`;
-
-        
-
-        document.getElementById('calc-res-away-lambda').innerText = data.expectancy.away_lambda.toFixed(2);
-
-        document.getElementById('calc-res-away-att').innerText = `Ataque: ${data.expectancy.away_att.toFixed(2)} | Defesa: ${data.expectancy.away_def.toFixed(2)}`;
-
-        
-
-        // Probabilities & Fair Odds Table
-
-        document.getElementById('calc-prob-home').innerHTML = renderProbValue(data.probabilities.home, 'home');
-
-        document.getElementById('calc-odd-home').innerText = data.fair_odds.home.toFixed(2);
-
-        
-
-        document.getElementById('calc-prob-draw').innerHTML = renderProbValue(data.probabilities.draw, 'draw');
-
-        document.getElementById('calc-odd-draw').innerText = data.fair_odds.draw.toFixed(2);
-
-        
-
-        document.getElementById('calc-prob-away').innerHTML = renderProbValue(data.probabilities.away, 'away');
-
-        document.getElementById('calc-odd-away').innerText = data.fair_odds.away.toFixed(2);
-
-        
-
-        document.getElementById('calc-prob-over15').innerHTML = renderProbValue(data.probabilities.over15, 'over');
-
-        document.getElementById('calc-odd-over15').innerText = data.fair_odds.over15.toFixed(2);
-
-        
-
-        document.getElementById('calc-prob-over25').innerHTML = renderProbValue(data.probabilities.over25, 'over');
-
-        document.getElementById('calc-odd-over25').innerText = data.fair_odds.over25.toFixed(2);
-
-        
-
-        document.getElementById('calc-prob-btts-yes').innerHTML = renderProbValue(data.probabilities.btts_yes, 'yes');
-
-        document.getElementById('calc-odd-btts-yes').innerText = data.fair_odds.btts_yes.toFixed(2);
-
-        
-
-        // Heatmap Score Grid
-
-        renderHeatmapGrid('calc-heatmap-grid', data.score_grid);
-
-        
-
-        // Populate pre-match calculator bookmakers table
-
-        const calcBookmakersTbody = document.getElementById('calc-bookmakers-tbody');
-
-        calcBookmakersTbody.innerHTML = '';
-
-        
-
-        const bookmakers = [
-
-            { key: 'Bet365', name: 'Bet365' },
-
-            { key: 'Pinnacle', name: 'Pinnacle' },
-
-            { key: 'Bwin', name: 'Bwin' },
-
-            { key: 'Media', name: 'Média' },
-
-            { key: 'Maxima', name: 'Máxima' }
-
-        ];
-
-        
-
-        let hasCalcOdds = false;
-
-        if (data.odds_comparison) {
-
-            bookmakers.forEach(b => {
-
-                const oddsObj = data.odds_comparison[b.key] || data.odds_comparison[b.key.toLowerCase()];
-
-                if (oddsObj && (oddsObj.H || oddsObj.D || oddsObj.A)) {
-
-                    hasCalcOdds = true;
-
-                    const tr = document.createElement('tr');
-
-                    tr.innerHTML = `
-
-                        <td style="font-weight: 600;">${b.name}</td>
-
-                        <td class="text-center">${oddsObj.H ? oddsObj.H.toFixed(2) : '-'}</td>
-
-                        <td class="text-center">${oddsObj.D ? oddsObj.D.toFixed(2) : '-'}</td>
-
-                        <td class="text-center">${oddsObj.A ? oddsObj.A.toFixed(2) : '-'}</td>
-
-                    `;
-
-                    calcBookmakersTbody.appendChild(tr);
-
-                }
-
-            });
-
-        }
-
-        
-
-        if (!hasCalcOdds) {
-
-            calcBookmakersTbody.innerHTML = `
-
-                <tr>
-
-                    <td colspan="4" class="text-center text-muted">Sem dados comparativos de odds para esta partida.</td>
-
-                </tr>
-
-            `;
-
-        }
-
-        
-
-        showToast("Previsão concluída!", "success");
-
-    } catch (err) {
-
-        console.error(err);
-
-        showToast(err.message, "error");
-
-    } finally {
-
-        btn.disabled = false;
-
-        btn.innerHTML = origHtml;
-
-    }
-
-}
-
-
-
-function renderHeatmapGrid(containerId, scoreGrid) {
-
-    const grid = document.getElementById(containerId);
-
-    grid.innerHTML = '';
-
-    
-
-    let maxProb = 0.1;
-
-    scoreGrid.forEach(row => {
-
-        row.forEach(cell => {
-
-            if (cell.prob > maxProb) maxProb = cell.prob;
-
-        });
-
-    });
-
-    
-
-    for (let h = 0; h <= 5; h++) {
-
-        for (let a = 0; a <= 5; a++) {
-
-            const cellData = scoreGrid[h][a];
-
-            const cell = document.createElement('div');
-
-            cell.className = 'heatmap-cell';
-
-            
-
-            const intensity = cellData.prob / maxProb;
-
-            cell.style.background = `rgba(99, 102, 241, ${0.05 + intensity * 0.85})`;
-
-            
-
-            if (intensity > 0.6) {
-
-                cell.style.color = '#ffffff';
-
-            }
-
-            
-
-            cell.innerHTML = `
-
-                <span>${cellData.prob.toFixed(1)}%</span>
-
-                <span class="heatmap-cell-score">${cellData.score}</span>
-
-            `;
-
-            
-
-            cell.title = `Placar ${cellData.score}: ${cellData.prob.toFixed(1)}%`;
-
-            grid.appendChild(cell);
-
-        }
-
-    }
-
-}
-
-
-
-async function showMatchDetails(bet) {
-
-    const modal = document.getElementById('match-details-modal');
-
-    modal.style.display = 'flex';
-
-    
-
-    document.getElementById('modal-league-badge').innerText = bet.league;
-
-    document.getElementById('modal-match-teams').innerText = `${bet.home_team} vs ${bet.away_team}`;
-
-    document.getElementById('modal-match-date').innerText = `Data da Partida: ${bet.date} | Placar Final: ${bet.score}`;
-
-    
-
-    document.getElementById('modal-home-team-name').innerText = bet.home_team;
-
-    document.getElementById('modal-away-team-name').innerText = bet.away_team;
-
-    document.getElementById('modal-home-att').innerText = '...';
-
-    document.getElementById('modal-home-def').innerText = '...';
-
-    document.getElementById('modal-home-lambda').innerText = '...';
-
-    document.getElementById('modal-away-att').innerText = '...';
-
-    document.getElementById('modal-away-def').innerText = '...';
-
-    document.getElementById('modal-away-lambda').innerText = '...';
-
-    document.getElementById('modal-league-avg-home').innerText = '...';
-
-    document.getElementById('modal-league-avg-away').innerText = '...';
-
-    
-
-    const tbody = document.getElementById('modal-odds-tbody');
-
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Carregando dados estatísticos...</td></tr>';
-
-    document.getElementById('modal-bookmakers-tbody').innerHTML = '<tr><td colspan="4" class="text-center">Carregando comparativo...</td></tr>';
-
-    document.getElementById('modal-heatmap-grid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); font-size: 11px; padding: 20px;">Calculando matriz...</div>';
-
-    
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/predict`, {
-
-            method: 'POST',
-
-            headers: { 'Content-Type': 'application/json' },
-
-            body: JSON.stringify({ league: bet.league, homeTeam: bet.home_team, awayTeam: bet.away_team })
-
-        });
-
-        
-
-        if (!res.ok) throw new Error("Failed to calculate parameters");
-
-        const data = await res.json();
-
-        
-
-        document.getElementById('modal-home-att').innerText = data.expectancy.home_att.toFixed(2);
-
-        document.getElementById('modal-home-def').innerText = data.expectancy.home_def.toFixed(2);
-
-        document.getElementById('modal-home-lambda').innerText = data.expectancy.home_lambda.toFixed(2);
-
-        
-
-        document.getElementById('modal-away-att').innerText = data.expectancy.away_att.toFixed(2);
-
-        document.getElementById('modal-away-def').innerText = data.expectancy.away_def.toFixed(2);
-
-        document.getElementById('modal-away-lambda').innerText = data.expectancy.away_lambda.toFixed(2);
-
-        
-
-        document.getElementById('modal-league-avg-home').innerText = data.expectancy.league_avg_home.toFixed(2);
-
-        document.getElementById('modal-league-avg-away').innerText = data.expectancy.league_avg_away.toFixed(2);
-
-        
-
-        tbody.innerHTML = '';
-
-        
-
-        const markets = [
-
-            { key: 'home', name: 'Mandante (1)', label: '1 (Mandante)' },
-
-            { key: 'draw', name: 'Empate (X)', label: 'X (Empate)' },
-
-            { key: 'away', name: 'Visitante (2)', label: '2 (Visitante)' },
-
-            { key: 'over15', name: 'Over 1.5 Gols', label: 'Over 1.5' },
-
-            { key: 'over25', name: 'Over 2.5 Gols', label: 'Over 2.5' },
-
-            { key: 'under25', name: 'Under 2.5 Gols', label: 'Under 2.5' },
-
-            { key: 'over35', name: 'Over 3.5 Gols', label: 'Over 3.5' },
-
-            { key: 'under35', name: 'Under 3.5 Gols', label: 'Under 3.5' },
-
-            { key: 'over45', name: 'Over 4.5 Gols', label: 'Over 4.5' },
-
-            { key: 'under45', name: 'Under 4.5 Gols', label: 'Under 4.5' },
-
-            { key: 'over55', name: 'Over 5.5 Gols', label: 'Over 5.5' },
-
-            { key: 'under55', name: 'Under 5.5 Gols', label: 'Under 5.5' },
-
-            { key: 'ht_home', name: 'HT Mandante', label: 'HT Mandante' },
-            { key: 'ht_draw', name: 'HT Empate', label: 'HT Empate' },
-            { key: 'ht_away', name: 'HT Visitante', label: 'HT Visitante' },
-            { key: 'ht_over05', name: 'HT Over 0.5', label: 'HT Over 0.5' },
-            { key: 'ht_under05', name: 'HT Under 0.5', label: 'HT Under 0.5' },
-            { key: 'ht_over15', name: 'HT Over 1.5', label: 'HT Over 1.5' },
-            { key: 'ht_under15', name: 'HT Under 1.5', label: 'HT Under 1.5' },
-
-            { key: 'lay_home', name: 'Contra Mandante (X2)', label: 'Contra Mandante (X2)' },
-
-            { key: 'lay_away', name: 'Contra Visitante (1X)', label: 'Contra Visitante (1X)' },
-
-            { key: 'lay_draw', name: 'Contra Empate (12)', label: 'Contra Empate (12)' },
-
-            { key: 'btts_yes', name: 'Ambas Marcam (Sim)', label: 'BTTS Sim' },
-
-            { key: 'btts_no', name: 'Ambas Marcam (Não)', label: 'BTTS Não' },
-
-            { key: 'dnb_h', name: 'DNB Mandante', label: 'DNB Mandante' },
-
-            { key: 'dnb_a', name: 'DNB Visitante', label: 'DNB Visitante' },
-
-            { key: 'cs_10', name: 'Placar Exato 1-0', label: 'Placar Exato 1-0' },
-
-            { key: 'cs_20', name: 'Placar Exato 2-0', label: 'Placar Exato 2-0' },
-
-            { key: 'cs_21', name: 'Placar Exato 2-1', label: 'Placar Exato 2-1' },
-
-            { key: 'cs_00', name: 'Placar Exato 0-0', label: 'Placar Exato 0-0' },
-
-            { key: 'cs_11', name: 'Placar Exato 1-1', label: 'Placar Exato 1-1' },
-
-            { key: 'cs_01', name: 'Placar Exato 0-1', label: 'Placar Exato 0-1' },
-
-            { key: 'cs_02', name: 'Placar Exato 0-2', label: 'Placar Exato 0-2' },
-
-            { key: 'cs_12', name: 'Placar Exato 1-2', label: 'Placar Exato 1-2' },
-
-            { key: 'lay_cs_10', name: 'Lay Placar Exato 1-0', label: 'Lay Placar Exato 1-0' },
-
-            { key: 'lay_cs_20', name: 'Lay Placar Exato 2-0', label: 'Lay Placar Exato 2-0' },
-
-            { key: 'lay_cs_21', name: 'Lay Placar Exato 2-1', label: 'Lay Placar Exato 2-1' },
-
-            { key: 'lay_cs_00', name: 'Lay Placar Exato 0-0', label: 'Lay Placar Exato 0-0' },
-
-            { key: 'lay_cs_11', name: 'Lay Placar Exato 1-1', label: 'Lay Placar Exato 1-1' },
-
-            { key: 'lay_cs_01', name: 'Lay Placar Exato 0-1', label: 'Lay Placar Exato 0-1' },
-
-            { key: 'lay_cs_02', name: 'Lay Placar Exato 0-2', label: 'Lay Placar Exato 0-2' },
-
-            { key: 'lay_cs_12', name: 'Lay Placar Exato 1-2', label: 'Lay Placar Exato 1-2' }
-
-        ];
-
-        
-
-        markets.forEach(m => {
-
-            const tr = document.createElement('tr');
-
-            const prob = data.probabilities[m.key];
-
-            const fairOdd = data.fair_odds[m.key];
-
-            
-
-            let bookieOddText = '-';
-
-            let evText = '-';
-
-            let trClass = '';
-
-            
-
-            const isMatch = (bet.market === m.label);
-
-            
-
-            if (isMatch) {
-
-                bookieOddText = bet.odds.toFixed(2);
-
-                evText = bet.ev.toFixed(2);
-
-                trClass = 'ev';
-
-            }
-
-            
-
-            tr.className = trClass;
-
-            tr.innerHTML = `
-
-                <td class="metric-name">${m.name}</td>
-
-                <td>${prob !== undefined ? renderProbValue(prob, m.key) : '-'}</td>
-
-                <td class="metric-opt">${fairOdd !== undefined ? fairOdd.toFixed(2) : '-'}</td>
-
-                <td>${bookieOddText}</td>
-
-                <td class="metric-diff positive">${evText}</td>
-
-            `;
-
-            tbody.appendChild(tr);
-
-        });
-
-        
-
-        // Asian Handicap Home Lines
-
-        if (data.fair_ah_home && Object.keys(data.fair_ah_home).length > 0) {
-
-            Object.keys(data.fair_ah_home).sort((a,b) => parseFloat(a) - parseFloat(b)).forEach(line => {
-
-                const tr = document.createElement('tr');
-
-                const fairOdd = data.fair_ah_home[line];
-
-                
-
-                let bookieOddText = '-';
-
-                let evText = '-';
-
-                let trClass = '';
-
-                
-
-                const isMatch = (bet.market === `AH Casa (${line})` || bet.market === 'ah_home');
-
-                if (isMatch && bet.odds) {
-
-                    bookieOddText = bet.odds.toFixed(2);
-
-                    evText = bet.ev.toFixed(2);
-
-                    trClass = 'ev';
-
-                }
-
-                
-
-                tr.className = trClass;
-
-                tr.innerHTML = `
-
-                    <td class="metric-name">AH Casa (${line})</td>
-
-                    <td>-</td>
-
-                    <td class="metric-opt">${fairOdd.toFixed(2)}</td>
-
-                    <td>${bookieOddText}</td>
-
-                    <td class="metric-diff positive">${evText}</td>
-
-                `;
-
-                tbody.appendChild(tr);
-
-            });
-
-        }
-
-        
-
-        // Asian Handicap Away Lines
-
-        if (data.fair_ah_away && Object.keys(data.fair_ah_away).length > 0) {
-
-            Object.keys(data.fair_ah_away).sort((a,b) => parseFloat(a) - parseFloat(b)).forEach(line => {
-
-                const tr = document.createElement('tr');
-
-                const fairOdd = data.fair_ah_away[line];
-
-                
-
-                let bookieOddText = '-';
-
-                let evText = '-';
-
-                let trClass = '';
-
-                
-
-                const isMatch = (bet.market === `AH Fora (${line})` || bet.market === 'ah_away');
-
-                if (isMatch && bet.odds) {
-
-                    bookieOddText = bet.odds.toFixed(2);
-
-                    evText = bet.ev.toFixed(2);
-
-                    trClass = 'ev';
-
-                }
-
-                
-
-                tr.className = trClass;
-
-                tr.innerHTML = `
-
-                    <td class="metric-name">AH Fora (${line})</td>
-
-                    <td>-</td>
-
-                    <td class="metric-opt">${fairOdd.toFixed(2)}</td>
-
-                    <td>${bookieOddText}</td>
-
-                    <td class="metric-diff positive">${evText}</td>
-
-                `;
-
-                tbody.appendChild(tr);
-
-            });
-
-        }
-
-        
-
-        renderHeatmapGrid('modal-heatmap-grid', data.score_grid);
-
-        
-
-        // Populate odds comparison table in details modal
-
-        const modalBookmakersTbody = document.getElementById('modal-bookmakers-tbody');
-
-        modalBookmakersTbody.innerHTML = '';
-
-        
-
-        const bookmakersList = [
-
-            { key: 'Bet365', name: 'Bet365' },
-
-            { key: 'Pinnacle', name: 'Pinnacle' },
-
-            { key: 'Bwin', name: 'Bwin' },
-
-            { key: 'Media', name: 'Média' },
-
-            { key: 'Maxima', name: 'Máxima' }
-
-        ];
-
-        
-
-        let hasModalOdds = false;
-
-        if (data.odds_comparison) {
-
-            bookmakersList.forEach(b => {
-
-                const oddsObj = data.odds_comparison[b.key] || data.odds_comparison[b.key.toLowerCase()];
-
-                if (oddsObj && (oddsObj.H || oddsObj.D || oddsObj.A)) {
-
-                    hasModalOdds = true;
-
-                    const tr = document.createElement('tr');
-
-                    tr.innerHTML = `
-
-                        <td style="font-weight: 600;">${b.name}</td>
-
-                        <td class="text-center">${oddsObj.H ? oddsObj.H.toFixed(2) : '-'}</td>
-
-                        <td class="text-center">${oddsObj.D ? oddsObj.D.toFixed(2) : '-'}</td>
-
-                        <td class="text-center">${oddsObj.A ? oddsObj.A.toFixed(2) : '-'}</td>
-
-                    `;
-
-                    modalBookmakersTbody.appendChild(tr);
-
-                }
-
-            });
-
-        }
-
-        
-
-        if (!hasModalOdds) {
-
-            modalBookmakersTbody.innerHTML = `
-
-                <tr>
-
-                    <td colspan="4" class="text-center text-muted">Sem dados comparativos de odds para esta partida.</td>
-
-                </tr>
-
-            `;
-
-        }
-
-        
-
-    } catch (err) {
-
-        console.error(err);
-
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-loss">Falha ao calcular parâmetros para esta partida.</td></tr>';
-
-    }
-
-}
-
-
-
-function closeMatchDetailsModal() {
-
-    document.getElementById('match-details-modal').style.display = 'none';
-
-}
-
-
-
-// ==========================================================================
-
-// Telegram Config and Upcoming Tips Logic [NEW]
-
-// ==========================================================================
-
-
-
-// Global variable to cache loaded upcoming matches for broadcasting
-
-let currentUpcomingMatches = [];
-
-
-
-async function loadTelegramConfigUi() {
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/config`);
-
-        if (!res.ok) throw new Error();
-
-        const data = await res.json();
-
-        
-
-        document.getElementById('tg-token').value = data.token || '';
-
-        document.getElementById('tg-chat-id').value = data.chat_id || '';
-
-        document.getElementById('tg-enabled').checked = !!data.enabled;
-
-    } catch (err) {
-
-        console.error("Error loading Telegram config:", err);
-
-    }
-
-}
-
-
-
-async function saveTelegramConfig() {
-
-    const token = document.getElementById('tg-token').value;
-
-    const chatId = document.getElementById('tg-chat-id').value;
-
-    const enabled = document.getElementById('tg-enabled').checked;
-
-    
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/config`, {
-
-            method: 'POST',
-
-            headers: { 'Content-Type': 'application/json' },
-
-            body: JSON.stringify({ token, chat_id: chatId, enabled })
-
-        });
-
-        
-
-        if (!res.ok) throw new Error("Erro ao salvar configuração.");
-
-        showToast("Configurações do Telegram salvas com sucesso!", "success");
-
-    } catch (err) {
-
-        showToast(err.message, "error");
-
-    }
-
-}
-
-
-
-async function testTelegramConnection() {
-
-    const btn = document.getElementById('btn-test-tg');
-
-    btn.disabled = true;
-
-    
-
-    // Save current config first
-
-    const token = document.getElementById('tg-token').value;
-
-    const chatId = document.getElementById('tg-chat-id').value;
-
-    const enabled = document.getElementById('tg-enabled').checked;
-
-    
-
-    try {
-
-        await fetch(`${API_BASE_URL}/api/telegram/config`, {
-
-            method: 'POST',
-
-            headers: { 'Content-Type': 'application/json' },
-
-            body: JSON.stringify({ token, chat_id: chatId, enabled })
-
-        });
-
-        
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/test`, { method: 'POST' });
-
-        if (!res.ok) {
-
-            const errData = await res.json();
-
-            throw new Error(errData.detail || "Erro no teste.");
-
-        }
-
-        showToast("Mensagem de teste enviada com sucesso ao Telegram!", "success");
-
-    } catch (err) {
-
-        showToast(err.message, "error");
-
-    } finally {
-
-        btn.disabled = false;
-
-    }
-
-}
-
-
-
-async function loadSchedulerConfigUi() {
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/scheduler`);
-
-        if (!res.ok) throw new Error();
-
-        const data = await res.json();
-
-        
-
-        document.getElementById('tg-scheduler-enabled').checked = !!data.enabled;
-
-        document.getElementById('tg-scheduler-interval').value = data.check_interval_hours || 6;
-
-        if (data.upcoming_source && document.getElementById('tg-scheduler-source')) {
-
-            document.getElementById('tg-scheduler-source').value = data.upcoming_source;
-
-        }
-
-    } catch (err) {
-
-        console.error("Error loading Telegram scheduler config:", err);
-
-    }
-
-}
-
-
-
-async function autoUpdateSchedulerFromBacktest(backtestData) {
-
-    try {
-
-        const resGet = await fetch(`${API_BASE_URL}/api/telegram/scheduler`);
-
-        let currentConfig = {
-
-            enabled: false,
-
-            check_interval_hours: 6,
-
-            upcoming_source: 'api'
-
-        };
-
-        if (resGet.ok) {
-
-            currentConfig = await resGet.json();
-
-        }
-
-        
-
-        const updatedConfig = {
-
-            enabled: currentConfig.enabled,
-
-            check_interval_hours: currentConfig.check_interval_hours,
-
-            leagues: backtestData.leagues,
-
-            market: backtestData.market,
-
-            value_threshold: backtestData.valueThreshold,
-
-            min_odds: backtestData.minOdds || 1.0,
-
-            max_odds: backtestData.maxOdds || 2.50,
-
-            staking_rule: backtestData.stakingRule,
-
-            stake_value: backtestData.stakeValue,
-
-            initial_bankroll: backtestData.initialBankroll,
-
-            upcoming_source: currentConfig.upcoming_source || 'api'
-
-        };
-
-        
-
-        const resPost = await fetch(`${API_BASE_URL}/api/telegram/scheduler`, {
-
-            method: 'POST',
-
-            headers: { 'Content-Type': 'application/json' },
-
-            body: JSON.stringify(updatedConfig)
-
-        });
-
-        
-
-        if (resPost.ok) {
-
-            console.log("Configurações do robô de Telegram sincronizadas com o backtest.");
-
-            await loadSchedulerConfigUi();
-
-        } else {
-
-            console.error("Erro ao sincronizar robô com backtest.");
-
-        }
-
-    } catch (err) {
-
-        console.error("Erro no autoUpdateSchedulerFromBacktest:", err);
-
-    }
-
-}
-
-
-
-async function saveSchedulerConfigUi() {
-
-    const enabled = document.getElementById('tg-scheduler-enabled').checked;
-
-    const interval = parseInt(document.getElementById('tg-scheduler-interval').value) || 6;
-
-    
-
-    // Collect active strategy parameters from the sidebar controls
-
-    const selectedLeagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked'))
-
-        .map(cb => cb.value);
-
-        
-
-    if (selectedLeagues.length === 0) {
-
-        showToast("Selecione pelo menos um campeonato no formulário lateral para salvar a estratégia do robô.", "error");
-
-        return;
-
-    }
-
-    
-
-    const ruleInput = document.getElementById('stake-rule').value;
-
-    let stakingRule = ruleInput;
-
-    let stakeValue = parseFloat(document.getElementById('stake-value').value);
-
-    
-
-    if (ruleInput.startsWith('kelly')) {
-
-        stakingRule = 'kelly';
-
-        if (ruleInput === 'kelly') stakeValue = 1.0;
-
-        else if (ruleInput === 'kelly_half') stakeValue = 0.5;
-
-        else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
-
-        else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
-        else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
-
-    }
-
-    
-
-    const upcomingSource = document.getElementById('tg-scheduler-source') ? document.getElementById('tg-scheduler-source').value : 'api';
-
-    
-
-    const selectedMarkets = Array.from(document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]:checked')).map(cb => cb.value);
-
-    
-
-    const requestData = {
-
-        enabled: enabled,
-
-        check_interval_hours: interval,
-
-        leagues: selectedLeagues,
-
-        market: selectedMarkets.length > 0 ? selectedMarkets : ['home'],
-
-        value_threshold: parseFloat(document.getElementById('val-threshold').value),
-
-        min_odds: parseFloat(document.getElementById('min-odds').value) || 1.0,
-
-        max_odds: parseFloat(document.getElementById('max-odds').value) || 2.50,
-
-        staking_rule: stakingRule,
-
-        stake_value: stakeValue,
-
-        initial_bankroll: parseFloat(document.getElementById('init-bankroll').value),
-
-        upcoming_source: upcomingSource
-
-    };
-
-    
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/scheduler`, {
-
-            method: 'POST',
-
-            headers: { 'Content-Type': 'application/json' },
-
-            body: JSON.stringify(requestData)
-
-        });
-
-        
-
-        if (!res.ok) throw new Error("Erro ao salvar configuração do robô.");
-
-        showToast("Configurações do Robô Automático salvas!", "success");
-
-    } catch (err) {
-
-        showToast(err.message, "error");
-
-    }
-
-}
-
-
-
-async function runSchedulerNow() {
-
-    const btn = document.getElementById('btn-run-scheduler-now');
-
-    const origHtml = btn.innerHTML;
-
-    
-
-    btn.disabled = true;
-
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Executando...';
-
-    showToast("Robô rodando varredura em tempo real nas próximas rodadas...", "info");
-
-    
-
-    // Save current scheduler config first
-
-    await saveSchedulerConfigUi();
-
-    
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/scheduler/run`, {
-
-            method: 'POST'
-
-        });
-
-        
-
-        if (!res.ok) {
-
-            const errData = await res.json();
-
-            throw new Error(errData.detail || "Erro ao rodar varredura do robô.");
-
-        }
-
-        
-
-        const data = await res.json();
-
-        if (data.status === 'skipped') {
-
-            showToast(data.message, "info");
-
-        } else {
-
-            showToast(`Varredura do Robô: ${data.sent_tips} novas tips enviadas para o Telegram!`, "success");
-
-            await loadTelegramTipsLog();
-
-        }
-
-    } catch (err) {
-
-        showToast(err.message, "error");
-
-    } finally {
-
-        btn.disabled = false;
-
-        btn.innerHTML = origHtml;
-
-    }
-
-}
-
-
-
-async function loadUpcomingMatches() {
-
-    const btn = document.getElementById('btn-load-upcoming');
-
-    const container = document.getElementById('upcoming-matches-list');
-
-    
-
-    btn.disabled = true;
-
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Atualizando...';
-
-    container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); font-size: 13px; padding: 40px 0;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; margin-bottom: 10px; display: block;"></i> Baixando calendário e processando estatísticas...</div>';
-
-    
-
-    // Read sidebar parameters
-
-    const ruleInput = document.getElementById('stake-rule').value;
-
-    let stakingRule = ruleInput;
-
-    let stakeValue = parseFloat(document.getElementById('stake-value').value);
-
-    
-
-    if (ruleInput.startsWith('kelly')) {
-
-        stakingRule = 'kelly';
-
-        if (ruleInput === 'kelly') stakeValue = 1.0;
-
-        else if (ruleInput === 'kelly_half') stakeValue = 0.5;
-
-        else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
-
-        else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
-        else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
-
-    }
-
-    
-
-
-    const opMode = document.getElementById('select-operation-mode') ? document.getElementById('select-operation-mode').value : 'manual';
-    const upcomingSource = document.getElementById('select-upcoming-source') ? document.getElementById('select-upcoming-source').value : 'api';
-    
-    let fetchUrl = '';
-    
-    if (opMode === 'autopilot') {
-        fetchUrl = `${API_BASE_URL}/api/autopilot?source=${upcomingSource}`;
-    } else {
-        const selectedLeagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked')).map(cb => cb.value);
-        if (selectedLeagues.length === 0) {
-            showToast("Selecione pelo menos uma liga na barra lateral.", "error");
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Atualizar Grade';
-            container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-loss); padding: 40px 0;">Nenhuma liga selecionada.</div>`;
-            return;
-        }
-        
-        const selectedMarkets = Array.from(document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]:checked')).map(cb => cb.value);
-        if (selectedMarkets.length === 0) {
-            showToast("Selecione pelo menos um mercado na barra lateral.", "error");
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Atualizar Grade';
-            container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-loss); padding: 40px 0;">Nenhum mercado selecionado.</div>`;
-            return;
-        }
-        const marketsParam = selectedMarkets.join(',');
-        
-        const params = new URLSearchParams({
-            markets: marketsParam,
-            valueThreshold: parseFloat(document.getElementById('val-threshold').value),
-            minOdds: parseFloat(document.getElementById('min-odds').value) || 1.0,
-            maxOdds: parseFloat(document.getElementById('max-odds').value) || 2.50,
-            stakingRule: stakingRule,
-            stakeValue: stakeValue,
-            initialBankroll: parseFloat(document.getElementById('init-bankroll').value),
-            source: upcomingSource
-        });
-        
-        fetchUrl = `${API_BASE_URL}/api/upcoming?${params}`;
-    }
-    
-    try {
-        const res = await fetch(fetchUrl);
-        const data = await res.json();
-
-        
-
-        // Filter upcoming matches by selected leagues ONLY if in manual mode
-        let filteredData = data;
-        if (opMode !== 'autopilot') {
-            const currentSelectedLeagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked')).map(cb => cb.value);
-            filteredData = data.filter(match => currentSelectedLeagues.includes(match.league_code));
-        }
-
-        
-
-        currentUpcomingMatches = filteredData;
-
-        renderUpcomingMatches(filteredData);
-
-        
-
-        // Trigger system notification if permission is granted and there are tips
-
-        if ('Notification' in window && Notification.permission === 'granted') {
-
-            const tips = filteredData.filter(m => m.is_tip);
-
-            if (tips.length === 1) {
-
-                new Notification("Nova Tip (+EV) Encontrada", {
-
-                    body: `${tips[0].home_team} vs ${tips[0].away_team} - Mercado: ${tips[0].market_label} (Odd: ${tips[0].bookie_odds.toFixed(2)})`,
-
-                    icon: "/icons/icon-192.png"
-
-                });
-
-            } else if (tips.length > 1) {
-
-                new Notification(`${tips.length} Novas Tips (+EV) Encontradas`, {
-
-                    body: `Confira os próximos jogos em destaque na grade de jogos futuros!`,
-
-                    icon: "/icons/icon-192.png"
-
-                });
-
-            }
-
-        }
-
-        
-
-        showToast(`Grade de jogos atualizada com sucesso! (${filteredData.length} partidas)`, "success");
-
-    } catch (err) {
-
-        container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-loss); padding: 40px 0;">${err.message}</div>`;
-
-        showToast(err.message, "error");
-
-    } finally {
-
-        btn.disabled = false;
-
-        btn.innerHTML = '<i class="fa-arrows-rotate fa-solid"></i> Atualizar Grade';
-
-    }
-
-}
-
-
-
-function renderUpcomingMatches(matches) {
-
-    const container = document.getElementById('upcoming-matches-list');
-
-    container.innerHTML = '';
-
-    
-
-    if (matches.length === 0) {
-
-        container.innerHTML = `
-
-            <div class="empty-state text-center" style="grid-column: 1 / -1; padding: 40px 0; width: 100%;">
-
-                <i class="fa-solid fa-calendar-xmark" style="font-size: 28px; margin-bottom: 10px; color: var(--text-muted);"></i>
-
-                <p>Nenhum jogo futuro agendado encontrado para as ligas ativas no momento.</p>
-
-                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">As ligas brasileiras e americanas rodando em verão são atualizadas regularmente.</p>
-
-            </div>
-
-        `;
-
-        return;
-
-    }
-
-    
-
-    matches.forEach(match => {
-
-        const isTip = match.is_tip;
-
-        const cardClass = isTip ? 'upcoming-match-card is-tip' : 'upcoming-match-card';
-
-        const card = document.createElement('div');
-
-        card.className = cardClass;
-
-        
-
-        let tipBadgeHtml = '';
-
-        let actionBtnClass = 'upcoming-match-action-btn';
-
-        if (isTip) {
-
-            tipBadgeHtml = `<span class="upcoming-tip-badge">Tip (+EV)</span>`;
-
-            actionBtnClass = 'upcoming-match-action-btn tip-btn';
-
-        }
-
-        
-
-        // Parse date for clean display (from DD/MM/YYYY to Brazilian style)
-
-        const dateParts = match.date.split('/');
-
-        const cleanDate = dateParts.length === 3 ? `${dateParts[0]}/${dateParts[1]}` : match.date;
-
-        
-
-        // Stringify the match object safely for onClick
-
-        const safeMatchStr = JSON.stringify(match).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-
-        
-
-        card.innerHTML = `
-
-            ${tipBadgeHtml}
-
-            <div class="upcoming-match-header">
-
-                <span class="badge badge-success" style="padding: 2px 6px; font-size: 10px;">${match.league_name}</span>
-
-                <span class="upcoming-match-date"><i class="fa-regular fa-clock"></i> ${cleanDate} - ${match.time}</span>
-
-            </div>
-
-            
-
-            <div class="upcoming-match-teams">
-
-                ${match.home_team} vs ${match.away_team}
-
-            </div>
-
-            
-
-            <div class="upcoming-strategy-info">
-
-                <div class="upcoming-strategy-values">
-
-                    <span class="upcoming-strategy-label">Mercado: <strong>${match.market_label}</strong></span>
-
-                    <span class="upcoming-strategy-edge" style="color: ${isTip ? 'var(--success)' : 'var(--text-secondary)'};">
-
-                        ${isTip ? `EV Edge: +${((match.ev - 1) * 100).toFixed(1)}%` : `EV: ${match.ev ? match.ev.toFixed(2) : '-'}`}
-
-                    </span>
-
-                </div>
-
-                <div class="upcoming-strategy-values" style="font-size: 11px; color: var(--text-secondary);">
-
-                    <span>Probabilidade IA: <strong>${match.prob}%</strong></span>
-
-                    <span>Odd Mínima: <strong>${match.fair_odds.toFixed(2)}</strong></span>
-
-                </div>
-
-                <div class="upcoming-strategy-values" style="font-size: 11px; color: var(--text-secondary);">
-
-                    <span>Odd Bet365: <strong style="color: var(--warning);">${match.bookie_odds ? match.bookie_odds.toFixed(2) : '-'}</strong></span>
-
-                    <span>Gestão Stake: <strong>${match.stake_pct}%</strong></span>
-
-                </div>
-
-            </div>
-
-            
-
-            <button type="button" class="${actionBtnClass}" onclick="sendIndividualTip(JSON.parse(this.getAttribute('data-match')))" data-match="${safeMatchStr}">
-
-                <i class="fa-solid fa-bullhorn"></i> ${isTip ? 'Enviar Tip p/ Telegram' : 'Enviar Análise p/ Telegram'}
-
-            </button>
-
-        `;
-
-        
-
-        container.appendChild(card);
-
-    });
-
-}
-
-
-
-async function sendIndividualTip(match) {
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/send_tips`, {
-
-            method: 'POST',
-
-            headers: { 'Content-Type': 'application/json' },
-
-            body: JSON.stringify({
-
-                league_name: match.league_name,
-
-                date_str: match.date,
-
-                time_str: match.time,
-
-                home_team: match.home_team,
-
-                away_team: match.away_team,
-
-                market_label: match.market_label,
-
-                prob: match.prob,
-
-                fair_odds: match.fair_odds,
-
-                bookie_odds: match.bookie_odds,
-
-                ev: match.ev,
-
-                stake_pct: match.stake_pct
-
-            })
-
-        });
-
-        
-
-        if (!res.ok) {
-
-            const errData = await res.json();
-
-            throw new Error(errData.detail || "Erro ao enviar.");
-
-        }
-
-        
-
-        showToast(`Tip para ${match.home_team} vs ${match.away_team} enviada ao Telegram!`, "success");
-
-        await loadTelegramTipsLog();
-
-    } catch (err) {
-
-        showToast(err.message, "error");
-
-    }
-
-}
-
-
-
-async function broadcastAllTips() {
-
-    const btn = document.getElementById('btn-broadcast-tips');
-
-    const tips = currentUpcomingMatches.filter(m => m.is_tip);
-
-    
-
-    if (tips.length === 0) {
-
-        showToast("Nenhuma dica (+EV) ativa na grade para transmitir no momento.", "info");
-
-        return;
-
-    }
-
-    
-
-    btn.disabled = true;
-
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Transmitindo (${tips.length})...`;
-
-    
-
-    let sentCount = 0;
-
-    let failCount = 0;
-
-    
-
-    for (const match of tips) {
-
-        try {
-
-            const res = await fetch(`${API_BASE_URL}/api/telegram/send_tips`, {
-
-                method: 'POST',
-
-                headers: { 'Content-Type': 'application/json' },
-
-                body: JSON.stringify({
-
-                    league_name: match.league_name,
-
-                    date_str: match.date,
-
-                    time_str: match.time,
-
-                    home_team: match.home_team,
-
-                    away_team: match.away_team,
-
-                    market_label: match.market_label,
-
-                    prob: match.prob,
-
-                    fair_odds: match.fair_odds,
-
-                    bookie_odds: match.bookie_odds,
-
-                    ev: match.ev,
-
-                    stake_pct: match.stake_pct
-
-                })
-
-            });
-
-            if (res.ok) sentCount++;
-
-            else failCount++;
-
-            
-
-            // Short delay to respect Telegram rate limiting
-
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-        } catch (err) {
-
-            failCount++;
-
-        }
-
-    }
-
-    
-
-    if (failCount === 0) {
-
-        showToast(`Todas as ${sentCount} tips foram transmitidas ao Telegram!`, "success");
-
-    } else {
-
-        showToast(`Transmissão concluída: ${sentCount} enviadas, ${failCount} falhas. Verifique o Token e Canal.`, sentCount > 0 ? "info" : "error");
-
-    }
-
-    btn.disabled = false;
-
-    btn.innerHTML = '<i class="fa-solid fa-bullhorn"></i> Transmitir Tips (+EV)';
-
-    await loadTelegramTipsLog();
-
-}
-
-
-
-async function loadTelegramTipsLog() {
-
-    const tbody = document.getElementById('telegram-tips-table-body');
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/tips`);
-
-        if (!res.ok) throw new Error("Erro ao carregar log de tips.");
-
-        const tips = await res.json();
-
-        
-
-        allTelegramTips = tips; // Cache for Telegram tips log
-
-        filterTipsTable(); // This will apply the active status filter and call renderTelegramTips
-
-    } catch (err) {
-
-        console.error("Error loading tips log:", err);
-
-        tbody.innerHTML = `
-
-            <tr>
-
-                <td colspan="7" class="text-center text-loss">
-
-                    <i class="fa-solid fa-triangle-exclamation"></i> Falha ao carregar o histórico de tips do servidor.
-
-                </td>
-
-            </tr>
-
-        `;
-
-    }
-
-}
-
-
-
-async function updateTipStatus(tipId, status) {
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/tips/${tipId}`, {
-
-            method: 'PUT',
-
-            headers: { 'Content-Type': 'application/json' },
-
-            body: JSON.stringify({ status })
-
-        });
-
-        if (!res.ok) throw new Error("Erro ao atualizar status da tip.");
-
-        showToast("Status da tip atualizado!", "success");
-
-        await loadTelegramTipsLog(); // Reload to apply color styling dynamically
-
-    } catch (err) {
-
-        showToast(err.message, "error");
-
-    }
-
-}
-
-
-
-async function clearTipsLog() {
-
-    if (!confirm("Tem certeza que deseja limpar todo o histórico de tips enviadas? Esta ação não pode ser desfeita.")) {
-
-        return;
-
-    }
-
-    
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/telegram/tips`, {
-
-            method: 'DELETE'
-
-        });
-
-        if (!res.ok) throw new Error("Erro ao limpar log.");
-
-        showToast("Histórico de tips limpo!", "success");
-
-        await loadTelegramTipsLog();
-
-    } catch (err) {
-
-        showToast(err.message, "error");
-
-    }
-
-}
-
-
-
-function renderTelegramTips(tips) {
-
-    const tbody = document.getElementById('telegram-tips-table-body');
-
-    if (tips.length === 0) {
-
-        const statusFilter = document.getElementById('tips-status-filter').value;
-
-        const msg = statusFilter === 'Todos' 
-
-            ? 'Nenhuma tip enviada ao Telegram registrada no log local.'
-
-            : 'Nenhuma tip encontrada com o status selecionado.';
-
-        tbody.innerHTML = `
-
-            <tr>
-
-                <td colspan="7" class="text-center empty-state">
-
-                    <i class="fa-solid fa-info-circle"></i> ${msg}
-
-                </td>
-
-            </tr>
-
-        `;
-
-        return;
-
-    }
-
-    
-
-    tbody.innerHTML = '';
-
-    // Render tips in reverse chronological order (latest first)
-
-    tips.slice().reverse().forEach(tip => {
-
-        const tr = document.createElement('tr');
-
-        
-
-        // Determine select dropdown class based on status
-
-        let statusClass = 'status-pendente';
-
-        if (tip.status === 'Green') statusClass = 'status-green';
-
-        else if (tip.status === 'Red') statusClass = 'status-red';
-
-        
-
-        tr.innerHTML = `
-
-            <td>${tip.date} ${tip.time || ''}</td>
-
-            <td><strong>${tip.league_name}</strong></td>
-
-            <td>${tip.home_team} vs ${tip.away_team}</td>
-
-            <td>${tip.market}</td>
-
-            <td style="color: var(--warning); font-weight: 600;">${tip.odds.toFixed(2)}</td>
-
-            <td>${tip.stake.toFixed(1)}%</td>
-
-            <td>
-
-                <select class="status-select ${statusClass}" onchange="updateTipStatus('${tip.id}', this.value)">
-
-                    <option value="Pendente" ${tip.status === 'Pendente' ? 'selected' : ''}>Pendente</option>
-
-                    <option value="Green" ${tip.status === 'Green' ? 'selected' : ''}>Green</option>
-
-                    <option value="Red" ${tip.status === 'Red' ? 'selected' : ''}>Red</option>
-
-                </select>
-
-            </td>
-
-        `;
-
-        tbody.appendChild(tr);
-
-    });
-
-}
-
-
-
-function filterTipsTable() {
-
-    const statusFilter = document.getElementById('tips-status-filter').value;
-
-    let filtered = allTelegramTips;
-
-    if (statusFilter !== 'Todos') {
-
-        filtered = allTelegramTips.filter(tip => tip.status === statusFilter);
-
-    }
-
-    renderTelegramTips(filtered);
-
-}
-
-
-
-function exportTipsToCsv() {
-
-    if (allTelegramTips.length === 0) {
-
-        showToast("Não há tips no log para exportar.", "info");
-
-        return;
-
-    }
-
-    
-
-    // Construct CSV Header (using semicolon delimiter for better compatibility with PT Excel)
-
-    let csvContent = "\uFEFF"; // Prepend UTF-8 BOM
-
-    csvContent += "Data;Liga;Mandante;Visitante;Mercado;Odds;Stake;Status\r\n";
-
-    
-
-    // Rows
-
-    allTelegramTips.forEach(tip => {
-
-        const row = [
-
-            tip.date + (tip.time ? ' ' + tip.time : ''),
-
-            `"${tip.league_name.replace(/"/g, '""')}"`,
-
-            `"${tip.home_team.replace(/"/g, '""')}"`,
-
-            `"${tip.away_team.replace(/"/g, '""')}"`,
-
-            `"${tip.market.replace(/"/g, '""')}"`,
-
-            tip.odds.toFixed(2),
-
-            tip.stake.toFixed(1) + "%",
-
-            tip.status
-
-        ];
-
-        csvContent += row.join(";") + "\r\n";
-
-    });
-
-    
-
-    // Trigger download
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-
-    link.setAttribute("href", url);
-
-    link.setAttribute("download", `tips_telegram_${new Date().toISOString().slice(0,10)}.csv`);
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    document.body.removeChild(link);
-
-}
-
-
-
-function displayStakingComparison(results) {
-
-    const panel = document.getElementById('staking-comparison-panel');
-
-    const tbody = document.getElementById('staking-comparison-tbody');
-
-    
-
-    if (!results.summary_fixed || !results.summary_proportional || !results.summary_kelly) {
-
-        panel.style.display = 'none';
-
-        return;
-
-    }
-
-    
-
-    panel.style.display = 'block';
-
-    tbody.innerHTML = '';
-
-    
-
-    const rule = document.getElementById('stake-rule').value;
-
-    const stakeValueInput = rule === 'kelly' ? parseFloat(document.getElementById('kelly-fraction').value) || 0.25 : parseFloat(document.getElementById('stake-value').value) || 10;
-
-    
-
-    const fixedStakeVal = rule === 'fixed' ? stakeValueInput : 10;
-
-    const propStakePct = rule === 'proportional' ? stakeValueInput : 2;
-
-    
-
-    let kellyFractionText = rule === 'kelly' ? stakeValueInput.toFixed(2) + (stakeValueInput == 1 ? ' (Full)' : ' (' + (1/stakeValueInput).toFixed(0) + ')') : '1/4 de Kelly';
-
-
-
-    
-
-    const methods = [
-
-        { name: `Stake Fixa ($${fixedStakeVal.toLocaleString('en-US')})`, key: 'summary_fixed', color: '#f59e0b' },
-
-        { name: `Stake Proporcional (${propStakePct}%)`, key: 'summary_proportional', color: '#06b6d4' },
-
-        { name: `Critério Kelly (${kellyFractionText})`, key: 'summary_kelly', color: '#ec4899' }
-
-    ];
-
-    
-
-    methods.forEach(m => {
-
-        const sum = results[m.key];
-
-        const tr = document.createElement('tr');
-
-        
-
-        const netProfit = sum.net_profit;
-
-        const profitClass = netProfit >= 0 ? 'text-profit' : 'text-loss';
-
-        const roiClass = sum.roi >= 0 ? 'text-profit' : 'text-loss';
-
-        
-
-        tr.innerHTML = `
-
-            <td style="font-weight: 600; color: ${m.color};">${m.name}</td>
-
-            <td style="font-weight: 600;">$${sum.final_bankroll.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-
-            <td class="${profitClass}" style="font-weight: 600;">${netProfit >= 0 ? '+' : ''}$${netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-
-            <td>${sum.total_bets}</td>
-
-            <td>${sum.win_rate.toFixed(1)}%</td>
-
-            <td class="${roiClass}" style="font-weight: 600;">${sum.roi >= 0 ? '+' : ''}${sum.roi.toFixed(2)}%</td>
-
-            <td style="color: var(--danger); font-weight: 600;">${sum.max_drawdown.toFixed(2)}%</td>
-
-        `;
-
-        tbody.appendChild(tr);
-
-    });
-
-}
-
-
-
-function toggleMarketDropdown(event) {
-
-    if (event) event.stopPropagation();
-
-    const dropdown = document.getElementById('market-dropdown');
-
-    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
-
-}
-
-
-
-function selectAllMarkets(val, event) {
-
-    if (event) event.stopPropagation();
-
-    const checkboxes = document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]');
-
-    checkboxes.forEach(cb => {
-
-        cb.checked = val;
-
-    });
-
-    onMarketSelectionChange();
-
-}
-
-
-
-function onMarketSelectionChange() {
-
-    const checkedBoxes = Array.from(document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]:checked'));
-
-    const label = document.getElementById('multiselect-label');
-
-    
-
-    if (checkedBoxes.length === 0) {
-
-        label.innerText = 'Nenhum Mercado Selecionado';
-
-    } else if (checkedBoxes.length === 1) {
-
-        label.innerText = checkedBoxes[0].parentNode.textContent.trim();
-
-    } else {
-
-        label.innerText = `${checkedBoxes.length} Mercados Selecionados`;
-
-    }
-
-
-
-    // Show exchange commission input if any Lay market is selected
-
-    const selectedMkts = checkedBoxes.map(cb => cb.value);
-
-    const hasLayMarket = selectedMkts.some(m => m.startsWith('lay'));
-
-    const commGroup = document.getElementById('exchange-commission-group');
-
-    if (commGroup) commGroup.style.display = hasLayMarket ? 'block' : 'none';
-
-}
-
-
-
-// ==========================================================================
-
+import './js/calculator.js';
+import './js/telegram.js';
+import './js/history.js?v=4';
+import './js/arbitrage.js?v=1';
+import './js/clustering.js?v=4';
+import './js/state.js';
 // Web Push Notifications & Portfolio Allocator helper functions
 
 // ==========================================================================
@@ -5785,6 +3563,23 @@ function renderStatValidation(summary) {
 
             </div>`;
 
+    }
+
+    // 2b. Bootstrap Drawdown Confidence Interval
+    if (summary.bootstrap_drawdown_ci_lower !== undefined) {
+        const ddLower = summary.bootstrap_drawdown_ci_lower;
+        const ddUpper = summary.bootstrap_drawdown_ci_upper;
+        const ddMedian = summary.bootstrap_drawdown_median;
+        const ddColor = ddUpper < 25 ? 'var(--success)' : ddUpper < 40 ? 'var(--warning)' : 'var(--danger)';
+        const ddTooltip = 'Intervalo de confianca de 95% do drawdown maximo obtido por reamostragem bootstrap (5.000 simulacoes).';
+        grid.innerHTML += `
+            <div class="stat-card" title="${ddTooltip}" onclick="showToast(this.title, 'info')">
+                <div class="stat-label"><i class="fa-solid fa-arrow-trend-down"></i> Drawdown Bootstrap (95% IC)</div>
+                <div class="stat-value" style="color: ${ddColor};">${ddMedian !== undefined ? fmtNum(ddMedian, 1) : '?'}%</div>
+                <div class="stat-detail">
+                    IC 95%: <strong style="color: ${ddColor};">${fmtNum(ddLower, 1)}%</strong> — <strong>${fmtNum(ddUpper, 1)}%</strong>
+                </div>
+            </div>`;
     }
 
 
@@ -6310,10 +4105,11 @@ async function runEqsScanner(scanType) {
     if (scanType === 'leagues') activeBtn = btnEqsLeagues;
 
     if (scanType === 'combinations') activeBtn = btnEqsCombinations;
+    if (scanType === 'staking') activeBtn = document.getElementById('btn-eqs-scan-staking');
 
     
 
-    const allBtns = [btnEqsMarkets, btnEqsLeagues, btnEqsCombinations];
+    const allBtns = [btnEqsMarkets, btnEqsLeagues, btnEqsCombinations, document.getElementById('btn-eqs-scan-staking')];
 
     
 
@@ -6407,6 +4203,7 @@ async function runEqsScanner(scanType) {
         maxOdds: parseFloat(document.getElementById('max-odds').value) || 2.50,
 
         use_ml: document.getElementById('use-ml-toggle')?.checked || false,
+        model_type: document.getElementById('model-type-select')?.value || 'poisson',
 
         data_source: window.currentDataSource,
 
@@ -6424,11 +4221,13 @@ async function runEqsScanner(scanType) {
 
             headers: { 'Content-Type': 'application/json' },
 
-            body: JSON.stringify(requestData)
+            body: JSON.stringify(requestData),
+
+            cache: 'no-store'
 
         });
 
-        
+
 
         if (!res.ok) {
 
@@ -6438,13 +4237,13 @@ async function runEqsScanner(scanType) {
 
         }
 
-        
+
 
         const data = await res.json();
 
         const results = data.results;
 
-        
+
 
         const sortedResults = results.sort((a, b) => b.eqs_score - a.eqs_score);
 
@@ -6603,7 +4402,7 @@ function renderEqsResults(results, scanType, requestData, diagnostics) {
 
                 <span style="color: var(--text-muted); font-size: 13px;">
 
-                    <i class="fa-solid fa-layer-group" style="margin-right: 5px;"></i> 
+                    <i class="fa-solid fa-layer-group" style="margin-right: 5px;"></i>
 
                     Escaneamento de <b>${combCount} nichos únicos</b> (Cruzamento de ${leaguesCount} ligas com ${marketsCount} mercados).
 
@@ -6612,6 +4411,85 @@ function renderEqsResults(results, scanType, requestData, diagnostics) {
             </div>
 
         `;
+
+    } else if (scanType === 'staking') {
+        // Staking Comparison Table
+        const leaguesCount = requestData.leagues.length;
+        const marketsCount = requestData.market.length || 33;
+        leaguesContextHtml = `
+            <div style="margin-bottom: 15px; padding: 10px 15px; background: rgba(0,0,0,0.2); border-left: 3px solid var(--primary); border-radius: 4px;">
+                <span style="color: var(--text-muted); font-size: 13px;">
+                    <i class="fa-solid fa-scale-balanced" style="margin-right: 5px;"></i>
+                    Comparando Fixed vs Proporcional vs Kelly em <b>${leaguesCount} liga(s) x ${marketsCount} mercado(s)</b>.
+                </span>
+            </div>
+        `;
+        const METHOD_LABELS = {
+            fixed:       { label: "Fixa ($10)",   color: "#f59e0b" },
+            proportional: { label: "Prop (2%)",    color: "#3b82f6" },
+            kelly:        { label: "Kelly (1/4)",  color: "#34d399" },
+        };
+        const stakingHtml = `
+            ${leaguesContextHtml}
+            <div class="eqs-legend" style="margin-bottom: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <h4 style="margin: 0 0 10px 0; font-size: 14px; color: var(--text-primary);"><i class="fa-solid fa-scale-balanced"></i> Comparacao de Gestoes de Banca</h4>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    ${Object.entries(METHOD_LABELS).map(([k,v]) => `
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="width: 12px; height: 12px; border-radius: 3px; background: ${v.color};"></span>
+                            <span style="font-size: 12px; color: var(--text-muted);"><b>${v.label}</b></span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <table class="scanner-table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <thead>
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
+                        <th style="padding: 12px 15px; text-align: left; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Liga / Mercado</th>
+                        <th style="padding: 12px 15px; text-align: center; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Apostas</th>
+                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #f59e0b;">Fixed ROI</th>
+                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #f59e0b;">Fixed DD</th>
+                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #3b82f6;">Prop ROI</th>
+                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #3b82f6;">Prop DD</th>
+                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #34d399;">Kelly ROI</th>
+                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #34d399;">Kelly DD</th>
+                        <th style="padding: 12px 15px; text-align: center; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Melhor Gestao</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${results.map(r => {
+                        const methods = ['fixed', 'proportional', 'kelly'];
+                        const best = r.best_method || 'fixed';
+                        return `
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                <td style="padding: 10px 15px; font-size: 11px;">
+                                    ${r.name.replace(' / ', ' <i class="fa-solid fa-angle-right" style="color:var(--text-muted); font-size:9px;"></i> ')}
+                                </td>
+                                <td style="padding: 10px 15px; text-align: center; font-size: 12px;">${r.total_bets}</td>
+                                ${methods.map(m => {
+                                    const d = r[m] || {};
+                                    const roiColor = d.roi >= 0 ? 'var(--success)' : 'var(--danger)';
+                                    const methodColor = METHOD_LABELS[m].color;
+                                    return `
+                                        <td style="padding: 10px 15px; text-align: right; color: ${roiColor}; font-weight: 500; font-size: 13px; background: ${best === m ? methodColor + '15' : 'transparent'};">${(d.roi || 0).toFixed(1)}%</td>
+                                        <td style="padding: 10px 15px; text-align: right; color: var(--danger); font-size: 12px; opacity: ${(d.max_drawdown || 0) > 20 ? 1 : 0.6}; background: ${best === m ? methodColor + '15' : 'transparent'};">-${(d.max_drawdown || 0).toFixed(1)}%</td>
+                                    `;
+                                }).join('')}
+                                <td style="padding: 10px 15px; text-align: center;">
+                                    <span style="background: ${METHOD_LABELS[best].color}20; color: ${METHOD_LABELS[best].color}; padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                                        ${METHOD_LABELS[best].label}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+        resultsContainer.innerHTML = stakingHtml;
+        window.lastEqsScanParams = requestData;
+        return;
+
 
     }
 
@@ -6765,141 +4643,110 @@ function renderEqsResults(results, scanType, requestData, diagnostics) {
 window.runSpecificEqsBacktest = async function(scanType, code, optRange) {
     try {
         if (!window.lastEqsScanParams) return;
-        
+
         switchTab('tab-laboratory');
-        
-        // Sincroniza a fonte de dados do painel lateral caso seja diferente
+
+        // Sincroniza a fonte de dados do painel lateral caso seja diferente (apenas visual, para consistência da UI)
         if (window.lastEqsScanParams.data_source && document.getElementById('data-source-select')) {
             const dsSelect = document.getElementById('data-source-select');
             if (dsSelect.value !== window.lastEqsScanParams.data_source) {
                 dsSelect.value = window.lastEqsScanParams.data_source;
                 window.currentDataSource = window.lastEqsScanParams.data_source;
-                if (typeof handleDataSourceChange === 'function') {
-                    await handleDataSourceChange();
-                }
+                const topbarSelect = document.getElementById('topbar-data-source');
+                if (topbarSelect) topbarSelect.value = window.lastEqsScanParams.data_source;
             }
         }
-        
-        // Limpar filtros avançados de odds residuais para não interferir no resultado
-        const advancedOddsFields = [
-            'min-odds-h', 'max-odds-h',
-            'min-odds-d', 'max-odds-d',
-            'min-odds-a', 'max-odds-a',
-            'min-odds-over25', 'max-odds-over25',
-            'min-odds-under25', 'max-odds-under25'
-        ];
-        advancedOddsFields.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.value = '';
-                el.dispatchEvent(new Event('change'));
-            }
-        });
-    
-        document.getElementById('start-date').value = window.lastEqsScanParams.startDate;
-        document.getElementById('end-date').value = window.lastEqsScanParams.endDate;
-    
-        // Configurar min/max odds com base na otimização (se houver)
-        let minOdd = window.lastEqsScanParams.minOdds || 1.0;
-        let maxOdd = window.lastEqsScanParams.maxOdds || 2.50;
-        
+        window.currentDataSource = window.lastEqsScanParams.data_source || window.currentDataSource;
+
+        // Constrói overrideParams diretamente — sem manipular DOM checkboxes
+        const p = window.lastEqsScanParams;
+        const overrideParams = {
+            leagues: [],
+            startDate: p.startDate,
+            endDate: p.endDate,
+            market: [],
+            valueThreshold: p.valueThreshold !== undefined ? p.valueThreshold : 1.05,
+            initialBankroll: p.initialBankroll !== undefined ? p.initialBankroll : 1000.0,
+            stakingRule: p.stakingRule || 'fixed',
+            stakeValue: p.stakeValue !== undefined ? p.stakeValue : 10.0,
+            oddsSource: p.oddsSource || 'B365',
+            odds_timing: p.odds_timing || 'closing',
+            minOdds: p.minOdds || 1.0,
+            maxOdds: p.maxOdds || 2.50,
+            exchange_commission: p.exchange_commission !== undefined ? p.exchange_commission : 0.0,
+            out_of_sample: true,
+            oos_split: p.oos_split !== undefined ? p.oos_split : 20.0,
+            slippage: p.slippage !== undefined ? p.slippage : 2.0,
+            use_ml: p.use_ml !== undefined ? p.use_ml : false,
+            data_source: p.data_source,
+            futpython_api_key: p.futpython_api_key,
+            minOddsH: p.minOddsH !== undefined ? p.minOddsH : null,
+            maxOddsH: p.maxOddsH !== undefined ? p.maxOddsH : null,
+            minOddsD: p.minOddsD !== undefined ? p.minOddsD : null,
+            maxOddsD: p.maxOddsD !== undefined ? p.maxOddsD : null,
+            minOddsA: p.minOddsA !== undefined ? p.minOddsA : null,
+            maxOddsA: p.maxOddsA !== undefined ? p.maxOddsA : null,
+            minOddsOver25: p.minOddsOver25 !== undefined ? p.minOddsOver25 : null,
+            maxOddsOver25: p.maxOddsOver25 !== undefined ? p.maxOddsOver25 : null,
+            minOddsUnder25: p.minOddsUnder25 !== undefined ? p.minOddsUnder25 : null,
+            maxOddsUnder25: p.maxOddsUnder25 !== undefined ? p.maxOddsUnder25 : null
+        };
+
+        // Aplica optRange ao valueThreshold e min/max odds, se houver
         if (optRange) {
-            if (optRange.includes('EV > 1.25')) { document.getElementById('val-threshold').value = '1.25'; }
-            else if (optRange.includes('EV > 1.15')) { document.getElementById('val-threshold').value = '1.15'; }
-            else if (optRange.includes('EV > 1.10')) { document.getElementById('val-threshold').value = '1.10'; }
-            else if (optRange.includes('EV > 1.05')) { document.getElementById('val-threshold').value = '1.05'; }
-            
-            if (optRange.includes('<= 1.50') && !optRange.includes('Excluir')) { minOdd = 1.0; maxOdd = 1.50; }
-            else if (optRange.includes('1.50 - 2.00')) { minOdd = 1.50; maxOdd = 2.00; }
-            else if (optRange.includes('2.00 - 3.00')) { minOdd = 2.00; maxOdd = 3.00; }
-            else if (optRange.includes('> 3.00') && !optRange.includes('<=')) { minOdd = 3.00; maxOdd = 50.0; }
-            else if (optRange.includes('<= 3.00')) { minOdd = 1.0; maxOdd = 3.00; }
-            else if (optRange.includes('> 1.50') && !optRange.includes('<=')) { minOdd = 1.50; maxOdd = 50.0; }
-        } else {
-            document.getElementById('val-threshold').value = window.lastEqsScanParams.valueThreshold || '1.05';
+            if (optRange.includes('EV > 1.25')) overrideParams.valueThreshold = 1.25;
+            else if (optRange.includes('EV > 1.15')) overrideParams.valueThreshold = 1.15;
+            else if (optRange.includes('EV > 1.10')) overrideParams.valueThreshold = 1.10;
+            else if (optRange.includes('EV > 1.05')) overrideParams.valueThreshold = 1.05;
+
+            if (optRange.includes('<= 1.50') && !optRange.includes('Excluir')) { overrideParams.minOdds = 1.0; overrideParams.maxOdds = 1.50; }
+            else if (optRange.includes('1.50 - 2.00')) { overrideParams.minOdds = 1.50; overrideParams.maxOdds = 2.00; }
+            else if (optRange.includes('2.00 - 3.00')) { overrideParams.minOdds = 2.00; overrideParams.maxOdds = 3.00; }
+            else if (optRange.includes('> 3.00') && !optRange.includes('<=')) { overrideParams.minOdds = 3.00; overrideParams.maxOdds = 50.0; }
+            else if (optRange.includes('<= 3.00')) { overrideParams.minOdds = 1.0; overrideParams.maxOdds = 3.00; }
+            else if (optRange.includes('> 1.50') && !optRange.includes('<=')) { overrideParams.minOdds = 1.50; overrideParams.maxOdds = 50.0; }
         }
-        
-        document.getElementById('val-threshold').dispatchEvent(new Event('change'));
-    
-        document.getElementById('min-odds').value = minOdd;
-        document.getElementById('max-odds').value = maxOdd;
-    
+
+        // Determina ligas e mercados para cada tipo de scan
         if (scanType === 'markets') {
-            const scanLeagues = window.lastEqsScanParams.leagues || [];
-            document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]').forEach(cb => {
-                const shouldBeChecked = scanLeagues.some(l => l.toLowerCase() === cb.value.toLowerCase());
-                if (cb.checked !== shouldBeChecked) {
-                    cb.checked = shouldBeChecked;
-                    cb.dispatchEvent(new Event('change'));
-                }
-            });
-            
-            document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]').forEach(cb => {
-                const shouldBeChecked = (cb.value.toLowerCase() === code.toLowerCase() || cb.value.toLowerCase() === code.replace('1x2_', '').toLowerCase());
-                if (cb.checked !== shouldBeChecked) {
-                    cb.checked = shouldBeChecked;
-                    cb.dispatchEvent(new Event('change'));
-                }
-            });
+            overrideParams.leagues = p.leagues || [];
+            overrideParams.market = [code];
         } else if (scanType === 'leagues') {
-            document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]').forEach(cb => {
-                const shouldBeChecked = (cb.value.toLowerCase() === code.toLowerCase());
-                if (cb.checked !== shouldBeChecked) {
-                    cb.checked = shouldBeChecked;
-                    cb.dispatchEvent(new Event('change'));
-                }
-            });
-            
-            const scanMarkets = window.lastEqsScanParams.market || [];
-            document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]').forEach(cb => {
-                let shouldBeChecked = false;
-                if (scanMarkets.length > 0) {
-                    shouldBeChecked = scanMarkets.some(m => m.toLowerCase() === cb.value.toLowerCase() || m.toLowerCase() === cb.value.replace('1x2_', '').toLowerCase());
-                } else {
-                    shouldBeChecked = true;
-                }
-                if (cb.checked !== shouldBeChecked) {
-                    cb.checked = shouldBeChecked;
-                    cb.dispatchEvent(new Event('change'));
-                }
-            });
+            overrideParams.leagues = [code];
+            overrideParams.market = p.market && p.market.length > 0 ? p.market : null; // null = all markets
         } else if (scanType === 'combinations') {
             const parts = code.split('|');
             if (parts.length === 2) {
-                const leagueCode = parts[0];
-                const marketCode = parts[1];
-                
-                document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]').forEach(cb => {
-                    const shouldBeChecked = (cb.value.toLowerCase() === leagueCode.toLowerCase());
-                    if (cb.checked !== shouldBeChecked) {
-                        cb.checked = shouldBeChecked;
-                        cb.dispatchEvent(new Event('change'));
-                    }
-                });
-                document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]').forEach(cb => {
-                    const shouldBeChecked = (cb.value.toLowerCase() === marketCode.toLowerCase() || cb.value.toLowerCase() === marketCode.replace('1x2_', '').toLowerCase());
-                    if (cb.checked !== shouldBeChecked) {
-                        cb.checked = shouldBeChecked;
-                        cb.dispatchEvent(new Event('change'));
-                    }
-                });
+                overrideParams.leagues = [parts[0]];
+                overrideParams.market = [parts[1]];
             }
         }
-    
-        if (typeof onMarketSelectionChange === 'function') {
-            onMarketSelectionChange();
-        }
-        
+
+        // Atualiza a sidebar visualmente para refletir o estado (sem disparar eventos que causem fetch)
+        document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]').forEach(cb => {
+            const shouldBeChecked = overrideParams.leagues.some(l => l.toLowerCase() === cb.value.toLowerCase());
+            cb.checked = shouldBeChecked;
+        });
+        document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]').forEach(cb => {
+            const shouldBeChecked = overrideParams.market && overrideParams.market.length > 0
+                ? overrideParams.market.some(m => (m || '').toLowerCase() === cb.value.toLowerCase() || (m || '').toLowerCase() === cb.value.replace('1x2_', '').toLowerCase())
+                : false;
+            cb.checked = shouldBeChecked;
+        });
+        // Atualiza campos visuais do formulário
+        document.getElementById('start-date').value = overrideParams.startDate || '';
+        document.getElementById('end-date').value = overrideParams.endDate || '';
+        document.getElementById('val-threshold').value = overrideParams.valueThreshold;
+        document.getElementById('min-odds').value = overrideParams.minOdds;
+        document.getElementById('max-odds').value = overrideParams.maxOdds;
         const oosToggle = document.getElementById('oos-toggle');
-        if (oosToggle && !oosToggle.checked) {
-            oosToggle.checked = true;
-            oosToggle.dispatchEvent(new Event('change'));
+        if (oosToggle && oosToggle.checked !== overrideParams.out_of_sample) {
+            oosToggle.checked = overrideParams.out_of_sample;
         }
-        
-        setTimeout(() => {
-            runBacktest();
-        }, 200);
-        
+
+        // Chama runBacktest diretamente com overrideParams — sem setTimeout, sem depender de DOM
+        runBacktest(overrideParams);
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
         showToast("Erro ao configurar simulação específica: " + err.message, "error");
@@ -6910,1330 +4757,6 @@ window.runSpecificEqsBacktest = async function(scanType, code, optRange) {
 
 
 // ==========================================================================
-
-// History / Saved Strategies Logic
-
-// ==========================================================================
-
-
-
-function openSaveStrategyModal() {
-
-    if (!lastBacktestParams || !lastBacktestSummary) {
-
-        showToast("Rode um backtest primeiro para salvar a estratégia.", "error");
-
-        return;
-
-    }
-
-    document.getElementById('save-strategy-modal').style.display = 'flex';
-
-    
-
-    // Auto-fill strategy name using the live banner displayed in the header
-    const leagueText  = (document.getElementById('active-leagues-text') || {}).innerText || '';
-    const marketText  = (document.getElementById('active-market-text')  || {}).innerText || '';
-    const oddsText    = (document.getElementById('active-odds-text')    || {}).innerText || '';
-    const evText      = (document.getElementById('active-ev-text')      || {}).innerText || '';
-
-    // Build a clean name from the visible pieces, skipping empty parts
-    const nameParts = [];
-    if (leagueText && leagueText !== 'N/A') nameParts.push(leagueText.trim());
-    if (marketText && marketText !== 'N/A') {
-        // Strip internal codes like "(odds_ft_under45)FD √FP" — keep only human label
-        const cleanMarket = marketText.split('(')[0].trim();
-        if (cleanMarket) nameParts.push(cleanMarket);
-    }
-    if (oddsText) nameParts.push('Odds: ' + oddsText.trim());
-    if (evText)   nameParts.push('EV: '   + evText.trim());
-
-    // Fallback to parameter-based name if banner is empty
-    const evVal = lastBacktestParams.valueThreshold || '1.05';
-    const minO  = lastBacktestParams.minOdds || 1.0;
-    const maxO  = lastBacktestParams.maxOdds || 2.50;
-    const suggestedName = nameParts.length > 0
-        ? nameParts.join(' | ')
-        : `Estratégia (EV: ${evVal} | Odds: ${minO.toFixed(2)}-${maxO.toFixed(2)})`;
-
-    document.getElementById('save-strategy-name').value = suggestedName;
-
-    document.getElementById('save-strategy-name').focus();
-
-}
-
-
-
-function closeSaveStrategyModal() {
-
-    document.getElementById('save-strategy-modal').style.display = 'none';
-
-}
-
-
-
-async function submitSaveStrategy() {
-
-    const nameInput = document.getElementById('save-strategy-name').value.trim();
-
-    const finalName = nameInput || "Estratégia " + new Date().toLocaleDateString('pt-BR');
-
-    
-
-    const payload = {
-        name: finalName,
-        params: lastBacktestParams,
-        summary: lastBacktestSummary.summary,
-        created_at: new Date().toISOString()
-    };
-
-
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/history`, {
-
-            method: 'POST',
-
-            headers: { 'Content-Type': 'application/json' },
-
-            body: JSON.stringify(payload)
-
-        });
-
-        
-
-        if (!res.ok) throw new Error("Erro ao salvar estratégia.");
-
-        // Persist to localStorage so it survives server restarts
-        const saved = await res.json();
-        if (saved && saved.entry) lsAddItem(saved.entry);
-
-        showToast("Estratégia salva com sucesso no Histórico!", "success");
-
-        closeSaveStrategyModal();
-
-        await loadHistoryTab();
-
-    } catch (err) {
-
-        console.error(err);
-
-        showToast(err.message, "error");
-
-    }
-
-}
-
-
-
-async function loadHistoryTab() {
-
-    const grid = document.getElementById('history-grid');
-
-    const emptyState = document.getElementById('history-empty');
-
-    
-
-    grid.innerHTML = '<div style="text-align:center; grid-column: 1/-1;"><div class="loading-spinner"></div> Carregando histórico...</div>';
-
-    emptyState.style.display = 'none';
-
-    
-
-    try {
-
-        // Load from server
-        let serverHistory = [];
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/history?t=${Date.now()}`, { cache: 'no-store' });
-            serverHistory = await res.json();
-        } catch {}
-
-        // Load from localStorage (survives server restarts)
-        const localHistory = lsLoadHistory();
-
-        // Find items in localStorage that the server doesn't have (lost after redeploy)
-        const serverIds = new Set(serverHistory.map(x => x.id));
-        const localOnly = localHistory.filter(x => !serverIds.has(x.id));
-
-        // For items that exist on both sides, check if is_tg_active status differs.
-        // If they differ, the local state (user setting stored in browser) wins, and we update/sync it to the server.
-        const serverMap = new Map(serverHistory.map(x => [x.id, x]));
-        const itemsToUpdateOnServer = [];
-        for (const localItem of localHistory) {
-            const serverItem = serverMap.get(localItem.id);
-            if (serverItem) {
-                const localActive = !!localItem.is_tg_active;
-                const serverActive = !!serverItem.is_tg_active;
-                if (localActive !== serverActive) {
-                    serverItem.is_tg_active = localActive;
-                    itemsToUpdateOnServer.push(serverItem);
-                }
-            }
-        }
-
-        // Sync missing items back to server silently
-        if (localOnly.length > 0) {
-            await lsSyncToServer(localOnly);
-        }
-
-        // Sync active state mismatches back to server silently
-        if (itemsToUpdateOnServer.length > 0) {
-            await lsSyncToServer(itemsToUpdateOnServer);
-        }
-
-        // Merge: localOnly items + server items
-        const history = [...localOnly, ...serverHistory];
-
-        // Keep localStorage up-to-date with the merged set
-        lsSaveHistory(history);
-        window.loadedHistoryStrategies = history;
-
-        applyHistoryFilters();
-
-        
-
-    } catch (err) {
-
-        console.error(err);
-
-        grid.innerHTML = `<div style="color: var(--danger); padding: 20px;">Erro ao carregar o histórico: ${err.message}</div>`;
-
-    }
-
-}
-
-function applyHistoryFilters() {
-    if (!window.loadedHistoryStrategies) return;
-
-    let items = [...window.loadedHistoryStrategies];
-
-    // 1. Filter by Type
-    const filterType = document.getElementById('history-filter-type')?.value || 'all';
-    if (filterType === 'strategy') {
-        items = items.filter(x => x.type !== 'portfolio' && (!x.params || !x.params.strategy_ids));
-    } else if (filterType === 'portfolio') {
-        items = items.filter(x => x.type === 'portfolio' || (x.params && x.params.strategy_ids));
-    }
-
-    // 2. Filter by Market
-    const filterMarket = document.getElementById('history-filter-market')?.value || 'all';
-    if (filterMarket !== 'all') {
-        items = items.filter(x => {
-            const p = x.params || {};
-            if (x.type === 'portfolio' || p.strategy_ids) {
-                // If it is a portfolio, check if any strategy in loaded history matches
-                const subIds = p.strategy_ids || [];
-                const subStrategies = window.loadedHistoryStrategies.filter(sub => subIds.includes(sub.id));
-                return subStrategies.some(sub => {
-                    const subMarket = sub.params?.market;
-                    if (Array.isArray(subMarket)) return subMarket.includes(filterMarket);
-                    return subMarket === filterMarket;
-                });
-            } else {
-                const mk = p.market;
-                if (Array.isArray(mk)) return mk.includes(filterMarket);
-                return mk === filterMarket;
-            }
-        });
-    }
-
-    // 3. Filter by Search Query (name / league / market)
-    const searchQuery = document.getElementById('history-filter-search')?.value.toLowerCase().trim() || '';
-    if (searchQuery) {
-        items = items.filter(x => {
-            const name = (x.name || '').toLowerCase();
-            const p = x.params || {};
-            
-            // Check leagues
-            let leaguesStr = '';
-            if (p.leagues && p.leagues.length > 0) {
-                leaguesStr = p.leagues.map(code => {
-                    const found = window.AVAILABLE_LEAGUES ? window.AVAILABLE_LEAGUES.find(l => l.code === code) : null;
-                    return found ? found.name : code;
-                }).join(', ').toLowerCase();
-            }
-
-            // Check markets
-            let marketsStr = '';
-            if (p.market) {
-                marketsStr = (Array.isArray(p.market) ? p.market.join(', ') : p.market).toLowerCase();
-            }
-
-            // Check sub-strategies leagues/markets if portfolio
-            if (x.type === 'portfolio' || p.strategy_ids) {
-                const subIds = p.strategy_ids || [];
-                const subStrategies = window.loadedHistoryStrategies.filter(sub => subIds.includes(sub.id));
-                const subLeagues = subStrategies.map(sub => {
-                    if (sub.params?.leagues) {
-                        return sub.params.leagues.map(code => {
-                            const found = window.AVAILABLE_LEAGUES ? window.AVAILABLE_LEAGUES.find(l => l.code === code) : null;
-                            return found ? found.name : code;
-                        }).join(' ');
-                    }
-                    return '';
-                }).join(' ').toLowerCase();
-                
-                const subMarkets = subStrategies.map(sub => {
-                    if (sub.params?.market) {
-                        return Array.isArray(sub.params.market) ? sub.params.market.join(' ') : sub.params.market;
-                    }
-                    return '';
-                }).join(' ').toLowerCase();
-
-                return name.includes(searchQuery) || subLeagues.includes(searchQuery) || subMarkets.includes(searchQuery);
-            }
-
-            return name.includes(searchQuery) || leaguesStr.includes(searchQuery) || marketsStr.includes(searchQuery);
-        });
-    }
-
-    // 4. Sort By
-    const sortBy = document.getElementById('history-sort-by')?.value || 'date-desc';
-    items.sort((a, b) => {
-        const sA = a.summary || {};
-        const sB = b.summary || {};
-        
-        switch (sortBy) {
-            case 'date-desc':
-                return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-            case 'date-asc':
-                return new Date(a.created_at || 0) - new Date(b.created_at || 0);
-            case 'name-asc':
-                return (a.name || '').localeCompare(b.name || '');
-            case 'profit-desc':
-                return (sB.net_profit || 0) - (sA.net_profit || 0);
-            case 'winrate-desc':
-                return (sB.win_rate || 0) - (sA.win_rate || 0);
-            case 'roi-desc':
-                return (sB.roi || 0) - (sA.roi || 0);
-            default:
-                return 0;
-        }
-    });
-
-    renderHistoryGrid(items);
-}
-
-function renderHistoryGrid(history) {
-    const grid = document.getElementById('history-grid');
-    const emptyState = document.getElementById('history-empty');
-    if (!grid) return;
-
-    if (!history || history.length === 0) {
-        grid.innerHTML = '';
-        emptyState.style.display = 'block';
-        return;
-    }
-    emptyState.style.display = 'none';
-    grid.innerHTML = '';
-
-    history.forEach(item => {
-        // Guarantee correct timezone parsing if it comes from the python backend without Z
-        let dtStr = item.created_at;
-        if (dtStr && !dtStr.endsWith('Z') && !dtStr.includes('+')) {
-            // If it contains a timezone-naive ISO string from Python, append 'Z' to treat as UTC
-            dtStr += 'Z';
-        }
-        const dateStr = new Date(dtStr).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-
-        const s = item.summary || {};
-        const p = item.params || {};
-
-        const card = document.createElement('div');
-        card.className = 'eval-card glassmorphism';
-        card.style.display = 'flex';
-        card.style.flexDirection = 'column';
-        card.style.justifyContent = 'space-between';
-
-        if (item.type === 'portfolio' || (p && p.strategy_ids)) {
-            // Portfolio Card with premium distinct purple styling
-            card.style.borderLeft = '5px solid #a78bfa'; // Glowing purple border
-            card.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(20, 15, 45, 0.6) 100%)';
-            card.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-            card.style.boxShadow = '0 8px 32px 0 rgba(139, 92, 246, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.05)';
-            
-            const isActive = item.is_tg_active === true;
-            const activeBadge = isActive ? `<span style="font-size: 11px; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 3px 6px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.3);"><i class="fa-brands fa-telegram"></i> Ativo no Robô</span>` : '';
-            const btnActiveHtml = isActive ? 
-                `<button class="btn-clear" onclick="toggleActivePortfolio('${item.id}')" style="flex: 1; padding: 6px; font-size: 13px; color: var(--text-primary); background: rgba(255,255,255,0.05);"><i class="fa-solid fa-bell-slash"></i> Desativar</button>` :
-                `<button class="btn-scanner" onclick="toggleActivePortfolio('${item.id}')" style="flex: 1; padding: 6px; font-size: 13px; margin: 0; background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981;"><i class="fa-brands fa-telegram"></i> Ativar no Robô</button>`;
-
-            card.innerHTML = `
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" class="history-select-checkbox" data-type="portfolio" value="${item.id}" style="width: 18px; height: 18px; cursor: pointer;">
-                                <i class="fa-solid fa-layer-group" style="color: #c084fc; font-size: 18px;"></i>
-                                <h4 style="margin: 0; color: #f3e8ff; font-size: 16px; font-weight: 700;">${item.name}</h4>
-                            </div>
-                            <div>${activeBadge}</div>
-                        </div>
-                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
-                            <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #e9d5ff; background: rgba(168, 85, 247, 0.3); border: 1px solid rgba(168, 85, 247, 0.5); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.8px;">Portfólio</span>
-                            <span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px;">${dateStr}</span>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-bottom: 15px; font-size: 13px; color: #e9d5ff;">
-                        <div style="margin-bottom: 4px;"><strong>Tipo:</strong> <span style="color:#c084fc; font-weight: 600;">Portfólio Combinado</span></div>
-                        <div style="margin-bottom: 4px;"><strong>Estratégias:</strong> ${p.strategy_ids ? p.strategy_ids.length : 0} combinadas</div>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.15); padding: 10px; border-radius: 8px;">
-                        <div>
-                            <div style="font-size: 11px; color: #d8b4fe; text-transform: uppercase;">Win Rate</div>
-                            <div style="font-size: 15px; font-weight: 700; color: ${s.win_rate > 50 ? 'var(--success)' : 'var(--text-primary)'};">${s.win_rate}%</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 11px; color: #d8b4fe; text-transform: uppercase;">Lucro</div>
-                            <div style="font-size: 15px; font-weight: 700; color: ${s.net_profit > 0 ? 'var(--success)' : 'var(--danger)'};">$${s.net_profit}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 11px; color: #d8b4fe; text-transform: uppercase;">ROI</div>
-                            <div style="font-size: 15px; font-weight: 700; color: ${s.roi > 0 ? 'var(--success)' : 'var(--danger)'};">${s.roi}%</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 11px; color: #d8b4fe; text-transform: uppercase;">Drawdown</div>
-                            <div style="font-size: 15px; font-weight: 700; color: var(--danger);">${s.max_drawdown}%</div>
-                        </div>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 10px; border-top: 1px solid rgba(139, 92, 246, 0.15); padding-top: 15px; flex-wrap: wrap;">
-                    <button class="btn-clear" onclick="deleteHistoryStrategy('${item.id}')" style="flex: 1; padding: 6px; font-size: 13px; color: var(--danger);"><i class="fa-solid fa-trash"></i> Excluir</button>
-                    <button class="btn-scanner" onclick="loadPortfolio('${item.id}')" style="flex: 1; padding: 6px; font-size: 13px; margin: 0; background: rgba(168, 85, 247, 0.25); border-color: #a855f7; color: #fff;"><i class="fa-solid fa-check-square"></i> Abrir</button>
-                    ${btnActiveHtml}
-                </div>
-            `;
-            grid.appendChild(card);
-            return;
-        }
-
-        card.style.borderLeft = '4px solid var(--primary)';
-
-        // Leagues format
-        let leaguesTxt = "Todas";
-        if (p.leagues && p.leagues.length > 0) {
-            const names = p.leagues.map(code => {
-                const found = window.AVAILABLE_LEAGUES ? window.AVAILABLE_LEAGUES.find(l => l.code === code) : null;
-                return found ? found.name : code;
-            });
-            leaguesTxt = names.length > 3 ? `${names.slice(0,3).join(', ')} e +${names.length - 3}` : names.join(', ');
-        }
-
-        let ruleText = "Desconhecida";
-        if (p.stakingRule === 'fixed') {
-            ruleText = `Fixo ($${p.stakeValue || 10.0})`;
-        } else if (p.stakingRule === 'proportional') {
-            ruleText = `Proporcional (${p.stakeValue || 2.0}%)`;
-        } else if (p.stakingRule === 'kelly') {
-            const frac = p.stakeValue || 0.25;
-            let fracName = "";
-            if (frac === 1) fracName = "Full";
-            else {
-                const inv = 1 / frac;
-                fracName = `1/${inv.toFixed(0)}`;
-            }
-            ruleText = `Kelly (${fracName} - ${frac * 100}%)`;
-        }
-
-        let sourceText = "Football-Data CSV";
-        if (p.data_source === 'futpython') {
-            sourceText = "Futpython API";
-        }
-
-        const isActive = item.is_tg_active === true;
-        const activeBadge = isActive ? `<span style="font-size: 11px; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 3px 6px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.3);"><i class="fa-brands fa-telegram"></i> Ativo no Robô</span>` : '';
-        const btnActiveHtml = isActive ? 
-            `<button class="btn-clear" onclick="toggleActivePortfolio('${item.id}')" style="flex: 1; padding: 6px; font-size: 13px; color: var(--text-primary); background: rgba(255,255,255,0.05);"><i class="fa-solid fa-bell-slash"></i> Desativar</button>` :
-            `<button class="btn-scanner" onclick="toggleActivePortfolio('${item.id}')" style="flex: 1; padding: 6px; font-size: 13px; margin: 0; background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981;"><i class="fa-brands fa-telegram"></i> Ativar no Robô</button>`;
-
-        card.innerHTML = `
-            <div>
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="checkbox" class="portfolio-checkbox history-select-checkbox" data-type="strategy" value="${item.id}" style="width: 18px; height: 18px; cursor: pointer;">
-                            <h4 style="margin: 0; color: var(--text-primary); font-size: 16px;">${item.name}</h4>
-                        </div>
-                        <div>${activeBadge}</div>
-                    </div>
-                    <span style="font-size: 12px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px;">${dateStr}</span>
-                </div>
-                
-                <div style="margin-bottom: 15px; font-size: 13px; color: var(--text-secondary); display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;">
-                    <div><strong>Mercado:</strong> <span style="color:var(--info);">${p.market || 'Desconhecido'}</span></div>
-                    <div><strong>Fonte:</strong> <span style="color:#a78bfa;">${sourceText}</span></div>
-                    <div style="grid-column: 1 / -1;"><strong>Ligas:</strong> ${leaguesTxt}</div>
-                    <div><strong>Odds:</strong> ${p.minOdds} a ${p.maxOdds}</div>
-                    <div><strong>Gestão:</strong> <span style="color:#fbbf24;">${ruleText}</span></div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
-                    <div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Win Rate</div>
-                        <div style="font-size: 14px; font-weight: bold; color: ${s.win_rate != null && s.win_rate >= 50 ? 'var(--success)' : 'var(--warning)'};">${s.win_rate != null ? s.win_rate.toFixed(1) + '%' : '--'}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Lucro</div>
-                        <div style="font-size: 14px; font-weight: bold; color: ${s.net_profit != null && s.net_profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${s.net_profit != null ? '$' + s.net_profit.toFixed(2) : '--'}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 11px; color: var(--text-muted);">ROI</div>
-                        <div style="font-size: 14px; font-weight: bold; color: ${s.roi != null && s.roi >= 0 ? 'var(--success)' : 'var(--danger)'};">${s.roi != null ? s.roi.toFixed(2) + '%' : '--'}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Drawdown</div>
-                        <div style="font-size: 14px; font-weight: bold; color: var(--danger);">${s.max_drawdown != null ? s.max_drawdown.toFixed(1) + '%' : '--'}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Sharpe</div>
-                        <div style="font-size: 14px; font-weight: bold; color: ${s.sharpe_ratio != null && s.sharpe_ratio >= 1 ? 'var(--success)' : 'var(--text-primary)'};">${s.sharpe_ratio != null ? s.sharpe_ratio.toFixed(2) : '--'}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 11px; color: var(--text-muted);">Apostas</div>
-                        <div style="font-size: 14px; font-weight: bold; color: var(--text-primary);">${s.total_bets != null ? s.total_bets : '--'}</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap;">
-                <button class="btn-clear" onclick="deleteHistoryStrategy('${item.id}')" style="flex: 1; justify-content: center; color: var(--danger); border-color: rgba(239, 68, 68, 0.2); padding: 6px; font-size: 13px;"><i class="fa-solid fa-trash-can"></i> Excluir</button>
-                <button class="btn-scanner" onclick="reloadStrategyById('${item.id}')" style="flex: 1; justify-content: center; padding: 6px; font-size: 13px;"><i class="fa-solid fa-play"></i> Carregar</button>
-                ${btnActiveHtml}
-            </div>
-        `;
-        grid.appendChild(card);
-    });
-}
-
-async function deleteHistoryStrategy(id) {
-
-    if (!confirm("Tem certeza que deseja excluir esta estratégia salva?")) return;
-
-    
-
-    try {
-
-        const res = await fetch(`${API_BASE_URL}/api/history/${id}`, { method: 'DELETE' });
-
-        if (!res.ok) throw new Error("Falha ao excluir.");
-
-        
-
-        // Remove from localStorage too
-        lsDeleteItem(id);
-        showToast("Estratégia excluída.", "success");
-        loadHistoryTab();
-
-    } catch (err) {
-        // Even if server fails, remove from localStorage
-        lsDeleteItem(id);
-        loadHistoryTab();
-        showToast(err.message, "error");
-    }
-}
-
-
-
-async function reloadStrategyById(id) {
-    try {
-        console.log("reloadStrategyById called with id:", id);
-        let strategy = null;
-        if (window.loadedHistoryStrategies) {
-            strategy = window.loadedHistoryStrategies.find(s => s.id === id);
-        }
-        if (!strategy) {
-            const local = lsLoadHistory();
-            strategy = local.find(s => s.id === id);
-        }
-        if (!strategy) {
-            throw new Error("Estratégia não encontrada no histórico.");
-        }
-        console.log("Found strategy params:", strategy.params);
-        await reloadStrategy(strategy.params);
-    } catch (err) {
-        console.error("Erro ao carregar estratégia por ID:", err);
-        showToast("Erro ao carregar estratégia: " + err.message, "error");
-    }
-}
-
-window.reloadStrategyById = reloadStrategyById;
-window.reloadStrategy = reloadStrategy;
-
-async function reloadStrategy(params) {
-
-    if (!params) {
-        console.warn("reloadStrategy called without params");
-        return;
-    }
-
-    try {
-        console.log("reloadStrategy executing with params:", params);
-
-        // Switch to Laboratory Tab
-        switchTab('tab-laboratory');
-
-        // Fill data source first and wait for leagues to load
-        if (params.data_source && document.getElementById('data-source-select')) {
-            const dsSelect = document.getElementById('data-source-select');
-            console.log("Setting data source to:", params.data_source);
-            if (dsSelect.value !== params.data_source) {
-                dsSelect.value = params.data_source;
-                if (typeof handleDataSourceChange === 'function') {
-                    await handleDataSourceChange();
-                }
-            }
-        }
-
-        // Force-load leagues if the checkboxes container is currently empty
-        const leaguesList = document.getElementById('leagues-checkbox-list');
-        const hasLeaguesLoaded = leaguesList && leaguesList.querySelectorAll('input[type="checkbox"]').length > 0;
-        if (!hasLeaguesLoaded && typeof loadLeagues === 'function') {
-            console.log("Leagues not loaded in DOM, calling loadLeagues");
-            await loadLeagues();
-        }
-
-        // Fill basic fields
-        if (params.market) {
-            const marketsToSelect = Array.isArray(params.market) ? params.market : [params.market];
-            const marketCheckboxes = document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]');
-            if (marketCheckboxes.length > 0) {
-                marketCheckboxes.forEach(cb => {
-                    cb.checked = marketsToSelect.includes(cb.value);
-                });
-            }
-            if (typeof onMarketSelectionChange === 'function') {
-                onMarketSelectionChange();
-            }
-        }
-        
-        if (params.minOdds !== undefined) document.getElementById('min-odds').value = params.minOdds;
-        if (params.maxOdds !== undefined) document.getElementById('max-odds').value = params.maxOdds;
-        
-        if (params.startDate) document.getElementById('start-date').value = params.startDate;
-        if (params.endDate) document.getElementById('end-date').value = params.endDate;
-        
-        if (params.leagues && Array.isArray(params.leagues)) {
-            // Uncheck all first
-            document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"], input[name="league-group"]').forEach(cb => cb.checked = false);
-            // Check saved
-            params.leagues.forEach(code => {
-                let cb = document.getElementById('league-' + code);
-                if (!cb) {
-                    try {
-                        cb = document.querySelector(`#leagues-checkbox-list input[value="${code}"], input[name="league-group"][value="${code}"]`);
-                    } catch (e) {
-                        const allCbs = document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"], input[name="league-group"]');
-                        for (const input of allCbs) {
-                            if (input.value === code || input.id === 'league-' + code) {
-                                cb = input;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (cb) cb.checked = true;
-            });
-            if (typeof updateLeagueLabel === 'function') updateLeagueLabel();
-        }
-        
-        // Fill EV and Gestão fields
-        if (params.valueThreshold !== undefined && document.getElementById('val-threshold')) document.getElementById('val-threshold').value = params.valueThreshold;
-        if (params.initialBankroll !== undefined && document.getElementById('init-bankroll')) document.getElementById('init-bankroll').value = params.initialBankroll;
-        
-        if (params.stakingRule) {
-            const srEl = document.getElementById('stake-rule');
-            if (srEl) {
-                let mappedRule = params.stakingRule;
-                let mappedFraction = params.stakeValue;
-                
-                if (params.stakingRule.startsWith('kelly')) {
-                    mappedRule = 'kelly';
-                    if (params.stakingRule === 'kelly_half') mappedFraction = 0.5;
-                    else if (params.stakingRule === 'kelly_quarter') mappedFraction = 0.25;
-                    else if (params.stakingRule === 'kelly_eighth') mappedFraction = 0.125;
-                    else if (params.stakingRule === 'kelly_sixteenth') mappedFraction = 0.0625;
-                }
-                
-                srEl.value = mappedRule;
-                srEl.dispatchEvent(new Event('change'));
-                
-                if (mappedRule === 'kelly' && document.getElementById('kelly-fraction')) {
-                    const kf = document.getElementById('kelly-fraction');
-                    kf.value = mappedFraction;
-                    // Fire input event to trigger UI text update next to slider
-                    kf.dispatchEvent(new Event('input'));
-                } else if (document.getElementById('stake-value')) {
-                    document.getElementById('stake-value').value = mappedFraction;
-                }
-            }
-        }
-        
-        if (params.oddsSource && document.getElementById('odds-source')) document.getElementById('odds-source').value = params.oddsSource;
-        if (params.odds_timing && document.getElementById('odds-timing')) document.getElementById('odds-timing').value = params.odds_timing;
-        if (params.exchange_commission !== undefined && document.getElementById('exchange-commission')) document.getElementById('exchange-commission').value = params.exchange_commission;
-        
-        if (params.out_of_sample !== undefined && document.getElementById('oos-toggle')) document.getElementById('oos-toggle').checked = params.out_of_sample;
-        if (params.use_ml !== undefined && document.getElementById('use-ml-toggle')) document.getElementById('use-ml-toggle').checked = params.use_ml;
-
-        // Clean & set sub-market odds filters (minOddsH, maxOddsH, etc.)
-        const subOddsFields = [
-            { param: 'minOddsH', id: 'min-odds-h' },
-            { param: 'maxOddsH', id: 'max-odds-h' },
-            { param: 'minOddsD', id: 'min-odds-d' },
-            { param: 'maxOddsD', id: 'max-odds-d' },
-            { param: 'minOddsA', id: 'min-odds-a' },
-            { param: 'maxOddsA', id: 'max-odds-a' },
-            { param: 'minOddsOver25', id: 'min-odds-over25' },
-            { param: 'maxOddsOver25', id: 'max-odds-over25' },
-            { param: 'minOddsUnder25', id: 'min-odds-under25' },
-            { param: 'maxOddsUnder25', id: 'max-odds-under25' }
-        ];
-        subOddsFields.forEach(f => {
-            const el = document.getElementById(f.id);
-            if (el) {
-                el.value = (params[f.param] !== undefined && params[f.param] !== null) ? params[f.param] : '';
-            }
-        });
-
-        // Run backtest
-        showToast("Carregando estratégia...", "info");
-
-        setTimeout(() => {
-            runBacktest(params);
-        }, 100);
-
-    } catch (err) {
-        console.error("Erro ao preencher parâmetros da estratégia:", err);
-        showToast("Erro ao carregar parâmetros da estratégia: " + err.message, "error");
-    }
-}
-
-
-
-
-
-
-
-// --- Steam Moves Radar ---
-async function runSteamScan() {
-    try {
-        const tableContainer = document.getElementById('steam-table-container');
-        const overlay = document.getElementById('steam-loading-overlay');
-        
-        // Pegar filtros
-        const leagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked')).map(cb => cb.value);
-        const startDate = document.getElementById('start-date').value;
-        const endDate = document.getElementById('end-date').value;
-        const markets = Array.from(document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]:checked')).map(cb => cb.value);
-        const minDropPct = parseFloat(document.getElementById('val-drop-pct').value || 5.0);
-        const stakeValue = parseFloat(document.getElementById('stake-value').value || 10.0);
-        
-        if (leagues.length === 0) {
-            alert("Por favor, selecione pelo menos uma liga para o Radar de Smart Money.");
-            return;
-        }
-
-        if (window.currentDataSource === 'futpython') {
-            alert("O Backtest de Queda de Odds (Modo Laboratório) requer dados históricos de abertura e fechamento (Max/Avg/Pinnacle) para detectar quedas de cotações.\n\nEsses dados estão disponíveis apenas na base de dados Padrão Global (Football-Data).\n\nA base da FutPythonTrader possui apenas as odds finais. Use o 'Radar Ao Vivo' (abaixo) para monitorar as quedas do dia em tempo real!");
-            return;
-        }
-        
-        tableContainer.innerHTML = '';
-        overlay.style.display = 'block';
-    } catch (e) {
-        alert("Erro no código do botão: " + e.message);
-        return;
-    }
-    
-    const tableContainer = document.getElementById('steam-table-container');
-    const overlay = document.getElementById('steam-loading-overlay');
-    const leagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked')).map(cb => cb.value);
-    const startDate = document.getElementById('start-date').value;
-    const endDate = document.getElementById('end-date').value;
-    const markets = Array.from(document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]:checked')).map(cb => cb.value);
-    const minDropPct = parseFloat(document.getElementById('val-drop-pct').value || 5.0);
-    const stakeValue = parseFloat(document.getElementById('stake-value').value || 10.0);
-
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/scan_steam_moves`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                leagues: leagues,
-                startDate: startDate,
-                endDate: endDate,
-                markets: markets.length > 0 ? markets : ['home', 'away', 'draw'],
-                minDropPct: minDropPct,
-                stakeValue: stakeValue,
-                data_source: window.currentDataSource,
-                futpython_api_key: window.futpythonApiKey
-            })
-        });
-        
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || "Erro na API de Steam Moves");
-        
-        renderSteamTable(data.scan_results || []);
-    } catch (err) {
-        tableContainer.innerHTML = `<div style="padding:20px; color:var(--danger); text-align:center;">Erro: ${err.message}</div>`;
-    } finally {
-        overlay.style.display = 'none';
-    }
-}
-
-function clearSteamScan() {
-    document.getElementById('steam-table-container').innerHTML = '';
-}
-
-function renderSteamTable(results) {
-    const container = document.getElementById('steam-table-container');
-    if (!results || results.length === 0) {
-        container.innerHTML = `<div class="info-alert" style="padding: 20px; text-align: center; color: var(--text-muted);">
-            <i class="fa-solid fa-satellite-dish" style="font-size: 24px; margin-bottom: 10px;"></i>
-            <p>Nenhum Steam Move detectado com os filtros atuais.</p>
-        </div>`;
-        return;
-    }
-    
-    // Sort by profit descending
-    results.sort((a, b) => b.net_profit - a.net_profit);
-    
-    let html = `
-        <table class="radar-smart-table" style="width: 100%; margin-top: 15px;">
-            <thead>
-                <tr>
-                    <th style="text-align: left;">Nicho</th>
-                    <th>Apostas Feitas</th>
-                    <th>Drop Médio (%)</th>
-                    <th>Confiança</th>
-                    <th>Taxa de Acerto</th>
-                    <th>ROI</th>
-                    <th>Lucro Líquido</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    results.forEach(r => {
-        const isProfit = r.net_profit > 0;
-        const codeParts = r.code.split('|');
-        const leagueName = (window.AVAILABLE_LEAGUES && window.AVAILABLE_LEAGUES.find(l => l.code === codeParts[0])) ? 
-            window.AVAILABLE_LEAGUES.find(l => l.code === codeParts[0]).name : codeParts[0];
-            
-        let rowGlowClass = '';
-        if (r.confidence_level === 'Alta') rowGlowClass = 'radar-row-glow-alta';
-        else if (r.confidence_level === 'Média') rowGlowClass = 'radar-row-glow-media';
-        else rowGlowClass = 'radar-row-glow-baixa';
-            
-        let confBorderColor = 'rgba(255, 255, 255, 0.1)';
-        let confGlowColor = 'rgba(255, 255, 255, 0.02)';
-        let confTextColor = '#9ca3af';
-        let confIcon = 'fa-circle-question';
-        
-        if (r.confidence_level === 'Alta') {
-            confBorderColor = '#10b981';
-            confGlowColor = 'rgba(16, 185, 129, 0.05)';
-            confTextColor = '#10b981';
-            confIcon = 'fa-circle-check';
-        } else if (r.confidence_level === 'Média') {
-            confBorderColor = '#f59e0b';
-            confGlowColor = 'rgba(245, 158, 11, 0.05)';
-            confTextColor = '#f59e0b';
-            confIcon = 'fa-circle-exclamation';
-        } else if (r.confidence_level === 'Baixa') {
-            confBorderColor = '#ef4444';
-            confGlowColor = 'rgba(239, 68, 68, 0.05)';
-            confTextColor = '#ef4444';
-            confIcon = 'fa-triangle-exclamation';
-        }
-        
-        const confidenceHTML = `
-            <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 12px; border: 1px solid ${confBorderColor}; background: ${confGlowColor}; box-shadow: 0 0 10px ${confGlowColor}; min-width: 140px; box-sizing: border-box;">
-                <div style="display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 11px; color: ${confTextColor}; text-transform: uppercase; letter-spacing: 0.5px;">
-                    <i class="fa-solid ${confIcon}"></i>
-                    <span>${r.confidence_level || 'BAIXA'}</span>
-                </div>
-                <div style="font-size: 9px; color: var(--text-muted); font-weight: bold; margin-top: 3px;">
-                    Score: ${(r.confidence_score || 0).toFixed(0)}% (${r.confidence_level || 'Baixa'})
-                </div>
-            </div>
-        `;
-            
-        html += `
-            <tr class="${rowGlowClass}">
-                <td style="font-weight: 500; font-size: 13px; text-align: left;">
-                    <span style="color: var(--text-secondary);">${leagueName}</span>
-                    <span style="color: var(--text-muted); margin: 0 5px;"><i class="fa-solid fa-angle-right" style="font-size: 10px;"></i></span>
-                    <span style="color: #67e8f9; font-weight: bold;">${r.market_name}</span>
-                </td>
-                <td style="font-family: var(--font-mono); color: var(--text-primary);">
-                    ${r.total_bets}
-                </td>
-                <td style="color: #f87171; font-family: var(--font-mono); font-weight: bold;">
-                    -${r.avg_drop.toFixed(1)}% <span style="font-size: 14px; margin-left: 2px;">&darr;</span>
-                </td>
-                <td>
-                    ${confidenceHTML}
-                </td>
-                <td style="color: var(--text-secondary);">
-                    ${r.win_rate.toFixed(1)}%
-                </td>
-                <td style="font-family: var(--font-mono); color: ${isProfit ? 'var(--success)' : 'var(--danger)'};">
-                    ${r.roi > 0 ? '+' : ''}${r.roi.toFixed(1)}%
-                </td>
-                <td style="font-family: var(--font-mono); color: ${isProfit ? 'var(--success)' : 'var(--danger)'}; font-weight: bold;">
-                    $${r.net_profit.toFixed(2)}
-                </td>
-            </tr>
-        `;
-    });
-    
-    html += `
-            </tbody>
-        </table>
-    `;
-    
-        if (results && results.length > 0) {
-        const backtestCache = {};
-        results.forEach(r => {
-            backtestCache[r.code] = {
-                roi: r.roi,
-                winRate: r.win_rate,
-                totalBets: r.total_bets,
-                netProfit: r.net_profit
-            };
-        });
-        localStorage.setItem('radar_backtest_cache', JSON.stringify(backtestCache));
-        if (typeof window.updateCacheStatus === 'function') window.updateCacheStatus();
-    }
-    container.innerHTML = html;
-}
-
-// ============================================
-// ARBITRAGE SCANNER LOGIC
-// ============================================
-let currentArbData = null;
-
-async function runArbitrageScan() {
-    const btn = document.getElementById('btn-scan-arbitrage');
-    const tbody = document.querySelector('#arbitrage-table tbody');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando...';
-    btn.disabled = true;
-    
-    const selectedBookies = Array.from(document.querySelectorAll('.bookie-cb:checked')).map(cb => cb.value);
-    const bookiesQuery = selectedBookies.length > 0 ? `?bookies=${encodeURIComponent(selectedBookies.join(','))}` : '';
-    
-    try {
-        const res = await fetch(`${API_BASE_URL}/api/scan_arbitrage${bookiesQuery}`);
-        const data = await res.json();
-        
-        tbody.innerHTML = '';
-        if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #6b7280;">Nenhuma surebet encontrada nas odds atuais. Tente novamente mais tarde.</td></tr>';
-            return;
-        }
-        
-        data.forEach((item, idx) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${item.match}</td>
-                <td>${item.date}</td>
-                <td>${item.market}</td>
-                <td style="color: #34d399; font-weight: bold;">+${item.profit_margin}%</td>
-                <td><button class="btn-primary" onclick='openArbitrageCalc(${JSON.stringify(item)})'><i class="fa-solid fa-calculator"></i> Calcular Stake</button></td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (e) {
-        console.error(e);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #ef4444;">Erro ao buscar oportunidades na API.</td></tr>';
-    } finally {
-        btn.innerHTML = '<i class="fa-solid fa-radar"></i> Rastrear Oportunidades';
-        btn.disabled = false;
-    }
-}
-
-window.openArbitrageCalc = function(item) {
-    currentArbData = item;
-    document.getElementById('arbitrage-calculator').style.display = 'block';
-    // Scroll down to the calculator smoothly
-    document.getElementById('arbitrage-calculator').scrollIntoView({ behavior: 'smooth', block: 'end' });
-    recalcArbitrage();
-};
-
-window.recalcArbitrage = function() {
-    if (!currentArbData) return;
-    const total = parseFloat(document.getElementById('arb-total-invest').value) || 1000;
-    const profitEl = document.getElementById('arb-profit-value');
-    const distList = document.getElementById('arb-distribution-list');
-    
-    distList.innerHTML = '';
-    
-    const implied = currentArbData.implied_prob / 100;
-    const profit = total * (currentArbData.profit_margin / 100);
-    profitEl.innerText = `$${profit.toFixed(2)}`;
-    
-    Object.keys(currentArbData.odds).forEach(outcome => {
-        const odd = currentArbData.odds[outcome];
-        const prob = 1 / odd;
-        const stake = total * (prob / implied);
-        const returnVal = stake * odd;
-        const bookieName = currentArbData.bookmakers ? currentArbData.bookmakers[outcome] : 'Desconhecida';
-        const labelName = (currentArbData.labels && currentArbData.labels[outcome]) ? currentArbData.labels[outcome] : outcome;
-        
-        distList.innerHTML += `
-            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 6px;">
-                <div><span style="color: #9ca3af">Seleção:</span> <b>${labelName}</b> <span style="color: #3b82f6; margin-left: 5px;">@${odd.toFixed(2)}</span> <span style="font-size: 11px; background: #374151; padding: 2px 6px; border-radius: 4px; margin-left: 8px;">🏠 ${bookieName}</span></div>
-                <div>Apostar: <b style="color: #34d399">$${stake.toFixed(2)}</b></div>
-                <div style="font-size: 13px; color: #6b7280; padding-top: 2px;">Retorno bruto: $${returnVal.toFixed(2)}</div>
-            </div>
-        `;
-    });
-};
-
-async function loadArbitrageBotConfig() {
-    try {
-        const res = await fetch(`${API_BASE_URL}/api/arbitrage_scheduler/config`);
-        if(res.ok) {
-            const config = await res.json();
-            document.getElementById('arb-bot-enabled').checked = config.enabled || false;
-            document.getElementById('arb-bot-interval').value = config.check_interval_hours || 1.0;
-            document.getElementById('arb-bot-profit').value = config.min_profit_pct || 0.5;
-        }
-    } catch(e) {
-        console.error("Erro ao carregar config de arbitragem", e);
-    }
-}
-
-async function saveArbitrageBotConfig() {
-    const enabled = document.getElementById('arb-bot-enabled').checked;
-    const interval = parseFloat(document.getElementById('arb-bot-interval').value);
-    const profit = parseFloat(document.getElementById('arb-bot-profit').value);
-    
-    try {
-        const res = await fetch(`${API_BASE_URL}/api/arbitrage_scheduler/config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                enabled: enabled, 
-                check_interval_hours: isNaN(interval) ? 1.0 : interval, 
-                min_profit_pct: isNaN(profit) ? 0.5 : profit 
-            })
-        });
-        
-        if (res.ok) {
-            showToast("Configuração do Robô de Arbitragem salva com sucesso!", "success");
-        } else {
-            showToast("Erro ao salvar configuração.", "danger");
-        }
-    } catch (e) {
-        showToast("Erro de conexão com API.", "danger");
-    }
-}
-
-async function testArbitrageTelegramAlert() {
-    try {
-        showToast("Enviando mensagem de teste...", "info");
-        const res = await fetch("/api/telegram/test_arbitrage", { method: 'POST' });
-        const data = await res.json();
-        
-        if (res.ok && data.status === 'success') {
-            showToast("Mensagem de teste enviada com sucesso! Verifique seu Telegram.", "success");
-        } else {
-            showToast("Falha ao enviar: " + (data.detail || data.message), "error");
-        }
-    } catch (e) {
-        showToast("Erro de conexo ao tentar enviar teste.", "error");
-    }
-}
-
-async function loadDutchingBotConfig() {
-    try {
-        const res = await fetch(`${API_BASE_URL}/api/telegram/dutching_config`);
-        if (res.ok) {
-            const config = await res.json();
-            document.getElementById('dutch-bot-enabled').checked = config.enabled || false;
-            document.getElementById('dutch-bot-interval').value = config.check_interval_hours || 1.0;
-            document.getElementById('dutch-bot-edge').value = config.min_edge_pct || 1.0;
-            document.getElementById('dutch-bot-hours').value = config.min_hours_before || 2.0;
-        }
-    } catch (e) {
-        console.error("Erro ao carregar config de dutching telegram", e);
-    }
-}
-
-async function saveDutchingBotConfig() {
-    const enabled = document.getElementById('dutch-bot-enabled').checked;
-    const interval = parseFloat(document.getElementById('dutch-bot-interval').value);
-    const edge = parseFloat(document.getElementById('dutch-bot-edge').value);
-    const hours = parseFloat(document.getElementById('dutch-bot-hours').value);
-    
-    try {
-        const res = await fetch(`${API_BASE_URL}/api/telegram/dutching_config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                enabled: enabled, 
-                check_interval_hours: isNaN(interval) ? 1.0 : interval, 
-                min_edge_pct: isNaN(edge) ? 1.0 : edge,
-                min_hours_before: isNaN(hours) ? 2.0 : hours
-            })
-        });
-        
-        if (res.ok) {
-            showToast("Configuração do Robô de Dutching salva com sucesso!", "success");
-        } else {
-            showToast("Erro ao salvar configuração.", "danger");
-        }
-    } catch (e) {
-        showToast("Erro de conexão com API.", "danger");
-    }
-}
-
-async function testDutchingTelegramAlert() {
-    try {
-        showToast("Enviando alerta de teste do Dutching...", "info");
-        const res = await fetch("/api/telegram/test_dutching", { method: 'POST' });
-        const data = await res.json();
-        
-        if (res.ok && data.status === 'success') {
-            showToast("Alerta de teste enviado com sucesso! Verifique seu Telegram.", "success");
-        } else {
-            showToast("Falha ao enviar: " + (data.detail || data.message), "error");
-        }
-    } catch (e) {
-        showToast("Erro de conexão ao tentar enviar teste de Dutching.", "error");
-    }
-}
-
-async function loadOddsApiKey() {
-    try {
-        const res = await fetch(`${API_BASE_URL}/api/telegram/odds_api_config`);
-        if (res.ok) {
-            const data = await res.json();
-            document.getElementById('dutch-odds-api-key').value = data.api_key || '';
-        }
-    } catch (e) {
-        console.error("Erro ao carregar chave da Odds API", e);
-    }
-}
-
-async function saveOddsApiKey() {
-    const keyInput = document.getElementById('dutch-odds-api-key');
-    const key = keyInput.value ? keyInput.value.trim() : '';
-    try {
-        const res = await fetch(`${API_BASE_URL}/api/telegram/odds_api_config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: key })
-        });
-        if (res.ok) {
-            showToast("Chave da The Odds API salva com sucesso!", "success");
-        } else {
-            showToast("Erro ao salvar chave da Odds API.", "danger");
-        }
-    } catch (e) {
-        showToast("Erro de conexão ao salvar chave da Odds API.", "danger");
-    }
-}
-
-
-function runBookieInit() {
-    const savedBookies = localStorage.getItem('arbBookies');
-    if (savedBookies) {
-        const bookieArray = JSON.parse(savedBookies);
-        document.querySelectorAll('.bookie-cb').forEach(cb => {
-            cb.checked = bookieArray.includes(cb.value);
-        });
-    }
-    
-    document.querySelectorAll('.bookie-cb').forEach(cb => {
-        cb.addEventListener('change', () => {
-            const selectedBookies = Array.from(document.querySelectorAll('.bookie-cb:checked')).map(c => c.value);
-            localStorage.setItem('arbBookies', JSON.stringify(selectedBookies));
-        });
-    });
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', runBookieInit);
-} else {
-    runBookieInit();
-}
-
-window.selectAllLeagues = function(check) {
-    document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]').forEach(cb => {
-        cb.checked = check;
-    });
-};
-
-window.showRadarInsights = function() {
-    alert("💡 INSIGHTS ESTRATÉGICOS DO RADAR SMART MONEY:\n\n" +
-          "1. Ligas de Tier Alta (ex: Premier League, La Liga, Brasileirão Série A) possuem volumes de negociação gigantescos. Drops nessas ligas representam a entrada de sindicatos asiáticos e possuem ALTÍSSIMA CONFIANÇA.\n\n" +
-          "2. Evite seguir drops de odds em ligas de baixa liquidez (Tier Baixa) quando o score de confiança for menor que 45%, pois estes mercados sofrem manipulações de pequenos apostadores locais (ruído).\n\n" +
-          "3. O mercado de 'Match Odds' (1X2) e 'Goals (O2.5/U2.5)' são os preferidos dos robôs institucionais. Fique atento a quedas simultâneas nestas linhas.");
-};
-
-// window.runLiveSteamScan = async function() {
-//     try {
-//         const tbody = document.querySelector('#steam-live-table tbody');
-//         const overlay = document.getElementById('steam-loading-overlay');
-//         
-//         const leagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked')).map(cb => cb.value);
-//         const markets = Array.from(document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]:checked')).map(cb => cb.value);
-//         const minDropPct = parseFloat(document.getElementById('val-drop-pct').value || 5.0);
-//         
-//         if (markets.length === 0) {
-//             alert("Por favor, selecione pelo menos um mercado.");
-//             return;
-//         }
-// 
-//         overlay.style.display = 'block';
-//         document.getElementById('steam-live-table-container').style.display = 'none';
-//         
-//         const reqBody = {
-//             minDropPct: minDropPct,
-//             markets: markets,
-//             leagues: leagues
-//         };
-//         
-//         const response = await fetch(`${API_BASE_URL}/api/live_steam_moves`, {
-//             method: 'POST',
-//             headers: { 'Content-Type': 'application/json' },
-//             body: JSON.stringify(reqBody)
-//         });
-//         
-//         if (!response.ok) {
-//             throw new Error(`Erro na API: ${response.status}`);
-//         }
-//         
-//         const data = await response.json();
-//         
-//         overlay.style.display = 'none';
-//         document.getElementById('steam-live-table-container').style.display = 'block';
-//         tbody.innerHTML = '';
-//         
-//         if (!data.scan_results || data.scan_results.length === 0) {
-//             tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #6b7280; padding: 20px;">Nenhuma queda significativa detectada nas odds ao vivo neste momento. O robô atualiza a cada 30 minutos.</td></tr>';
-//             return;
-//         }
-//         
-//         data.scan_results.forEach((item, idx) => {
-//             const tr = document.createElement('tr');
-//             
-//             if (item.confidence_level === 'Alta') {
-//                 tr.className = 'radar-row-glow-alta';
-//             } else if (item.confidence_level === 'Média') {
-//                 tr.className = 'radar-row-glow-media';
-//             } else {
-//                 tr.className = 'radar-row-glow-baixa';
-//             }
-//             
-//             let confBorderColor = 'rgba(255, 255, 255, 0.1)';
-//             let confGlowColor = 'rgba(255, 255, 255, 0.02)';
-//             let confTextColor = '#9ca3af';
-//             let confIcon = 'fa-circle-question';
-//             
-//             if (item.confidence_level === 'Alta') {
-//                 confBorderColor = '#10b981';
-//                 confGlowColor = 'rgba(16, 185, 129, 0.05)';
-//                 confTextColor = '#10b981';
-//                 confIcon = 'fa-circle-check';
-//             } else if (item.confidence_level === 'Média') {
-//                 confBorderColor = '#f59e0b';
-//                 confGlowColor = 'rgba(245, 158, 11, 0.05)';
-//                 confTextColor = '#f59e0b';
-//                 confIcon = 'fa-circle-exclamation';
-//             } else if (item.confidence_level === 'Baixa') {
-//                 confBorderColor = '#ef4444';
-//                 confGlowColor = 'rgba(239, 68, 68, 0.05)';
-//                 confTextColor = '#ef4444';
-//                 confIcon = 'fa-triangle-exclamation';
-//             }
-// 
-//             const confidenceHTML = `
-//                 <div style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 12px; border: 1px solid ${confBorderColor}; background: ${confGlowColor}; box-shadow: 0 0 10px ${confGlowColor}; min-width: 140px; box-sizing: border-box;">
-//                     <div style="display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 11px; color: ${confTextColor}; text-transform: uppercase; letter-spacing: 0.5px;">
-//                         <i class="fa-solid ${confIcon}"></i>
-//                         <span>${item.confidence_level || 'BAIXA'}</span>
-//                     </div>
-//                     <div style="font-size: 9px; color: var(--text-muted); font-weight: bold; margin-top: 3px;">
-//                         Score: ${(item.confidence_score || 0).toFixed(0)}% (${item.confidence_level || 'Baixa'})
-//                     </div>
-//                 </div>
-//             `;
-// 
-//             let indexCell = `<span style="color: var(--text-muted); font-size: 13px; font-weight: bold; margin-right: 12px; font-family: var(--font-mono);">${idx + 1}.</span>`;
-//             const teams = item.match.split(' vs ');
-//             const home = teams[0] || 'Desconhecido';
-//             const away = teams[1] || 'Desconhecido';
-//             
-//             const matchHTML = `
-//                 <div style="display: flex; align-items: center;">
-//                     ${indexCell}
-//                     <div style="display: flex; flex-direction: column; gap: 3px;">
-//                         <div style="display: flex; align-items: center; gap: 8px;">
-//                             <i class="fa-solid fa-shirt" style="font-size: 11px; color: var(--text-muted);"></i>
-//                             <span style="font-weight: 700; color: var(--text-primary); font-size: 13px;">${home}</span>
-//                         </div>
-//                         <div style="display: flex; align-items: center; gap: 8px;">
-//                             <i class="fa-solid fa-shirt" style="font-size: 11px; color: var(--text-muted); opacity: 0.6;"></i>
-//                             <span style="font-weight: 700; color: var(--text-secondary); font-size: 13px;">${away}</span>
-//                         </div>
-//                         <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
-//                             <i class="fa-regular fa-clock" style="font-size: 10px;"></i> ${item.date}
-//                         </div>
-//                     </div>
-//                 </div>
-//             `;
-// 
-//             let bookieHTML = '';
-//             const bName = item.bookmaker.toLowerCase();
-//             if (bName.includes('365')) {
-//                 bookieHTML = `<span class="radar-bookmaker-badge radar-bookie-bet365" style="font-family: 'Outfit', sans-serif; font-style: italic; font-weight: 900; letter-spacing: -0.5px;"><span style="color: #ffffff;">bet</span><span style="color: #ffdf1b;">365</span></span>`;
-//             } else if (bName.includes('pinnacle')) {
-//                 bookieHTML = `<span class="radar-bookmaker-badge radar-bookie-pinnacle" style="font-family: 'Outfit', sans-serif; font-weight: 900; letter-spacing: 0.5px;"><span style="color: #ff7020;">PIN</span><span style="color: #ffffff;">NACLE</span></span>`;
-//             } else if (bName.includes('betfair')) {
-//                 bookieHTML = `<span class="radar-bookmaker-badge radar-bookie-betfair" style="font-family: 'Outfit', sans-serif; font-weight: 900; letter-spacing: -0.5px;"><span style="color: #ffbe00;">bet</span><span style="color: #ffffff;">fair</span></span>`;
-//             } else {
-//                 bookieHTML = `<span class="radar-bookmaker-badge radar-bookie-neutral">${item.bookmaker}</span>`;
-//             }
-//             
-//             const marketHTML = `<span style="color: #67e8f9; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">${item.market}</span>`;
-//             const openingHTML = `<span style="color: var(--text-secondary); font-family: var(--font-mono); font-size: 13px;">@${item.opening_odd.toFixed(2)}</span>`;
-//             const currentHTML = `<span class="radar-odd-badge-current">@${item.current_odd.toFixed(2)}</span>`;
-//             const dropHTML = `
-//                 <span class="radar-drop-pct-red">
-//                     ${item.drop_pct.toFixed(0)}% <span style="font-size: 16px; margin-left: 2px;">&darr;</span>
-//                 </span>
-//             `;
-// 
-//             tr.innerHTML = `
-//                 <td>${matchHTML}</td>
-//                 <td>${bookieHTML}</td>
-//                 <td>${marketHTML}</td>
-//                 <td>${openingHTML}</td>
-//                 <td>${currentHTML}</td>
-//                 <td>${dropHTML}</td>
-//                 <td>${confidenceHTML}</td>
-//             `;
-//             tbody.appendChild(tr);
-//         });
-//         
-//     } catch (e) {
-//         console.error(e);
-//         document.getElementById('steam-loading-overlay').style.display = 'none';
-//         document.getElementById('steam-live-table-container').style.display = 'block';
-//         document.querySelector('#steam-live-table tbody').innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 20px;">Erro ao buscar dados ao vivo.</td></tr>`;
-//     }
-// };
-// 
-
 
 window.runBacktest = async function(overrideParams) {
     let btn = null;
@@ -8266,13 +4789,16 @@ window.runBacktest = async function(overrideParams) {
         });
 
         btn = document.getElementById('btn-run-backtest');
-        if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Rodando...';
+        const topbarBtn = document.getElementById('btn-topbar-run');
+        if(btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Rodando...'; btn.disabled = true; }
+        if(topbarBtn) { topbarBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; topbarBtn.disabled = true; }
 
         let leagues, startDate, endDate, markets, valThreshold, initialBankroll, stakeRule, stakeValue, oddsSource, oddsTiming, minOdds, maxOdds, exchangeCommission, oos, useMl;
         let minOddsH, maxOddsH, minOddsD, maxOddsD, minOddsA, maxOddsA, minOddsOver25, maxOddsOver25, minOddsUnder25, maxOddsUnder25;
         let dataSource, API_key;
         let oosSplitVal = 20.0;
         let slippageVal = 2.0;
+        let wfFolds = 0;
 
         if (overrideParams) {
             leagues = overrideParams.leagues || [];
@@ -8334,6 +4860,10 @@ window.runBacktest = async function(overrideParams) {
             const oosSplitEl = document.getElementById('oos-split-pct');
             oosSplitVal = oosSplitEl ? parseFloat(oosSplitEl.value) : 20.0;
 
+            const wfToggle = document.getElementById('wf-toggle');
+            const wfFoldsEl = document.getElementById('wf-folds');
+            wfFolds = (wfToggle && wfToggle.checked) ? (wfFoldsEl ? parseInt(wfFoldsEl.value) : 5) : 0;
+
             const slippageEl = document.getElementById('backtest-slippage');
             slippageVal = slippageEl ? parseFloat(slippageEl.value) : 2.0;
 
@@ -8369,8 +4899,10 @@ window.runBacktest = async function(overrideParams) {
             exchange_commission: exchangeCommission,
             out_of_sample: oos,
             oos_split: oosSplitVal,
+            walk_forward_folds: wfFolds,
             slippage: slippageVal,
             use_ml: useMl,
+            model_type: document.getElementById('model-type-select')?.value || 'poisson',
             data_source: dataSource,
             futpython_api_key: API_key,
             minOddsH: minOddsH,
@@ -8385,10 +4917,12 @@ window.runBacktest = async function(overrideParams) {
             maxOddsUnder25: maxOddsUnder25
         };
         console.log("Backtest Request Payload:", JSON.stringify(payload));
+        const signal = createAbortController().signal;
         const response = await fetch('/api/backtest', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal: signal
         });
         const data = await response.json();
         console.log("Backtest Response Status:", response.status);
@@ -8396,17 +4930,24 @@ window.runBacktest = async function(overrideParams) {
         if (data.error) console.error("Backtest Response Error:", data.error);
 
         if (response.ok && !data.error) {
-            lastBacktestSummary = data;
-            lastBacktestParams = payload;
+            // Check if walk-forward result (different structure from standard backtest)
+            if (data.method === 'walk_forward') {
+                renderWalkForwardResults(data);
+                return;
+            }
+
+            window.lastBacktestSummary = data;
+            window.lastBacktestParams = payload;
             
             const btnSave = document.getElementById('btn-save-strategy');
             if(btnSave) btnSave.style.display = 'inline-block';
 
             const summary = data.summary;
-            if(document.getElementById('metric-net-profit')) document.getElementById('metric-net-profit').innerText = '$' + summary.net_profit.toFixed(2);
+            // KPI Hero — animated count-up
+            animateValue(document.getElementById('metric-net-profit'), 0, summary.net_profit, 800, v => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2));
             if(document.getElementById('metric-profit-stakes')) document.getElementById('metric-profit-stakes').innerText = (summary.profit_in_stakes > 0 ? '+' : '') + summary.profit_in_stakes.toFixed(2) + ' st.';
-            if(document.getElementById('metric-roi')) document.getElementById('metric-roi').innerText = summary.roi.toFixed(1) + '%';
-            if(document.getElementById('metric-win-rate')) document.getElementById('metric-win-rate').innerText = summary.win_rate.toFixed(1) + '%';
+            animateValue(document.getElementById('metric-roi'), 0, summary.roi, 800, v => v.toFixed(1) + '%');
+            animateValue(document.getElementById('metric-win-rate'), 0, summary.win_rate, 800, v => v.toFixed(1) + '%');
             if(document.getElementById('metric-avg-odds')) document.getElementById('metric-avg-odds').innerText = summary.avg_odds.toFixed(2);
             if(document.getElementById('metric-max-drawdown')) document.getElementById('metric-max-drawdown').innerText = (summary.max_drawdown || 0).toFixed(1) + '%';
             if(document.getElementById('metric-drawdown')) {
@@ -8418,7 +4959,24 @@ window.runBacktest = async function(overrideParams) {
                 }
             }
             if(document.getElementById('metric-total-bets')) document.getElementById('metric-total-bets').innerText = summary.total_bets;
-            if(document.getElementById('metric-final-bankroll')) document.getElementById('metric-final-bankroll').innerText = '$' + summary.final_bankroll.toFixed(2);
+            if(document.getElementById('metric-matches-analyzed')) document.getElementById('metric-matches-analyzed').innerText = (summary.matches_total_in_file || 0).toLocaleString();
+            if(document.getElementById('metric-seasons')) {
+                const seasons = summary.seasons_analyzed || [];
+                document.getElementById('metric-seasons').innerText = seasons.length > 0 ? seasons.join(', ') : '-';
+            }
+            if(document.getElementById('metric-wins')) document.getElementById('metric-wins').innerText = summary.wins || 0;
+            if(document.getElementById('metric-losses')) document.getElementById('metric-losses').innerText = summary.losses || 0;
+            const pushesCard = document.getElementById('metric-pushes-card');
+            if (pushesCard && document.getElementById('metric-pushes')) {
+                const pushes = summary.pushes || 0;
+                if (pushes > 0) {
+                    pushesCard.style.display = 'flex';
+                    document.getElementById('metric-pushes').innerText = pushes;
+                } else {
+                    pushesCard.style.display = 'none';
+                }
+            }
+            animateValue(document.getElementById('metric-final-bankroll'), payload.initialBankroll, summary.final_bankroll, 800, v => '$' + v.toFixed(2));
             if(document.getElementById('metric-sharpe')) document.getElementById('metric-sharpe').innerText = (summary.sharpe_ratio || 0).toFixed(2);
             if(document.getElementById('metric-sortino')) document.getElementById('metric-sortino').innerText = (summary.sortino_ratio || 0).toFixed(2);
             if(document.getElementById('metric-skewness')) document.getElementById('metric-skewness').innerText = (summary.skewness || 0).toFixed(2);
@@ -8426,7 +4984,47 @@ window.runBacktest = async function(overrideParams) {
             if(document.getElementById('metric-consec-losses')) document.getElementById('metric-consec-losses').innerText = summary.max_consec_losses || 0;
             if(document.getElementById('metric-clv')) document.getElementById('metric-clv').innerText = summary.avg_clv != null ? ((summary.avg_clv >= 0 ? '+' : '') + summary.avg_clv.toFixed(1) + '%') : 'N/A';
             if(document.getElementById('metric-bcl')) document.getElementById('metric-bcl').innerText = summary.bcl_percent != null ? (summary.bcl_percent.toFixed(1) + '%') : 'N/A';
-            
+
+            // Apply positive/negative classes to metric cards + color h2 values
+            function applyMetricColors(summary) {
+                var np = parseFloat(summary.net_profit);
+                var ps = parseFloat(summary.profit_in_stakes);
+                var rr = parseFloat(summary.roi);
+                var wr = parseFloat(summary.win_rate);
+
+                function colorCard(h2Id, value, neutralThreshold) {
+                    var h2 = document.getElementById(h2Id);
+                    if (!h2) return;
+                    var card = h2.closest('.metric-card');
+                    var isPositive = neutralThreshold !== undefined ? value > neutralThreshold : value >= 0;
+                    if (card) {
+                        // Clear any leftover inline styles from previous versions
+                        card.style.background = '';
+                        card.style.borderColor = '';
+                        card.style.borderLeftColor = '';
+                        card.style.boxShadow = '';
+                        card.style.setProperty('border-left', '');
+                        card.style.setProperty('--mc-accent', '');
+                        var icon = card.querySelector('.metric-icon');
+                        if (icon) { icon.style.color = ''; icon.style.background = ''; icon.style.borderColor = ''; icon.style.boxShadow = ''; }
+                        var label = card.querySelector('.metric-label');
+                        if (label) { label.style.color = ''; }
+                        // Apply class
+                        card.classList.remove('positive', 'negative');
+                        if (isPositive) card.classList.add('positive');
+                        else card.classList.add('negative');
+                    }
+                    h2.style.textShadow = '';
+                    h2.style.color = isPositive ? 'var(--color-success)' : 'var(--color-danger)';
+                }
+
+                colorCard('metric-net-profit', np);
+                colorCard('metric-profit-stakes', ps);
+                colorCard('metric-roi', rr, 0);
+                colorCard('metric-win-rate', wr, 50);
+            }
+            applyMetricColors(summary);
+
             // Populate Transparency Panel (Phase 1)
             const transPanel = document.getElementById('transparency-panel');
             if (transPanel) {
@@ -8542,7 +5140,7 @@ window.runBacktest = async function(overrideParams) {
                             mlBanner.style.background = 'rgba(245, 158, 11, 0.06)';
                             mlBanner.style.border = '1px solid rgba(245, 158, 11, 0.2)';
                             mlBanner.style.color = '#fcd34d';
-                            mlBanner.innerHTML = `<i class="fa-solid fa-brain" style="color:#f59e0b;"></i> <strong>ML Inativo (Sem amostras):</strong> O XGBoost foi ativado nas configurações, mas nenhuma aposta pôde ser recalibrada por falta de histórico de dados (requer pelo menos 100 jogos para treinar o ensemble). O sistema usou o Poisson clássico.`;
+                            mlBanner.innerHTML = `<i class="fa-solid fa-brain" style="color:#f59e0b;"></i> <strong>ML Inativo (Sem amostras):</strong> O XGBoost foi ativado nas configurações, mas nenhuma aposta pôde ser recalibrada por falta de histórico de dados (requer pelo menos 200 jogos para treinar o ensemble). O sistema usou o Poisson clássico.`;
                         } else {
                             mlBanner.style.display = 'block';
                             mlBanner.style.background = 'rgba(139, 92, 246, 0.05)';
@@ -8552,6 +5150,29 @@ window.runBacktest = async function(overrideParams) {
                         }
                     } else {
                         mlBanner.style.display = 'none';
+                    }
+                }
+
+                // ML status badge next to toggle
+                const mlBadge = document.getElementById('ml-status-badge');
+                if (mlBadge) {
+                    const useMlEnabled = payload.use_ml || false;
+                    if (!useMlEnabled) {
+                        mlBadge.style.display = 'none';
+                    } else if (mlAppliedVal > 0) {
+                        mlBadge.style.display = 'inline';
+                        mlBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+                        mlBadge.style.color = '#34d399';
+                        mlBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                        mlBadge.textContent = mlAppliedVal + ' recalibradas';
+                        mlBadge.title = 'XGBoost treinado com sucesso. ' + mlAppliedVal + ' apostas (' + mlPctVal + '%) foram ajustadas pelo ensemble.';
+                    } else {
+                        mlBadge.style.display = 'inline';
+                        mlBadge.style.background = 'rgba(245, 158, 11, 0.1)';
+                        mlBadge.style.color = '#fbbf24';
+                        mlBadge.style.border = '1px solid rgba(245, 158, 11, 0.25)';
+                        mlBadge.textContent = 'Sem dados para treinar';
+                        mlBadge.title = 'XGBoost requer >=200 jogos na janela OOS para treinar. Nenhuma aposta foi recalibrada neste backtest. O sistema usou Poisson classico.';
                     }
                 }
                 
@@ -8638,14 +5259,21 @@ window.runBacktest = async function(overrideParams) {
                 window.renderLaboratoryPanels(data, false);
             }
 
+            if (data.ai_analysis) {
+                displayAiAnalysis(data.ai_analysis, data);
+            }
+
             if (typeof populateBetsTable === 'function') {
-                allBets = data.bets || [];
-                populateBetsTable(allBets);
+                window.allBets = data.bets || [];
+                populateBetsTable(window.allBets);
             }
 
             if (typeof autoUpdateSchedulerFromBacktest === 'function') {
                 autoUpdateSchedulerFromBacktest(payload);
             }
+
+            // Apply metric colors at the very end (after ALL DOM updates, banners, text, etc.)
+            applyMetricColors(summary);
 
             const banner = document.getElementById('active-strategy-banner');
             if (banner) banner.style.display = 'flex';
@@ -8669,21 +5297,31 @@ window.runBacktest = async function(overrideParams) {
             const btnExport = document.getElementById('btn-export-backtest');
             if (btnExport) btnExport.style.display = 'inline-flex';
 
-            if(btn) btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest';
+            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
+            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
             if (typeof showToast === 'function') showToast("Backtest concluído!", "success");
 
         } else {
-            alert(data.error || data.detail || "Erro ao executar backtest.");
-            if(btn) btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest';
+            const errMsg = data.error || data.detail || "Erro ao executar backtest.";
+            console.error("Backtest error:", errMsg, data);
+            showToast(errMsg, "error");
+            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
+            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
         }
     } catch(err) {
         console.error("Backtest error:", err);
-        if (err.message.includes("Unexpected end of JSON input")) {
-            alert("Erro: O servidor encerrou a conexão inesperadamente (possível falta de memória / OOM). Se você ativou a Otimização da IA (XGBoost), tente selecionar menos ligas simultaneamente para evitar exceder os limites do servidor gratuito.");
-        } else {
-            alert("Erro JS: " + err.message + "\nStack: " + err.stack);
+        if (err.name === 'AbortError') {
+            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
+            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
+            return;
         }
-        if(btn) btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest';
+        if (err.message.includes("Unexpected end of JSON input")) {
+            showToast("Erro: O servidor encerrou a conexão inesperadamente (possível falta de memória / OOM).", "error");
+        } else {
+            showToast("Erro: " + err.message, "error");
+        }
+        if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
+        if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
     }
 };
 
@@ -8761,364 +5399,6 @@ window.toggleGroup = function(groupEl) {
 
 let clusterChartInstance = null;
 
-async function runClustering() {
-    const leagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked')).map(cb => cb.value);
-    if (leagues.length < 3) {
-        showToast("Selecione pelo menos 3 ligas para rodar a clusterização.", "warning");
-        return;
-    }
-    
-    const startDate = document.getElementById("start-date").value;
-    const endDate = document.getElementById("end-date").value;
-    const dataSource = document.getElementById("data-source-select").value;
-    const futpythonKey = document.getElementById("futpython-api-key") ? document.getElementById("futpython-api-key").value : "";
-    let nClusters = document.getElementById("cluster-count").value;
-    nClusters = nClusters === "auto" ? null : parseInt(nClusters);
-    
-    document.getElementById("clustering-loading").style.display = "block";
-    document.getElementById("clustering-results").style.display = "none";
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/cluster_leagues`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                leagues: leagues,
-                startDate: startDate,
-                endDate: endDate,
-                data_source: dataSource,
-                futpython_api_key: futpythonKey,
-                n_clusters: nClusters
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.detail || "Erro ao executar clusterização.");
-        }
-        
-        renderClusterChart(data.points, data.clusters);
-        renderClusterList(data.clusters);
-        
-        document.getElementById("clustering-loading").style.display = "none";
-        document.getElementById("clustering-results").style.display = "block";
-        
-    } catch (error) {
-        console.error(error);
-        showToast(error.message, "error");
-        document.getElementById("clustering-loading").style.display = "none";
-    }
-}
-
-function renderClusterChart(points, clusters) {
-    const ctx = document.getElementById('clusterChart').getContext('2d');
-    
-    if (clusterChartInstance) {
-        clusterChartInstance.destroy();
-    }
-    
-    // Paleta de cores premium
-    const colors = [
-        '#3b82f6', // Azul
-        '#10b981', // Verde
-        '#f59e0b', // Amarelo
-        '#ef4444', // Vermelho
-        '#8b5cf6', // Roxo
-        '#ec4899', // Rosa
-        '#06b6d4', // Ciano
-    ];
-    
-    const datasets = clusters.map((c, i) => {
-        const clusterPoints = points.filter(p => p.cluster === c.cluster_id);
-        const color = colors[i % colors.length];
-        
-        return {
-            label: `Grupo ${c.cluster_id + 1}`,
-            data: clusterPoints.map(p => ({
-                x: p.pca_x,
-                y: p.pca_y,
-                league: p.league,
-                avg_goals: p.avg_goals,
-                btts: p.btts_pct,
-                win: p.home_win_pct
-            })),
-            backgroundColor: color,
-            borderColor: color,
-            borderWidth: 1,
-            pointRadius: 6,
-            pointHoverRadius: 9,
-        };
-    });
-    
-    clusterChartInstance = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: { color: '#e5e7eb', font: { family: 'Inter', size: 12 } }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(11, 14, 20, 0.95)',
-                    titleColor: '#34d399',
-                    bodyColor: '#e5e7eb',
-                    borderColor: 'rgba(52, 211, 153, 0.2)',
-                    borderWidth: 1,
-                    padding: 12,
-                    callbacks: {
-                        label: function(context) {
-                            const p = context.raw;
-                            return [
-                                `Liga: ${p.league}`,
-                                `Gols/Jogo: ${p.avg_goals.toFixed(2)}`,
-                                `Vitória Mandante: ${(p.win * 100).toFixed(1)}%`,
-                                `Ambas Marcam: ${(p.btts * 100).toFixed(1)}%`
-                            ];
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#9ca3af' },
-                    title: { display: true, text: 'Componente Principal 1', color: '#6b7280' }
-                },
-                y: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#9ca3af' },
-                    title: { display: true, text: 'Componente Principal 2', color: '#6b7280' }
-                }
-            }
-        }
-    });
-}
-
-function renderClusterList(clusters) {
-    const container = document.getElementById('cluster-list-container');
-    container.innerHTML = '';
-    
-    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
-    
-    clusters.forEach((c, i) => {
-        const color = colors[i % colors.length];
-        
-        const card = document.createElement('div');
-        card.className = 'glassmorphism';
-        card.style.padding = '15px';
-        card.style.borderLeft = `4px solid ${color}`;
-        
-        let suggestedMarkets = "";
-        let clusterProfile = "";
-        
-        if (c.avg_goals >= 2.75 || c.over25_pct >= 0.52) {
-            clusterProfile = "Ligas de Gols (Over)";
-            suggestedMarkets = "Over 2.5, Ambas Marcam (Sim), Over 0.5 HT";
-        } else if (c.avg_goals <= 2.55 || c.over25_pct <= 0.46) {
-            clusterProfile = "Ligas Truncadas (Under)";
-            suggestedMarkets = "Under 2.5, Under 0.5 HT, Empate HT";
-        } else {
-            clusterProfile = "Ligas Equilibradas";
-            suggestedMarkets = "Match Odds (Mandante/Visitante), Handicap Asiático";
-        }
-        
-        if (c.home_win_pct >= 0.47) {
-            suggestedMarkets += ", Back Mandante";
-        } else if (c.home_win_pct <= 0.38) {
-            suggestedMarkets += ", Dupla Chance Visitante";
-        }
-
-        const leaguesList = c.leagues.map(l => `<span style="display:inline-block; background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px; margin:2px; font-size:11px;">${l}</span>`).join('');
-        
-        card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h4 style="margin: 0; color: ${color}; font-size: 14px;">Grupo ${c.cluster_id + 1} (${c.count} ligas) - ${clusterProfile}</h4>
-                <button type="button" onclick="copyClusterLeagues('${c.leagues.join(',')}')" class="btn-secondary" style="padding: 4px 8px; font-size: 10px;">
-                    <i class="fa-solid fa-copy"></i> Copiar Ligas
-                </button>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 10px; font-size: 11px; color: #9ca3af;">
-                <div><i class="fa-solid fa-futbol"></i> Gols: ${c.avg_goals.toFixed(2)}</div>
-                <div><i class="fa-solid fa-arrow-up"></i> Over 2.5: ${(c.over25_pct * 100).toFixed(0)}%</div>
-                <div><i class="fa-solid fa-house"></i> Home Win: ${(c.home_win_pct * 100).toFixed(0)}%</div>
-            </div>
-            <div style="margin-bottom: 10px; padding: 6px; background: rgba(255, 255, 255, 0.05); border-left: 2px solid ${color}; font-size: 11px; color: #d1d5db; border-radius: 4px;">
-                <strong style="color: ${color};"><i class="fa-solid fa-lightbulb"></i> Mercados Sugeridos para o Scanner:</strong> ${suggestedMarkets}
-            </div>
-            <div style="max-height: 100px; overflow-y: auto;">
-                ${leaguesList}
-            </div>
-        `;
-        
-        container.appendChild(card);
-    });
-}
-
-function copyClusterLeagues(leaguesStr) {
-    const leagues = leaguesStr.split(',');
-    
-    // Uncheck all
-    document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]').forEach(cb => {
-        cb.checked = false;
-    });
-    
-    // Check the ones in the cluster
-    document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]').forEach(cb => {
-        if (leagues.includes(cb.value)) {
-            cb.checked = true;
-        }
-    });
-    showToast(`${leagues.length} ligas do cluster selecionadas!`, "success");
-}
-
-// Cluster AI Alerts Config
-async function loadClusterAiConfig() {
-    try {
-        const res = await fetch(`${API_BASE_URL}/api/telegram/cluster_ai_config`);
-        if (res.ok) {
-            const config = await res.json();
-            const el1 = document.getElementById("toggle-tg-pure-blood");
-            const el2 = document.getElementById("toggle-tg-contrarian");
-            const el3 = document.getElementById("toggle-tg-dna-shift");
-            
-            if (el1) el1.checked = config.pure_blood_enabled !== false;
-            if (el2) el2.checked = config.contrarian_enabled !== false;
-            if (el3) el3.checked = config.dna_shift_enabled !== false;
-        }
-    } catch (e) {
-        console.error("Error loading cluster AI config:", e);
-    }
-}
-
-async function saveClusterAiConfig() {
-    const el1 = document.getElementById("toggle-tg-pure-blood");
-    const el2 = document.getElementById("toggle-tg-contrarian");
-    const el3 = document.getElementById("toggle-tg-dna-shift");
-    
-    if (!el1 || !el2 || !el3) return;
-    
-    const config = {
-        enabled: el1.checked || el2.checked || el3.checked,
-        pure_blood_enabled: el1.checked,
-        contrarian_enabled: el2.checked,
-        dna_shift_enabled: el3.checked
-    };
-    
-    try {
-        const res = await fetch(`${API_BASE_URL}/api/telegram/cluster_ai_config`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(config)
-        });
-        if (res.ok) {
-            showToast("Configuração de Alertas IA salva com sucesso!", "success");
-        }
-    } catch (e) {
-        console.error("Error saving cluster AI config:", e);
-    }
-}
-
-window.renderLaboratoryPanels = function(data, isPortfolio = false) {
-    const summary = data.summary || {};
-    if(document.getElementById('metric-sharpe')) document.getElementById('metric-sharpe').innerText = (summary.sharpe_ratio || 0).toFixed(2);
-    if(document.getElementById('metric-sortino')) document.getElementById('metric-sortino').innerText = (summary.sortino_ratio || 0).toFixed(2);
-    if(document.getElementById('metric-skewness')) document.getElementById('metric-skewness').innerText = (summary.skewness || 0).toFixed(2);
-    if(document.getElementById('metric-consec-wins')) document.getElementById('metric-consec-wins').innerText = summary.max_consec_wins || 0;
-    if(document.getElementById('metric-consec-losses')) document.getElementById('metric-consec-losses').innerText = summary.max_consec_losses || 0;
-    if(document.getElementById('metric-clv')) document.getElementById('metric-clv').innerText = summary.avg_clv != null ? ((summary.avg_clv >= 0 ? '+' : '') + summary.avg_clv.toFixed(1) + '%') : 'N/A';
-    if(document.getElementById('metric-bcl')) document.getElementById('metric-bcl').innerText = summary.bcl_percent != null ? (summary.bcl_percent.toFixed(1) + '%') : 'N/A';
-
-    if (typeof displayAiAnalysis === 'function') {
-        displayAiAnalysis(data.ai_analysis, data, isPortfolio);
-    }
-
-    if (data.ai_analysis && data.ai_analysis.score !== undefined) {
-        const eqsData = {
-            score: data.ai_analysis.score,
-            verdict: data.ai_analysis.verdict || 'Avaliando...',
-            verdict_color: data.ai_analysis.verdict_color || 'warning',
-            risk_recommendation: data.ai_analysis.risk_recommendation || data.ai_analysis.report || '',
-            breakdown: data.ai_analysis.breakdown || []
-        };
-        if (typeof renderEdgeQualityScore === 'function') {
-            renderEdgeQualityScore(eqsData);
-        }
-    }
-
-    if (typeof renderStatValidation === 'function') {
-        renderStatValidation(data.summary);
-    }
-
-    if (typeof renderOosResults === 'function' && data.ai_analysis) {
-        const oosSum = data.ai_analysis.oos_summary || null;
-        renderOosResults(oosSum, data.summary);
-    }
-
-    if (typeof renderDriftValidation === 'function') {
-        renderDriftValidation(data.ai_analysis, data);
-    }
-
-    if (typeof renderRiskManagement === 'function') {
-        renderRiskManagement(data);
-    }
-
-    const stakingPanel = document.getElementById('staking-comparison-panel');
-    if (stakingPanel && data.summary_fixed && data.summary_proportional && data.summary_kelly) {
-        stakingPanel.style.display = 'block';
-        const stakingTbody = document.getElementById('staking-comparison-tbody');
-        if (stakingTbody) {
-            const sf = data.summary_fixed;
-            const sp = data.summary_proportional;
-            const sk = data.summary_kelly;
-            stakingTbody.innerHTML = `
-                <tr>
-                    <td>Stake Fixa</td>
-                    <td>$${sf.final_bankroll.toFixed(2)}</td>
-                    <td style="color:${sf.net_profit>=0?'var(--success)':'var(--danger)'}">${sf.net_profit>=0?'+':''}$${sf.net_profit.toFixed(2)}</td>
-                    <td>${sf.total_bets}</td>
-                    <td>${sf.win_rate.toFixed(1)}%</td>
-                    <td>${sf.roi.toFixed(2)}%</td>
-                    <td>${sf.max_drawdown.toFixed(2)}%</td>
-                </tr>
-                <tr>
-                    <td>Stake Proporcional (2%)</td>
-                    <td>$${sp.final_bankroll.toFixed(2)}</td>
-                    <td style="color:${sp.net_profit>=0?'var(--success)':'var(--danger)'}">${sp.net_profit>=0?'+':''}$${sp.net_profit.toFixed(2)}</td>
-                    <td>${sp.total_bets}</td>
-                    <td>${sp.win_rate.toFixed(1)}%</td>
-                    <td>${sp.roi.toFixed(2)}%</td>
-                    <td>${sp.max_drawdown.toFixed(2)}%</td>
-                </tr>
-                <tr>
-                    <td>Kelly Criterion (1/4)</td>
-                    <td>$${sk.final_bankroll.toFixed(2)}</td>
-                    <td style="color:${sk.net_profit>=0?'var(--success)':'var(--danger)'}">${sk.net_profit>=0?'+':''}$${sk.net_profit.toFixed(2)}</td>
-                    <td>${sk.total_bets}</td>
-                    <td>${sk.win_rate.toFixed(1)}%</td>
-                    <td>${sk.roi.toFixed(2)}%</td>
-                    <td>${sk.max_drawdown.toFixed(2)}%</td>
-                </tr>
-            `;
-        }
-    }
-
-    if (typeof renderQuartiles === 'function') renderQuartiles(data.quartiles);
-
-    if (typeof displayPortfolioOptimization === 'function') {
-        displayPortfolioOptimization(data.portfolio_optimization);
-    }
-};
-
-// Call load config on startup
-setTimeout(loadClusterAiConfig, 2000);
-
-
 // --- Portfolio Backtesting ---
 
 function togglePortfolioStakeInput() {
@@ -9155,23 +5435,42 @@ async function runPortfolioBacktest(overrideStrategyIds) {
     
     const btn = document.querySelector('button[onclick="runPortfolioBacktest()"]');
     if (btn) {
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando (Aguarde...)';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sincronizando estratégias...';
         btn.disabled = true;
     }
-    
-    // Show Loading
-    showToast('Rodando Portfólio. Isso pode levar de 30 a 60 segundos...', 'info', 60000);
-    
+
+    showToast('Sincronizando estratégias com o servidor...', 'info', 30000);
+
     try {
-        // Switch to Laboratory Tab
+        const history = lsLoadHistory();
+        const selectedItems = history.filter(h => strategyIds.includes(h.id));
+        if (selectedItems.length > 0) {
+            // Fire-and-forget: don't block UI while syncing
+            lsSyncToServer(selectedItems).catch(() => {});
+        }
+
+        // Switch to Laboratory Tab and show spinner IMMEDIATELY
         switchTab('tab-laboratory');
-        
+
+        if (btn) {
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando (Aguarde...)';
+            btn.disabled = true;
+        }
+        showToast('Rodando Portfólio. Pode levar até 2 min no servidor gratuito...', 'info');
+
         // Hide standard Laboratory panels early so we don't see 0s
         const stdGrid = document.getElementById('standard-metrics-grid');
         if (stdGrid) stdGrid.style.display = 'none';
-        
+
         const mainCharts = document.querySelector('.main-charts');
         if (mainCharts) mainCharts.style.display = 'none';
+
+        // Show placeholder in portfolio panel while loading
+        document.getElementById('portfolio-results-panel').style.display = 'block';
+        document.getElementById('port-metric-bankroll').innerText = '---';
+        document.getElementById('port-metric-profit').innerText = '---';
+        document.getElementById('port-metric-roi').innerText = 'Aguardando...';
+        document.getElementById('port-metric-dd').innerText = '---';
 
         const res = await fetch(`${API_BASE_URL}/api/portfolio_backtest`, {
             method: 'POST',
@@ -9179,12 +5478,13 @@ async function runPortfolioBacktest(overrideStrategyIds) {
             body: JSON.stringify({
                 strategy_ids: strategyIds,
                 initial_bankroll: parseFloat(document.getElementById('portfolio-bankroll-input')?.value || 1000),
-                risk_method: riskMethod
+                risk_method: riskMethod,
+                strategies_inline: selectedItems  // fallback when DB is empty post-deploy
             })
         });
-        
+
         const data = await res.json();
-        
+
         if (!res.ok || data.error) {
             showToast(data.detail || data.error || 'Erro desconhecido do servidor.', 'error');
             if (btn) { btn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Rodar Portfólio Selecionado'; btn.disabled = false; }
@@ -9197,10 +5497,16 @@ async function runPortfolioBacktest(overrideStrategyIds) {
             if(tbody) tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted">Nenhuma aposta atendeu aos critérios (odds > 2.50 foram removidas).</td></tr>`;
             return;
         }
-        
+
         // Show Portfolio Panel
         document.getElementById('portfolio-results-panel').style.display = 'block';
-        
+
+        // Show dedup warnings if any
+        if (data.dedup_warnings && data.dedup_warnings.length > 0) {
+            const msg = data.dedup_warnings.join('\n');
+            showToast(msg, 'warning', 8000);
+        }
+
         // Update top-level Metrics
         document.getElementById('port-metric-bankroll').innerText = `$${data.final_bankroll.toFixed(2)}`;
         document.getElementById('port-metric-profit').innerText = `$${data.net_profit.toFixed(2)}`;
@@ -9225,7 +5531,16 @@ async function runPortfolioBacktest(overrideStrategyIds) {
         setEl('port-metric-pvalue',  s.p_value != null ? (s.p_value < 0.001 ? '< 0.001' : s.p_value.toFixed(3)) : '-');
         setEl('port-metric-consec-wins',   s.max_consec_wins ?? '-');
         setEl('port-metric-consec-losses', s.max_consec_losses ?? '-');
-        
+
+        // Also populate shared Laboratório cards (matches, seasons)
+        if (document.getElementById('metric-matches-analyzed')) {
+            document.getElementById('metric-matches-analyzed').innerText = (data.matches_total_in_file || 0).toLocaleString();
+        }
+        if (document.getElementById('metric-seasons')) {
+            const seasons = data.seasons_analyzed || [];
+            document.getElementById('metric-seasons').innerText = seasons.length > 0 ? seasons.join(', ') : '-';
+        }
+
         // Render Chart
         renderPortfolioChart(data.equity_curve);
         
@@ -9281,10 +5596,13 @@ async function runPortfolioBacktest(overrideStrategyIds) {
         }
         
         if (typeof populateBetsTable === 'function') {
-            allBets = bets;
-            populateBetsTable(allBets);
+            window.allBets = bets;
+            populateBetsTable(window.allBets);
         }
-        
+
+        // Reset button after successful run
+        if (btn) { btn.innerHTML = '<i class="fa-solid fa-layer-group"></i> Rodar Portfólio Selecionado'; btn.disabled = false; }
+
     } catch (e) {
         console.error(e);
         showToast('Erro: ' + e.message, 'error');
@@ -9400,7 +5718,22 @@ async function savePortfolio() {
         riskMethod = `fixed_${pct}`;
     }
     
-    const portfolioObj = {
+    // Sanitize NaN/Infinity values (JSON.stringify throws on them)
+    const sanitizeObj = (obj) => {
+        if (obj === null || obj === undefined) return obj;
+        if (typeof obj === 'number' && (isNaN(obj) || !isFinite(obj))) return 0;
+        if (Array.isArray(obj)) return obj.map(sanitizeObj);
+        if (typeof obj === 'object' && obj.constructor === Object) {
+            const cleaned = {};
+            for (const [k, v] of Object.entries(obj)) {
+                cleaned[k] = sanitizeObj(v);
+            }
+            return cleaned;
+        }
+        return obj;
+    };
+
+    const portfolioObj = sanitizeObj({
         name: name,
         type: 'portfolio',
         created_at: new Date().toISOString(),
@@ -9415,8 +5748,9 @@ async function savePortfolio() {
             win_rate: parseFloat(winrateText.replace(/[^\d.-]/g, '')) || 0,
             total_bets: parseInt(betsText.replace(/[^\d.-]/g, '')) || 0,
             max_drawdown: parseFloat(drawdownText.replace(/[^\d.-]/g, '')) || 0
-        }
-    };
+        },
+        is_tg_active: false
+    });
     
     try {
         const res = await fetch(`${API_BASE_URL}/api/history`, {
@@ -9565,45 +5899,27 @@ async function importHistory(event) {
 
 
 // Expose remaining functions to global scope for HTML event handlers
-window.runRealtimePrediction = runRealtimePrediction;
 window.filterTable = filterTable;
 window.toggleBetsSort = toggleBetsSort;
 window.prevPage = prevPage;
 window.nextPage = nextPage;
-window.saveTelegramConfig = saveTelegramConfig;
-window.testTelegramConnection = testTelegramConnection;
-window.saveSchedulerConfigUi = saveSchedulerConfigUi;
-window.runSchedulerNow = runSchedulerNow;
-window.broadcastAllTips = broadcastAllTips;
-window.loadUpcomingMatches = loadUpcomingMatches;
-window.filterTipsTable = filterTipsTable;
-window.exportTipsToCsv = exportTipsToCsv;
-window.clearTipsLog = clearTipsLog;
 window.togglePortfolioStakeInput = togglePortfolioStakeInput;
 window.runPortfolioBacktest = runPortfolioBacktest;
-window.loadHistoryTab = loadHistoryTab;
 window.exportHistory = exportHistory;
 window.triggerImportHistory = triggerImportHistory;
 window.importHistory = importHistory;
-window.applyHistoryFilters = applyHistoryFilters;
-window.closeMatchDetailsModal = closeMatchDetailsModal;
-window.closeSaveStrategyModal = closeSaveStrategyModal;
-window.submitSaveStrategy = submitSaveStrategy;
 window.saveFutpythonKey = saveFutpythonKey;
 window.handleDataSourceChange = handleDataSourceChange;
 window.runScanner = runScanner;
 window.exportScannerResults = exportScannerResults;
 window.exportBacktestReport = exportBacktestReport;
 window.runEqsScanner = runEqsScanner;
-window.runSteamScan = runSteamScan;
-window.clearSteamScan = clearSteamScan;
-window.runArbitrageScan = runArbitrageScan;
-window.loadArbitrageBotConfig = loadArbitrageBotConfig;
-window.saveArbitrageBotConfig = saveArbitrageBotConfig;
-window.testArbitrageTelegramAlert = testArbitrageTelegramAlert;
-window.runClustering = runClustering;
-window.saveClusterAiConfig = saveClusterAiConfig;
-window.loadClusterAiConfig = loadClusterAiConfig;
+window.renderRiskManagement = renderRiskManagement;
+window.renderEdgeQualityScore = renderEdgeQualityScore;
+window.displayAiAnalysis = displayAiAnalysis;
+window.renderStatValidation = renderStatValidation;
+window.renderOosResults = renderOosResults;
+window.renderDriftValidation = renderDriftValidation;
 async function selectAllHistory(checked) {
     document.querySelectorAll('.history-select-checkbox').forEach(cb => {
         cb.checked = checked;
@@ -9656,49 +5972,110 @@ async function deleteSelectedHistory() {
     loadHistoryTab();
 }
 
-window.deleteHistoryStrategy = deleteHistoryStrategy;
-window.reloadStrategyById = reloadStrategyById;
-window.reloadStrategy = reloadStrategy;
 window.toggleActivePortfolio = toggleActivePortfolio;
 window.selectAllHistory = selectAllHistory;
 window.deleteSelectedHistory = deleteSelectedHistory;
-window.onCalculatorLeagueChange = onCalculatorLeagueChange;
 window.applyEvSuggestion = applyEvSuggestion;
 window.applyLeagueSuggestion = applyLeagueSuggestion;
 window.applyOddsSuggestion = applyOddsSuggestion;
 window.applyScannedStrategy = applyScannedStrategy;
-window.copyClusterLeagues = copyClusterLeagues;
 window.loadPortfolio = loadPortfolio;
-window.sendIndividualTip = sendIndividualTip;
 window.simulateSelectedScannerItems = simulateSelectedScannerItems;
-window.updateTipStatus = updateTipStatus;
 
 // Expose missing UI event handlers to global scope
 window.clearDashboard = clearDashboard;
-window.onMarketSelectionChange = onMarketSelectionChange;
-window.openSaveStrategyModal = openSaveStrategyModal;
 window.requestNotificationPermission = requestNotificationPermission;
 window.savePortfolio = savePortfolio;
-window.selectAllMarkets = selectAllMarkets;
 window.testNotificationAlert = testNotificationAlert;
-window.toggleMarketDropdown = toggleMarketDropdown;
 
-window.loadDutchingBotConfig = loadDutchingBotConfig;
-window.saveDutchingBotConfig = saveDutchingBotConfig;
-window.testDutchingTelegramAlert = testDutchingTelegramAlert;
-window.loadOddsApiKey = loadOddsApiKey;
-window.saveOddsApiKey = saveOddsApiKey;
 
 window.updateCacheStatus = function() {
     const backtestCache = JSON.parse(localStorage.getItem('radar_backtest_cache') || '{}');
     const cacheCount = Object.keys(backtestCache).length;
     const cacheStatusEl = document.getElementById('live-cache-status');
     if (cacheStatusEl) {
-        cacheStatusEl.innerHTML = cacheCount > 0 ? 
-            `<span style="color: #34d399; font-weight: bold;"><i class="fa-solid fa-circle-check"></i> Cérebro Conectado:</span> ${cacheCount} nichos em cache.` : 
-            `<span style="color: #f59e0b;"><i class="fa-solid fa-circle-exclamation"></i> Laboratório Desconectado:</span> Rode um backtest para ativar filtros.`;
+        cacheStatusEl.innerHTML = cacheCount > 0 ?
+            '<span style="color: #34d399; font-weight: bold;"><i class="fa-solid fa-circle-check"></i> Cerebro Conectado:</span> ' + cacheCount + ' nichos em cache.' :
+            '<span style="color: #f59e0b;"><i class="fa-solid fa-circle-exclamation"></i> Laboratorio Desconectado:</span> Rode um backtest para ativar filtros.';
     }
 };
+
+function renderWalkForwardResults(data) {
+    ['transparency-panel', 'stat-validation-panel', 'drift-validation-panel',
+     'robustness-stress-panel', 'staking-comparison-panel'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    var panel = document.getElementById('walk-forward-results-panel');
+    if (panel) panel.style.display = 'block';
+
+    var tbody = document.getElementById('walk-forward-tbody');
+    if (tbody && data.fold_results) {
+        tbody.innerHTML = data.fold_results.map(function(f) {
+            var roiColor = f.roi >= 0 ? '#34d399' : '#f87171';
+            var profitColor = f.net_profit >= 0 ? '#34d399' : '#f87171';
+            return '<tr>' +
+                '<td style="padding:8px;font-weight:bold;color:#38bdf8;">Fold ' + f.fold + '</td>' +
+                '<td style="padding:8px;font-size:10px;color:var(--text-secondary);">' + f.train_start + ' &rarr; ' + f.train_end + '</td>' +
+                '<td style="padding:8px;font-size:10px;color:var(--text-secondary);">' + f.test_start + ' &rarr; ' + f.test_end + '</td>' +
+                '<td style="padding:8px;text-align:center;">' + f.total_bets + '</td>' +
+                '<td style="padding:8px;text-align:right;color:' + profitColor + ';font-weight:bold;">' + (f.net_profit >= 0 ? '+' : '') + '$' + f.net_profit.toFixed(2) + '</td>' +
+                '<td style="padding:8px;text-align:right;color:' + roiColor + ';font-weight:bold;">' + (f.roi >= 0 ? '+' : '') + f.roi.toFixed(2) + '%</td>' +
+                '<td style="padding:8px;text-align:right;">' + f.win_rate.toFixed(1) + '%</td>' +
+                '<td style="padding:8px;text-align:right;color:#f87171;">-' + f.max_drawdown_pct.toFixed(1) + '%</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    var scoreCard = document.getElementById('walk-forward-score-card');
+    if (scoreCard) {
+        var meanRoi = data.mean_roi;
+        var medianRoi = data.median_roi;
+        var cvRoi = data.cv_roi;
+        var wfScore = data.walk_forward_score;
+        var verdict = data.verdict;
+        var positiveFoldsPct = data.positive_folds_pct;
+        var meanDD = data.mean_max_drawdown;
+        var verdictColor = verdict === 'STRONG' ? '#34d399' : (verdict === 'MODERATE' ? '#f59e0b' : '#ef4444');
+        var scoreColor = wfScore >= 70 ? '#34d399' : (wfScore >= 45 ? '#f59e0b' : '#ef4444');
+        var cvColor = cvRoi < 1.0 ? '#34d399' : (cvRoi < 2.0 ? '#f59e0b' : '#ef4444');
+
+        scoreCard.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">' +
+            '<div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);padding:12px;border-radius:6px;text-align:center;">' +
+                '<div style="font-size:10px;color:var(--text-secondary);margin-bottom:4px;">WF Score</div>' +
+                '<div style="font-size:28px;font-weight:bold;color:' + scoreColor + ';">' + wfScore + '</div>' +
+                '<div style="font-size:10px;color:' + verdictColor + ';font-weight:bold;margin-top:2px;">' + verdict + '</div>' +
+            '</div>' +
+            '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:12px;border-radius:6px;text-align:center;">' +
+                '<div style="font-size:10px;color:var(--text-secondary);margin-bottom:4px;">ROI Medio</div>' +
+                '<div style="font-size:22px;font-weight:bold;color:' + (meanRoi >= 0 ? '#34d399' : '#f87171') + ';">' + (meanRoi >= 0 ? '+' : '') + meanRoi.toFixed(2) + '%</div>' +
+                '<div style="font-size:10px;color:var(--text-secondary);">Mediana: ' + (medianRoi >= 0 ? '+' : '') + medianRoi.toFixed(2) + '%</div>' +
+            '</div>' +
+            '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:12px;border-radius:6px;text-align:center;">' +
+                '<div style="font-size:10px;color:var(--text-secondary);margin-bottom:4px;">Estabilidade (CV)</div>' +
+                '<div style="font-size:22px;font-weight:bold;color:' + cvColor + ';">' + cvRoi.toFixed(2) + '</div>' +
+                '<div style="font-size:10px;color:var(--text-secondary);">Menor = melhor</div>' +
+            '</div>' +
+            '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:12px;border-radius:6px;text-align:center;">' +
+                '<div style="font-size:10px;color:var(--text-secondary);margin-bottom:4px;">Folds Positivos</div>' +
+                '<div style="font-size:22px;font-weight:bold;color:' + (positiveFoldsPct >= 60 ? '#34d399' : '#f59e0b') + ';">' + data.positive_folds + '/' + data.n_folds + '</div>' +
+                '<div style="font-size:10px;color:var(--text-secondary);">' + positiveFoldsPct.toFixed(0) + '% dos folds</div>' +
+            '</div>' +
+            '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:12px;border-radius:6px;text-align:center;">' +
+                '<div style="font-size:10px;color:var(--text-secondary);margin-bottom:4px;">DD Medio</div>' +
+                '<div style="font-size:22px;font-weight:bold;color:#f87171;">-' + meanDD.toFixed(1) + '%</div>' +
+                '<div style="font-size:10px;color:var(--text-secondary);">Max DD entre folds</div>' +
+            '</div>' +
+        '</div>' +
+        '<div style="margin-top:10px;padding:8px 12px;background:rgba(56,189,248,0.05);border-left:3px solid #38bdf8;border-radius:4px;font-size:11px;color:var(--text-secondary);">' +
+            '<strong style="color:#38bdf8;">Como interpretar:</strong> WF Score >= 70 (STRONG) = robusto. Score < 45 (WEAK) = overfitting. CV baixo = ROI consistente entre folds.' +
+        '</div>';
+    }
+
+    var totalBetsEl = document.getElementById('metric-total-bets');
+    if (totalBetsEl) totalBetsEl.innerText = data.total_oos_bets;
+}
 
 window.addEventListener('DOMContentLoaded', () => {
     if (typeof window.updateCacheStatus === 'function') {

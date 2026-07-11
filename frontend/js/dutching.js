@@ -217,13 +217,20 @@ async function runDutchingScan() {
     
     try {
         const source = document.getElementById('dutching-source-select')?.value || 'odds_api';
-        const strategy = document.getElementById('dutching-strategy-select')?.value || 'fav_short';
+        const strategy = document.getElementById('dutching-strategy-select')?.value || 'auto_ia';
         const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/scan_dutching?source=${source}&strategy=${strategy}`);
         if (!res.ok) throw new Error("Dutching scan failed");
-        
+
         const opps = await res.json();
         dutchingRadarAllOpps = opps;
-        
+
+        // Detect API error responses (backend returns error objects instead of opportunities)
+        if (opps.length === 1 && opps[0].error) {
+            showToast(opps[0].message, "error");
+            filterDutchingRadar();
+            return;
+        }
+
         filterDutchingRadar();
         showToast(`Radar de Dutching atualizado! ${opps.length} oportunidades +EV encontradas.`, "success");
     } catch (err) {

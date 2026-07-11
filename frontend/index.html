@@ -3,23 +3,23 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Sports Betting Backtester Pro</title>
 <script>
 window.addEventListener('error', function(e) {
     if (e.message && !e.message.includes("ResizeObserver")) {
-        alert("ERRO GLOBAL JS: " + e.message + "\nLinha: " + e.lineno);
+        console.error("ERRO GLOBAL JS:", e.message, "Linha:", e.lineno);
     }
 });
 window.addEventListener('unhandledrejection', function(e) {
     if (e.reason) {
-        alert("ERRO ASYNC JS: " + e.reason);
+        console.error("ERRO ASYNC JS:", e.reason);
     }
 });
 </script>
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-<meta http-equiv="Pragma" content="no-cache" />
-<meta http-equiv="Expires" content="0" />
 <!-- Google Fonts: Outfit (headings) & Inter (UI) -->
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -29,11 +29,64 @@ window.addEventListener('unhandledrejection', function(e) {
 <!-- Chart.js for premium charting -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="manifest.json" rel="manifest"/>
-<link href="styles.css?v=6" rel="stylesheet"/>
+<link href="styles.css?v=18" rel="stylesheet"/>
 </head>
 <body>
 
+<!-- Top Bar -->
+<header class="topbar" role="banner" aria-label="Barra principal">
+  <div class="topbar-brand">
+    <i class="fa-solid fa-chart-line"></i>
+    Predictive<span>Backtest</span>
+  </div>
+  <div class="topbar-center">
+    <select id="topbar-data-source" aria-label="Fonte de dados" onchange="var ds=document.getElementById('data-source-select'); ds.value=this.value; ds.dispatchEvent(new Event('change'))">
+      <option value="footballdata">Football-Data (Global)</option>
+      <option value="futpython">FutPythonTrader (América do Sul)</option>
+    </select>
+    <button class="btn-topbar btn-topbar--primary" id="btn-topbar-run" onclick="runBacktest()" aria-label="Executar backtest">
+      <i class="fa-solid fa-play"></i> Executar
+    </button>
+  </div>
+  <div class="topbar-actions">
+    <span id="topbar-status" style="font-size:11px;color:var(--text-muted);"></span>
+  </div>
+</header>
+
 <div class="app-container">
+<nav class="sidenav" role="navigation" aria-label="Navegação principal">
+  <button class="sidenav-item active" onclick="switchTab('tab-scanner')" aria-label="Scanner">
+    <i class="fa-solid fa-globe"></i><span class="sidenav-label">Scanner</span>
+  </button>
+  <button class="sidenav-item" onclick="switchTab('tab-laboratory')" aria-label="Laboratório">
+    <i class="fa-solid fa-microscope"></i><span class="sidenav-label">Laboratório</span>
+  </button>
+  <button class="sidenav-item" onclick="switchTab('tab-optimization')" aria-label="Otimização">
+    <i class="fa-solid fa-wand-magic-sparkles"></i><span class="sidenav-label">Otimização</span>
+  </button>
+  <button class="sidenav-item" onclick="switchTab('tab-clustering')" aria-label="Clusterização">
+    <i class="fa-solid fa-network-wired"></i><span class="sidenav-label">Clusters</span>
+  </button>
+  <button class="sidenav-item" onclick="switchTab('tab-radar')" aria-label="Radar">
+    <i class="fa-solid fa-satellite-dish"></i><span class="sidenav-label">Radar</span>
+  </button>
+  <button class="sidenav-item" onclick="switchTab('tab-arbitrage')" aria-label="Arbitragem">
+    <i class="fa-solid fa-scale-balanced"></i><span class="sidenav-label">Arbitragem</span>
+  </button>
+  <button class="sidenav-item" onclick="switchTab('tab-dutching')" aria-label="Dutching">
+    <i class="fa-solid fa-calculator"></i><span class="sidenav-label">Dutching</span>
+  </button>
+  <button class="sidenav-item" onclick="switchTab('tab-operations')" aria-label="Operações">
+    <i class="fa-solid fa-bolt"></i><span class="sidenav-label">Operações</span>
+  </button>
+  <button class="sidenav-item" onclick="switchTab('tab-gr')" aria-label="Risco">
+    <i class="fa-solid fa-shield-halved"></i><span class="sidenav-label">Risco</span>
+  </button>
+  <button class="sidenav-item" onclick="switchTab('tab-history')" aria-label="Histórico">
+    <i class="fa-solid fa-bookmark"></i><span class="sidenav-label">Histórico</span>
+  </button>
+</nav>
+
 <!-- Sidebar Controls -->
 <aside class="sidebar">
 <div class="brand">
@@ -43,12 +96,12 @@ window.addEventListener('unhandledrejection', function(e) {
 <form id="backtest-form" onsubmit="event.preventDefault(); runBacktest();">
 <div class="form-section">
 <h3><i class="fa-solid fa-database"></i> Fonte de Dados</h3>
-<select id="data-source-select" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px; margin-bottom: 10px;" onchange="handleDataSourceChange()">
+<select id="data-source-select" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px; margin-bottom: 10px;" onchange="window.handleDataSourceChange()">
     <option value="footballdata">Padrão Global (Football-Data)</option>
     <option value="futpython">América do Sul (FutPythonTrader)</option>
 </select>
 <div id="futpython-config" style="display: none; margin-bottom: 10px;">
-    <input type="text" id="futpython-api-key" placeholder="API Key da FutPythonTrader..." value="cmqa6oz0p01i1wq6lzxknltmd" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px;" onchange="saveFutpythonKey(this.value)">
+    <input type="text" id="futpython-api-key" placeholder="API Key da FutPythonTrader..." value="cmqa6oz0p01i1wq6lzxknltmd" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 4px;" onchange="window.saveFutpythonKey(this.value)">
 </div>
 </div>
 <div class="form-section">
@@ -91,12 +144,36 @@ window.addEventListener('unhandledrejection', function(e) {
         <option value="40">40% dos jogos (Extremo)</option>
     </select>
 </div>
+<div class="form-group" style="margin-top: 10px;">
+<label class="multiselect-option-item" style="font-size: 12px; padding: 5px 0;">
+<input id="wf-toggle" type="checkbox" onchange="document.getElementById('wf-folds-container').style.display = this.checked ? 'block' : 'none';"/> Walk-Forward Validation (Janela Expansiva)
+                            <i class="fa-solid fa-circle-info" onclick="showToast(this.title, 'info')" style="font-size: 10px; color: var(--text-muted); cursor: help;" title="Divide o histórico em N janelas expansivas. Cada janela treina nos dados anteriores e testa nos dados futuros — sem contaminação entre folds. Mede a estabilidade real da estratégia."></i>
+</label>
+</div>
+<div class="form-group" id="wf-folds-container" style="display: none; margin-top: 5px; margin-left: 20px;">
+    <label for="wf-folds" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 2px;">Número de Folds</label>
+    <select id="wf-folds" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none;">
+        <option value="3">3 folds (Rápido)</option>
+        <option value="5" selected>5 folds (Padrão Recomendado)</option>
+        <option value="7">7 folds (Rigoroso)</option>
+        <option value="10">10 folds (Extremo)</option>
+    </select>
+</div>
 <div class="form-group" style="margin-top: 5px;">
 <label class="multiselect-option-item" style="font-size: 12px; padding: 5px 0;">
 <input id="use-ml-toggle" type="checkbox"/> 🧠 Correção por Machine Learning (XGBoost)
                             <i class="fa-solid fa-circle-info" onclick="showToast(this.title, 'info')" style="font-size: 10px; color: var(--text-muted); cursor: help;" title="Treina um modelo XGBoost em lote (expanding window) para aprender com as distorções passadas e ajustar as probabilidades matemáticas futuras, otimizando o Edge."></i>
+                            <span id="ml-status-badge" style="display: none; font-size: 10px; margin-left: 6px; padding: 1px 6px; border-radius: 3px; vertical-align: middle;"></span>
 </label>
 </div>
+	<div class="form-group" style="margin-top: 10px;">
+	    <label for="model-type-select" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Modelo de Probabilidade</label>
+	    <select id="model-type-select" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none;">
+	        <option value="poisson" selected>Poisson Bivariado (Padrao)</option>
+	        <option value="negative_binomial">Negative Binomial (Avancado)</option>
+	    </select>
+	    <span style="font-size: 9px; color: var(--text-muted); display: block; margin-top: 2px;">NB captura overdispersion - maior acuracia para Correct Score</span>
+	</div>
 <div class="form-group" style="margin-top: 10px; cursor: help;" title="Slippage das Odds (Penalidade): Simula o impacto de cotações que caem antes de você conseguir apostar (deriva de execução). Deixe em 0% para simulação ideal sem perdas.">
     <label for="backtest-slippage" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Slippage das Odds (Penalidade)</label>
     <select id="backtest-slippage" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 11px; outline: none;">
@@ -692,6 +769,9 @@ window.addEventListener('unhandledrejection', function(e) {
                             <button type="button" class="btn-scanner" id="btn-eqs-scan-combinations" onclick="runEqsScanner('combinations')" style="background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.5); color: #34d399; font-size: 11px; font-weight: bold; border-width: 2px;">
                                 <i class="fa-solid fa-layer-group"></i> SUPER SCAN (Ligas + Mercados)
                             </button>
+                            <button type="button" class="btn-scanner" id="btn-eqs-scan-staking" onclick="runEqsScanner('staking')" style="background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.4); color: #60a5fa; font-size: 11px; font-weight: bold; border-width: 2px;">
+                                <i class="fa-solid fa-scale-balanced"></i> COMPARA GESTÕES (Fixed vs Prop vs Kelly)
+                            </button>
                             <div style="width: 1px; background: rgba(255,255,255,0.1); margin: 0 5px;"></div>
                             <button type="button" class="btn-scanner" onclick="clearScannerResults()" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #f87171; font-size: 11px; margin-left: auto;">
                                 <i class="fa-solid fa-eraser"></i> Limpar Tela
@@ -731,8 +811,11 @@ window.addEventListener('unhandledrejection', function(e) {
                             <option value="7">7 Grupos</option>
                         </select>
                     </div>
-                    <button type="button" class="btn-scanner" id="btn-run-clustering" onclick="runClustering()" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">
+                    <button type="button" class="btn-scanner" id="btn-run-clustering" onclick="window.runClustering()" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">
                         <i class="fa-solid fa-brain"></i> Agrupar Ligas
+                    </button>
+                    <button type="button" class="btn-scanner" id="btn-test-cluster-alerts" onclick="window.testClusterAlerts()" style="background: rgba(36, 161, 222, 0.2); border-color: #24A1DE; color: #24A1DE; font-size: 11px; margin-top: 6px;">
+                        <i class="fa-brands fa-telegram"></i> Testar Alertas Telegram
                     </button>
                 </div>
             </div>
@@ -1088,10 +1171,10 @@ window.addEventListener('unhandledrejection', function(e) {
                 
                 <div class="steam-mode-toggle" style="display: flex; gap: 10px; align-items: center; margin: 0;">
                     <button id="btn-mode-lab" class="action-button active" onclick="window.toggleSteamMode('lab')" style="padding: 8px 15px; font-size: 13px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
-                        <i class="fa-solid fa-flask"></i> Modo Laboratório (Backtest)
+                        <i class="fa-solid fa-flask"></i> Modo Lab: Value Scanner
                     </button>
                     <button id="btn-mode-live" class="action-button" onclick="window.toggleSteamMode('live')" style="padding: 8px 15px; font-size: 13px; background: transparent; color: var(--text-secondary); border: 1px solid transparent;">
-                        <i class="fa-solid fa-broadcast-tower"></i> Radar Ao Vivo
+                        <i class="fa-solid fa-broadcast-tower"></i> Radar Ao Vivo (Steam Moves)
                     </button>
                 </div>
             </div>
@@ -1208,7 +1291,7 @@ window.addEventListener('unhandledrejection', function(e) {
                             <h2 style="margin: 0; color: #34d399; font-weight: 600;"><i class="fa-solid fa-scale-balanced"></i> Scanner de Arbitragem (Surebets)</h2>
                             <p style="margin: 5px 0 0 0; color: #9ca3af; font-size: 14px;">Monitoramento em tempo real de assimetrias globais (Risco Zero).</p>
                         </div>
-                        <button type="button" class="btn-primary" id="btn-scan-arbitrage" onclick="runArbitrageScan()">
+                        <button type="button" class="btn-primary" id="btn-scan-arbitrage" onclick="window.runArbitrageScan()">
                             <i class="fa-solid fa-radar"></i> Rastrear Oportunidades
                         </button>
                     </div>
@@ -1265,14 +1348,29 @@ window.addEventListener('unhandledrejection', function(e) {
                                     <th>Jogo</th>
                                     <th>Data / Hora</th>
                                     <th>Mercado Encontrado</th>
-                                    <th>Lucro Líquido</th>
+                                    <th>Lucro Bruto</th>
+                                    <th>Lucro Líquido*</th>
+                                    <th>Qualidade</th>
                                     <th>Ação</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td colspan="5" style="text-align: center; color: #6b7280;">Clique em Rastrear para buscar Surebets nos jogos futuros.</td></tr>
+                                <tr><td colspan="7" style="text-align: center; color: #6b7280;">Clique em Rastrear para buscar Surebets nos jogos futuros.</td></tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <div style="margin-top: 10px; padding: 10px; background: var(--bg-darker); border-radius: 8px; font-size: 11px; color: var(--text-muted); display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+                        <span><strong style="color: var(--text-secondary);">* Lucro Líquido</strong> = Lucro Bruto − Slippage (−1% a 3%) − Comissão Betfair (2% a 5%)</span>
+                        <span>|</span>
+                        <span><strong style="color: var(--text-secondary);">Qualidade</strong>:
+                            <span style="color:#34d399;">≥70 Excelente</span> ·
+                            <span style="color:#f59e0b;">50-69 Boa</span> ·
+                            <span style="color:#f97316;">30-49 Regular</span> ·
+                            <span style="color:#ef4444;">&lt;30 Fraca</span>
+                        </span>
+                        <span>|</span>
+                        <span><strong style="color: var(--text-secondary);">Apenas Futebol</strong> — odds com ~60s de delay (tier gratuito)</span>
                     </div>
                 </div>
 
@@ -1375,10 +1473,13 @@ window.addEventListener('unhandledrejection', function(e) {
                             
                             <span style="font-size: 12px; color: var(--text-secondary); margin-left: 15px;">Estratégia:</span>
                             <select id="dutching-strategy-select" style="background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 12px; outline: none;" onchange="window.runDutchingScan()">
-                                <option value="auto_ia" selected>🧠 Seleção Automática (IA Recomendada)</option>
-                                <option value="fav_classic">🏆 Favorito Clássico (5 Placares)</option>
-                                <option value="fav_short">⚡ Favorito Curto (3 Placares)</option>
-                                <option value="under_trunc">🛡️ Jogo Truncado / Under (4 Placares)</option>
+                                <option value="auto_ia" selected>IA Auto (Recomendada)</option>
+                                <option value="dynamic">Todos os Placares (EV Individual)</option>
+                                <option value="home_fav">Favorito Mandante</option>
+                                <option value="away_fav">Favorito Visitante</option>
+                                <option value="draw">Empate</option>
+                                <option value="under">Under / Jogo Truncado</option>
+                                <option value="over">Over / Goleada</option>
                             </select>
 
                             <button type="button" class="btn-clear" onclick="window.toggleDutchingGuide()" style="padding: 4px 8px; font-size: 11px; margin-left: 15px; color: #a78bfa; border-color: rgba(167,139,250,0.2); background: rgba(167,139,250,0.05); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
@@ -1388,19 +1489,32 @@ window.addEventListener('unhandledrejection', function(e) {
 
                         <!-- Definições das Estratégias Collapsible Box -->
                         <div id="dutching-strategies-guide" style="display: none; background: rgba(139, 92, 246, 0.04); border: 1px solid rgba(139, 92, 246, 0.15); padding: 15px; border-radius: 6px; margin-bottom: 15px; font-size: 12px; line-height: 1.5; color: var(--text-secondary);">
-                            <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--text-primary); font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-brain" style="color: #a78bfa;"></i> Definições das Estratégias de Dutching</h4>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                            <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--text-primary); font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-brain" style="color: #a78bfa;"></i> Estratégias de Dutching (Nova Geração — EV Individual)</h4>
+                            <p style="margin: 0 0 10px 0; font-size: 11px; color: #a78bfa;"><strong>Como funciona:</strong> Cada placar é selecionado individualmente com base no EV (prob_modelo x odd - 1). Apenas placares com edge mínimo de 5% entram, limitados a 8 pernas e overround de 92%. As odds de CS são estimadas a partir das odds reais de O/U 2.5 da casa, com juice variável por raridade do placar (22-45%).</p>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
                                 <div>
-                                    <strong style="color: #c084fc;">🏆 Favorito Clássico (5 Placares)</strong>
-                                    <p style="margin: 5px 0 0 0; font-size: 11px; color: var(--text-muted);">Cobre: <code>1-0, 2-0, 2-1, 3-0, 3-1</code> (ou o inverso fora). Indicado para quando há um favorito claro em jogo aberto com tendência de gols, garantindo cobertura total da vitória do favorito sem se expor a empates.</p>
+                                    <strong style="color: #c084fc;">IA Auto (Recomendada)</strong>
+                                    <p style="margin: 3px 0 0 0; font-size: 11px; color: var(--text-muted);">Escolhe automaticamente entre as estratégias abaixo com base no perfil do jogo (gols esperados, prob under 2.5, prob empate).</p>
                                 </div>
                                 <div>
-                                    <strong style="color: #c084fc;">⚡ Favorito Curto (3 Placares)</strong>
-                                    <p style="margin: 5px 0 0 0; font-size: 11px; color: var(--text-muted);">Cobre: <code>1-0, 2-0, 2-1</code> (ou o inverso fora). Foco na vitória do favorito pelo placar mínimo. Indicado para cenários de favoritismo médio com odds combinadas mais elevadas.</p>
+                                    <strong style="color: #c084fc;">Todos os Placares</strong>
+                                    <p style="margin: 3px 0 0 0; font-size: 11px; color: var(--text-muted);">Busca EV em 20 placares (0-0 a 3-3). Máxima liberdade — o modelo seleciona os melhores placares independente de tema.</p>
                                 </div>
                                 <div>
-                                    <strong style="color: #c084fc;">🛡️ Jogo Truncado / Under (4 Placares)</strong>
-                                    <p style="margin: 5px 0 0 0; font-size: 11px; color: var(--text-muted);">Cobre: <code>0-0, 1-0, 2-0, 1-1</code> (ou o inverso fora). Cobre empates de poucos gols e vitória magra do favorito. Ideal para partidas muito truncadas com forte viés de Under 2.5.</p>
+                                    <strong style="color: #c084fc;">Favorito Mandante/Visitante</strong>
+                                    <p style="margin: 3px 0 0 0; font-size: 11px; color: var(--text-muted);">Foco nos 8 placares de vitória do favorito: 1-0, 2-0, 2-1, 3-0, 3-1, 3-2, 4-0, 4-1 (ou inverso).</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #c084fc;">Empate</strong>
+                                    <p style="margin: 3px 0 0 0; font-size: 11px; color: var(--text-muted);">Cobre 0-0, 1-1, 2-2, 3-3. Ideal para jogos equilibrados com alta probabilidade de empate.</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #c084fc;">Under / Jogo Truncado</strong>
+                                    <p style="margin: 3px 0 0 0; font-size: 11px; color: var(--text-muted);">Cobre placares de poucos gols: 0-0, 1-0, 0-1, 2-0, 0-2, 1-1. Viés de Under 2.5.</p>
+                                </div>
+                                <div>
+                                    <strong style="color: #c084fc;">Over / Goleada</strong>
+                                    <p style="margin: 3px 0 0 0; font-size: 11px; color: var(--text-muted);">Cobre placares com 3+ gols: 2-1, 1-2, 3-1, 1-3, 2-2, 3-2, 2-3, etc. Viés de Over 2.5.</p>
                                 </div>
                             </div>
                         </div>
@@ -1663,7 +1777,7 @@ window.addEventListener('unhandledrejection', function(e) {
 <div class="metric-card card-profit">
 <div class="metric-info">
 <span class="metric-label">Lucro Líquido</span>
-<h2 id="metric-net-profit">$0.00</h2>
+<h2 class="metric-value" id="metric-net-profit">$0.00</h2>
 </div>
 <div class="metric-icon">
 <i class="fa-solid fa-money-bill-trend-up"></i>
@@ -1673,7 +1787,7 @@ window.addEventListener('unhandledrejection', function(e) {
 <div class="metric-card card-stakes">
 <div class="metric-info">
 <span class="metric-label">Lucro em Stakes</span>
-<h2 id="metric-profit-stakes">+0.00 st.</h2>
+<h2 class="metric-value" id="metric-profit-stakes">+0.00 st.</h2>
 </div>
 <div class="metric-icon">
 <i class="fa-solid fa-coins"></i>
@@ -1683,7 +1797,7 @@ window.addEventListener('unhandledrejection', function(e) {
 <div class="metric-card card-roi">
 <div class="metric-info">
 <span class="metric-label">ROI (Yield)</span>
-<h2 id="metric-roi">0.0%</h2>
+<h2 class="metric-value" id="metric-roi">0.0%</h2>
 </div>
 <div class="metric-icon">
 <i class="fa-solid fa-percent"></i>
@@ -1693,7 +1807,7 @@ window.addEventListener('unhandledrejection', function(e) {
 <div class="metric-card card-winrate">
 <div class="metric-info">
 <span class="metric-label">Taxa de Acerto</span>
-<h2 id="metric-win-rate">0.0%</h2>
+<h2 class="metric-value" id="metric-win-rate">0.0%</h2>
 </div>
 <div class="metric-icon">
 <i class="fa-solid fa-bullseye"></i>
@@ -1707,6 +1821,56 @@ window.addEventListener('unhandledrejection', function(e) {
 </div>
 <div class="metric-icon">
 <i class="fa-solid fa-ticket"></i>
+</div>
+    </div>
+    <!-- Partidas Analisadas -->
+    <div class="metric-card card-matches">
+    <div class="metric-info">
+    <span class="metric-label">Partidas Analisadas</span>
+    <h2 id="metric-matches-analyzed">0</h2>
+    </div>
+    <div class="metric-icon">
+    <i class="fa-solid fa-futbol"></i>
+    </div>
+    </div>
+    <!-- Temporadas -->
+    <div class="metric-card card-seasons">
+    <div class="metric-info">
+    <span class="metric-label">Temporadas</span>
+    <h2 id="metric-seasons" style="font-size: 1.1rem;">-</h2>
+    </div>
+    <div class="metric-icon">
+    <i class="fa-solid fa-calendar-days"></i>
+    </div>
+    </div>
+    <!-- Vitórias -->
+<div class="metric-card card-wins">
+<div class="metric-info">
+<span class="metric-label">Vitórias</span>
+<h2 id="metric-wins">0</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-trophy"></i>
+</div>
+</div>
+<!-- Derrotas -->
+<div class="metric-card card-losses">
+<div class="metric-info">
+<span class="metric-label">Derrotas</span>
+<h2 id="metric-losses">0</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-circle-xmark"></i>
+</div>
+</div>
+<!-- Pushes (DNB/AH) -->
+<div class="metric-card card-pushes" id="metric-pushes-card" style="display: none;">
+<div class="metric-info">
+<span class="metric-label">Pushes</span>
+<h2 id="metric-pushes">0</h2>
+</div>
+<div class="metric-icon">
+<i class="fa-solid fa-circle-half-stroke"></i>
 </div>
 </div>
 <!-- Odd Média -->
@@ -1896,6 +2060,31 @@ window.addEventListener('unhandledrejection', function(e) {
                                     </table>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Walk-Forward Validation Panel -->
+                        <div id="walk-forward-results-panel" style="display: none; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 25px;">
+                            <h4 style="color: #38bdf8; font-family: var(--font-heading); margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-arrows-spin"></i> Walk-Forward Validation (Janela Expansiva)
+                            </h4>
+                            <div id="walk-forward-score-card" style="margin-bottom: 15px;"></div>
+                            <table class="table-styled" style="width: 100%; font-size: 11px;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 6px;">Fold</th>
+                                        <th style="padding: 6px;">Treino</th>
+                                        <th style="padding: 6px;">Teste</th>
+                                        <th style="padding: 6px; text-align: center;">Apostas</th>
+                                        <th style="padding: 6px; text-align: right;">Lucro ($)</th>
+                                        <th style="padding: 6px; text-align: right;">ROI (%)</th>
+                                        <th style="padding: 6px; text-align: right;">Acerto (%)</th>
+                                        <th style="padding: 6px; text-align: right;">Max DD (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="walk-forward-tbody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
                         </div>
 
                         <h4 style="margin-bottom: 15px; font-size: 14px; color: var(--text-muted);"><i class="fa-solid fa-list-check"></i> Detalhamento do Score</h4>
@@ -2136,6 +2325,20 @@ window.addEventListener('unhandledrejection', function(e) {
 </div>
 </div>
 
+</div>
+</section>
+<!-- AI Strategy Optimization Section -->
+<section class="ai-optimization-section" id="ai-optimization-panel" style="display: none; margin-bottom: 24px;">
+<div class="ai-card glassmorphism">
+<div class="ai-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 15px; margin-bottom: 15px;">
+<div class="ai-title">
+<h3><i class="fa-solid fa-wand-magic-sparkles text-glow"></i> Sugestões de Otimização da IA</h3>
+<p>Simulações "What-If" baseadas no histórico para maximizar seu ROI e diminuir o risco.</p>
+</div>
+</div>
+<div class="optimization-body" id="ai-optimization-suggestions">
+<!-- Populated dynamically -->
+</div>
 </div>
 </section>
 
@@ -3174,7 +3377,7 @@ window.addEventListener('unhandledrejection', function(e) {
     </div>
 
     <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
-    <script type="module" src="app.js?v=86"></script>
+    <script type="module" src="app.js?v=124"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
@@ -3204,6 +3407,10 @@ window.addEventListener('unhandledrejection', function(e) {
                     correspondingBtn.classList.add('active');
                     correspondingBtn.style.color = 'var(--text-primary)';
                     correspondingBtn.style.borderBottomColor = 'var(--primary)';
+                }
+                // Auto-load history when switching to history tab
+                if (tabId === 'tab-history' && typeof window.loadHistoryTab === 'function') {
+                    window.loadHistoryTab();
                 }
             } catch (err) {
                 console.error('[switchTab fallback] erro:', err);
@@ -3286,7 +3493,6 @@ window.applyEvSuggestion = window.applyEvSuggestion || function(val) {
     if (!evInput) { alert('Recarregue a página e tente novamente.'); return; }
     evInput.value = val;
     if (typeof window.showToast === 'function') window.showToast('Gatilho EV atualizado para ' + val + '. Rodando nova simulação...', 'success');
-    if (typeof window.switchTab === 'function') window.switchTab('tab-laboratory');
     if (typeof window.runBacktest === 'function') window.runBacktest();
 };
 
@@ -3296,20 +3502,82 @@ window.applyLeagueSuggestion = window.applyLeagueSuggestion || function(codes) {
         if (cb) cb.checked = false;
     });
     if (typeof window.showToast === 'function') window.showToast('Ligas problemáticas removidas. Reexecutando backtest...', 'success');
-    if (typeof window.switchTab === 'function') window.switchTab('tab-laboratory');
     if (typeof window.runBacktest === 'function') window.runBacktest();
 };
 
 window.applyOddsSuggestion = window.applyOddsSuggestion || function(rangeName) {
     if (typeof window.showToast === 'function') window.showToast('Filtro de odds aplicado. Rodando simulação...', 'success');
-    if (typeof window.switchTab === 'function') window.switchTab('tab-laboratory');
     if (typeof window.runBacktest === 'function') window.runBacktest();
+};
+
+window.runSteamScan = window.runSteamScan || function() {
+    var leagues = Array.from(document.querySelectorAll('#leagues-checkbox-list input[type="checkbox"]:checked')).map(function(cb) { return cb.value; });
+    if (leagues.length === 0) {
+        if (typeof showToast === 'function') showToast('Selecione pelo menos uma liga.', 'warning');
+        return;
+    }
+    var overlay = document.getElementById('steam-loading-overlay');
+    var table = document.getElementById('steam-table-container');
+    if (overlay) overlay.style.display = 'block';
+    if (table) table.innerHTML = '';
+    var startDate = document.getElementById('start-date') ? document.getElementById('start-date').value : '2024-09-01';
+    var endDate = document.getElementById('end-date') ? document.getElementById('end-date').value : '2025-05-31';
+    var markets = Array.from(document.querySelectorAll('#market-checkboxes-container input[type="checkbox"]:checked')).map(function(cb) { return cb.value; });
+    if (markets.length === 0) markets = ['home'];
+    var minDropPct = parseFloat((document.getElementById('val-drop-pct') || {}).value || 5.0);
+    var stakeValue = parseFloat((document.getElementById('stake-value') || {}).value || 10.0);
+    fetch((window.API_BASE_URL || '') + '/api/scan_steam_moves', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({leagues: leagues.slice(0, 1), startDate: startDate, endDate: endDate, markets: markets, minDropPct: minDropPct, stakeValue: stakeValue, data_source: window.currentDataSource || 'footballdata', detectionMode: 'model_edge'})
+    }).then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (overlay) overlay.style.display = 'none';
+        if (data.errors && data.errors.length) {
+            if (typeof showToast === 'function') showToast('Algumas ligas falharam (memória insuficiente). Reduza o período.', 'warning');
+        }
+        if (typeof window.renderSteamTable === 'function' && data.scan_results) {
+            window.renderSteamTable(data.scan_results);
+        } else if (table && data.scan_results) {
+            var html = '<table><thead><tr><th>Nicho</th><th>Bets</th><th>ROI</th><th>Drop</th><th>Win</th></tr></thead><tbody>';
+            data.scan_results.forEach(function(r) {
+                html += '<tr><td>' + r.code + '</td><td>' + r.total_bets + '</td><td>' + r.roi.toFixed(1) + '%</td><td>' + r.avg_drop.toFixed(1) + '%</td><td>' + r.win_rate.toFixed(0) + '%</td></tr>';
+            });
+            html += '</tbody></table>';
+            table.innerHTML = html;
+        }
+    }).catch(function(e) {
+        if (overlay) overlay.style.display = 'none';
+        if (table) table.innerHTML = '<p style="color:#f87171;text-align:center;padding:20px;">Erro ao buscar dados do Radar. Tente reduzir o período ou número de ligas.</p>';
+        if (typeof showToast === 'function') showToast('Erro no Radar Smart Money. Reduza período ou ligas.', 'error');
+    });
 };
 
 window.openSaveStrategyModal = window.openSaveStrategyModal || function() {
     var modal = document.getElementById('save-strategy-modal');
     if (modal) modal.style.display = 'flex';
     else alert('Rode um backtest primeiro para salvar a estratégia.');
+};
+
+window.runArbitrageScan = window.runArbitrageScan || function() {
+    var btn = document.getElementById('btn-scan-arbitrage');
+    var tbody = document.querySelector('#arbitrage-table tbody');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando...'; }
+    fetch((window.API_BASE_URL || '') + '/api/scan_arbitrage?min_profit_pct=0.5')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (Array.isArray(data) && data.length === 1 && data[0].error) {
+                if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f87171;padding:20px;"><i class="fa-solid fa-key"></i><br>' + data[0].message + '</td></tr>';
+                if (typeof showToast === 'function') showToast(data[0].message, 'error');
+            } else if (Array.isArray(data) && data.length === 0) {
+                if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#6b7280;padding:20px;">Nenhuma oportunidade encontrada. Configure THE_ODDS_API_KEY no Render.</td></tr>';
+                if (typeof showToast === 'function') showToast('API key não configurada. Obtenha em the-odds-api.com', 'warning');
+            }
+        }).catch(function(e) {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ef4444;">Erro ao buscar oportunidades.</td></tr>';
+        }).finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-radar"></i> Rastrear Oportunidades'; }
+        });
 };
 </script>
 </body>

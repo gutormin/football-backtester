@@ -1,6 +1,7 @@
 import os
 import json
 import math
+import logging
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
@@ -31,10 +32,12 @@ from ..cluster_ai_tracker import get_cluster_ai_config, save_cluster_ai_config
 from ..ml_clustering import extract_league_features, cluster_leagues
 from ..history_manager import load_history
 from ..models import PoissonModel, estimate_bookmaker_odds
+from ..constants import RHO_FALLBACK
 from ..elo_model import build_elo_tracker_from_history
 from ..ai_predictor import compute_edge_quality_score, apply_fdr_correction
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Request schemas
 class ClusterRequest(BaseModel):
@@ -62,6 +65,8 @@ class ScanRequest(BaseModel):
     use_ml: bool = False
     data_source: str = "footballdata"
     futpython_api_key: str = ""
+    model_type: str = "poisson"  # "poisson" or "negative_binomial"
+    walk_forward_folds: int = 0  # 0 = disabled, 2-10 = walk-forward mode
 
     @validator('startDate', 'endDate')
     def validate_date_format(cls, v):
@@ -126,6 +131,7 @@ class SteamMovesRequest(BaseModel):
     futpython_api_key: str = ""
     profileFilter: str = "all"
     latencySeconds: int = 0
+    detectionMode: str = "model_edge"  # 'model_edge' | 'temporal_drop'
 
     @validator('startDate', 'endDate')
     def validate_date_format(cls, v):
@@ -255,26 +261,49 @@ class ClusterAIConfigReq(BaseModel):
 @router.post("/cluster_leagues")
 def api_cluster_leagues(req: ClusterRequest):
     try:
+        import os as _os
+        is_render = _os.environ.get("RENDER") is not None
+        max_leagues = 100 if is_render else len(req.leagues)
+        if len(req.leagues) > max_leagues:
+            req.leagues = req.leagues[:max_leagues]
+
         features_list = []
+        errors = []
         for league in req.leagues:
-            df = load_league_data(league, start_date=req.startDate, data_source=req.data_source, api_key=req.futpython_api_key)
-            features = extract_league_features(league, df)
-            if features:
-                features_list.append(features)
-                
+            try:
+                df = load_league_data(league, start_date=req.startDate, data_source=req.data_source, api_key=req.futpython_api_key)
+                features = extract_league_features(league, df)
+                if features:
+                    features_list.append(features)
+            except Exception as league_error:
+                import traceback
+                logger.error(f"Erro ao processar liga {league} para clusterização: {league_error}")
+                traceback.print_exc()
+                errors.append({"league": league, "error": str(league_error)})
+
         if not features_list:
             raise ValueError("Não foi possível extrair dados para nenhuma das ligas selecionadas.")
-            
+
         cluster_results = cluster_leagues(features_list, req.n_clusters)
         if 'error' in cluster_results:
             raise ValueError(cluster_results['error'])
-            
+
+        if errors:
+            cluster_results['_warnings'] = errors
+
         return cluster_results
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/clear_cache")
+def clear_cache():
+    """Clear the league data cache. Use when leagues show zero results."""
+    from ..data_loader import clear_league_data_cache
+    clear_league_data_cache()
+    return {"status": "success", "message": "Cache limpo com sucesso."}
 
 @router.get("/status")
 def get_status():
@@ -303,24 +332,30 @@ def run_steam_moves_scan(req: SteamMovesRequest):
     try:
         def loader(code, start_date='2021-01-01'):
             return load_league_data(code, start_date=start_date, data_source=req.data_source, api_key=req.futpython_api_key)
-            
+
         backtester = SmartMoneyBacktester(loader)
-        
+
         all_results = []
+        errors = []
         for league in req.leagues:
-            results = backtester.scan_steam_moves(
-                league_code=league,
-                min_drop_pct=req.minDropPct,
-                markets=req.markets,
-                start_date=req.startDate,
-                end_date=req.endDate,
-                stake_value=req.stakeValue,
-                profile_filter=req.profileFilter,
-                latency_seconds=req.latencySeconds
-            )
-            all_results.extend(results)
-            
-        return {"status": "success", "scan_results": all_results, "results": all_results}
+            try:
+                results = backtester.scan_steam_moves(
+                    league_code=league,
+                    min_drop_pct=req.minDropPct,
+                    markets=req.markets,
+                    start_date=req.startDate,
+                    end_date=req.endDate,
+                    stake_value=req.stakeValue,
+                    profile_filter=req.profileFilter,
+                    latency_seconds=req.latencySeconds,
+                    detection_mode=req.detectionMode
+                )
+                all_results.extend(results)
+            except Exception as league_error:
+                logger.error(f"Erro ao escanear liga {league}: {league_error}")
+                errors.append({"league": league, "error": str(league_error)})
+
+        return {"status": "success", "scan_results": all_results, "results": all_results, "errors": errors}
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -339,10 +374,10 @@ def scan_arbitrage(bookies: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/scan_dutching")
-def scan_dutching(source: str = "odds_api", strategy: str = "fav_short", data_source: str = "auto", futpython_api_key: str = ""):
+def scan_dutching(source: str = "odds_api", strategy: str = "dynamic", data_source: str = "auto", futpython_api_key: str = ""):
     try:
         from ..dutching_scanner import get_odds_api_token
-        token = get_odds_api_token() or '75d5d936cc573c75bacf71e12b5de769'
+        token = os.getenv('THE_ODDS_API_KEY') or get_odds_api_token()
         return fetch_dutching_opportunities(api_key=token, source=source, strategy=strategy, data_source=data_source, futpython_api_key=futpython_api_key)
     except Exception as e:
         import traceback
@@ -367,9 +402,41 @@ def save_arb_scheduler_config_api(req: ArbitrageSchedulerConfig):
 @router.post("/scan")
 def run_scan(req: ScanRequest):
     try:
+        # Always clear stale cache before scanning — prevents zero-results from cached empty DataFrames
+        from ..data_loader import clear_league_data_cache
+        clear_league_data_cache()
+
         backtester = ChronologicalBacktester()
         scan_results = []
-        
+
+        # Walk-forward mode: single market or league, expanding window validation
+        if getattr(req, 'walk_forward_folds', 0) >= 2:
+            wf_market = req.market[0] if isinstance(req.market, list) else req.market
+            if not wf_market or wf_market == 'string':
+                wf_market = 'home'
+            wf_result = backtester.run_walk_forward(
+                leagues=req.leagues,
+                start_date=req.startDate,
+                end_date=req.endDate,
+                n_folds=req.walk_forward_folds,
+                market=wf_market,
+                value_threshold=req.valueThreshold,
+                initial_bankroll=req.initialBankroll,
+                staking_rule=req.stakingRule,
+                stake_value=req.stakeValue,
+                odds_source=req.oddsSource,
+                odds_timing=req.odds_timing or 'closing',
+                min_odds=req.minOdds or 1.0,
+                max_odds=req.maxOdds or 2.50,
+                use_ml=req.use_ml,
+                data_source=req.data_source,
+                futpython_api_key=req.futpython_api_key,
+                model_type=req.model_type
+            )
+            if 'error' in wf_result:
+                raise HTTPException(status_code=400, detail=wf_result['error'])
+            return wf_result
+
         all_markets_def = [
             {'code': 'home', 'name': 'Mandante (1)'},
             {'code': 'away', 'name': 'Visitante (2)'},
@@ -440,7 +507,8 @@ def run_scan(req: ScanRequest):
                 markets_list=market_codes,
                 use_ml=req.use_ml,
                 data_source=req.data_source,
-                futpython_api_key=req.futpython_api_key
+                futpython_api_key=req.futpython_api_key,
+                model_type=req.model_type
             )
             for m in markets_to_scan:
                 m_code = m['code']
@@ -466,7 +534,18 @@ def run_scan(req: ScanRequest):
                         'opt_eqs': summary.get('optimized_eqs_score')
                     })
         elif req.scanType == 'leagues':
-            market_list = [req.market] if isinstance(req.market, str) else req.market
+            raw_market_list = [req.market] if isinstance(req.market, str) else req.market
+            # Expand group market codes (e.g. '1X2' → ['home', 'draw', 'away'])
+            MARKET_EXPAND_MAP = {
+                '1X2': ['home', 'draw', 'away'],
+                '1x2': ['home', 'draw', 'away'],
+            }
+            market_list = []
+            for m in raw_market_list:
+                if m in MARKET_EXPAND_MAP:
+                    market_list.extend(MARKET_EXPAND_MAP[m])
+                else:
+                    market_list.append(m)
             parallel_results = backtester.run_parallel_scan(
                 leagues=req.leagues,
                 start_date=req.startDate,
@@ -483,7 +562,8 @@ def run_scan(req: ScanRequest):
                 markets_list=market_list,
                 use_ml=req.use_ml,
                 data_source=req.data_source,
-                futpython_api_key=req.futpython_api_key
+                futpython_api_key=req.futpython_api_key,
+                model_type=req.model_type
             )
             all_leagues = get_all_available_leagues()
             for league_code in req.leagues:
@@ -534,7 +614,8 @@ def run_scan(req: ScanRequest):
                 markets_list=market_codes,
                 use_ml=req.use_ml,
                 data_source=req.data_source,
-                futpython_api_key=req.futpython_api_key
+                futpython_api_key=req.futpython_api_key,
+                model_type=req.model_type
             )
             all_leagues = get_all_available_leagues()
             for key, summary in parallel_results.items():
@@ -562,9 +643,83 @@ def run_scan(req: ScanRequest):
                         'opt_range': summary.get('optimized_odds_range'),
                         'opt_eqs': summary.get('optimized_eqs_score')
                     })
-                    
+
+        elif req.scanType == 'staking':
+            user_markets = req.market if isinstance(req.market, list) else [req.market]
+            if not user_markets or len(user_markets) == 0:
+                markets_to_scan = all_markets_def
+            else:
+                markets_to_scan = [m for m in all_markets_def if m['code'] in user_markets or m['code'].replace('home', '1x2_home').replace('away', '1x2_away').replace('draw', '1x2_draw') in user_markets]
+
+            market_codes = [m['code'] for m in markets_to_scan]
+            parallel_results = backtester.run_parallel_scan(
+                leagues=req.leagues,
+                start_date=req.startDate,
+                end_date=req.endDate,
+                value_threshold=req.valueThreshold,
+                initial_bankroll=req.initialBankroll,
+                staking_rule=req.stakingRule,
+                stake_value=req.stakeValue,
+                odds_source=req.oddsSource,
+                odds_timing=req.odds_timing or 'closing',
+                min_odds=req.minOdds or 1.0,
+                max_odds=req.maxOdds or 2.50,
+                scan_type='staking',
+                markets_list=market_codes,
+                use_ml=req.use_ml,
+                data_source=req.data_source,
+                futpython_api_key=req.futpython_api_key,
+                model_type=req.model_type
+            )
+            all_leagues = get_all_available_leagues()
+            for key, methods_data in parallel_results.items():
+                if key == 'model_version' or key == 'exclusion_stats':
+                    continue
+                parts = key.split('|', 1)
+                if len(parts) == 2:
+                    league_code, m_code = parts
+                    league_name = next((l['name'] for l in all_leagues if l['code'] == league_code), league_code)
+                    market_name = next((m['name'] for m in all_markets_def if m['code'] == m_code), m_code)
+
+                    entry = {
+                        'code': key,
+                        'name': f"{league_name} / {market_name}",
+                        'total_bets': methods_data['fixed']['total_bets'],
+                    }
+                    best_method = 'fixed'
+                    best_roi = methods_data['fixed']['roi']
+                    for method in ('proportional', 'kelly'):
+                        if methods_data[method]['roi'] > best_roi:
+                            best_roi = methods_data[method]['roi']
+                            best_method = method
+                    entry['best_method'] = best_method
+                    entry['best_roi'] = best_roi
+
+                    for method in ('fixed', 'proportional', 'kelly'):
+                        summary = methods_data[method]
+                        eqs_data = compute_edge_quality_score(summary, summary.get('oos_summary'))
+                        v_color = eqs_data.get('verdict_color', '')
+                        hex_color = '#34d399' if v_color == 'success' else '#f59e0b' if v_color == 'warning' else '#ef4444' if v_color == 'danger' else '#888888'
+                        entry[method] = {
+                            'net_profit': summary['net_profit'],
+                            'roi': summary['roi'],
+                            'win_rate': summary['win_rate'],
+                            'total_bets': summary['total_bets'],
+                            'ai_score': summary.get('ai_score', 0.0),
+                            'p_value': summary.get('p_value'),
+                            'max_drawdown': summary.get('max_drawdown', 0.0),
+                            'eqs_score': eqs_data.get('score', 0),
+                            'eqs_verdict': eqs_data.get('verdict', 'N/A'),
+                            'eqs_color': hex_color,
+                            'avg_clv': summary.get('avg_clv', 0.0),
+                            'opt_range': summary.get('optimized_odds_range'),
+                            'opt_eqs': summary.get('optimized_eqs_score'),
+                        }
+                    scan_results.append(entry)
+
         # Aplica correção FDR (Benjamini-Hochberg) aos p-values do scanner
-        if scan_results:
+        # Skip FDR for staking scan — each method already has EQS score
+        if scan_results and req.scanType != 'staking':
             p_values_raw = [r.get('p_value', 1.0) for r in scan_results]
             if any(p is not None for p in p_values_raw):
                 p_values_clean = [p if p is not None else 1.0 for p in p_values_raw]
@@ -777,6 +932,20 @@ async def run_tg_scheduler_now():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/steam_confidence_calibration")
+def get_steam_confidence_calibration(min_resolved: int = 50):
+    """Calibra thresholds de confiança do Smart Money usando dados reais resolvidos."""
+    try:
+        from ..smart_money import calibrate_confidence_from_history, _load_confidence_calibration
+        # Tenta calibrar com dados resolvidos
+        result = calibrate_confidence_from_history(min_resolved_bets=min_resolved)
+        # Inclui estado atual da calibração
+        result['current_calibration'] = _load_confidence_calibration()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/live_steam_moves")
 def get_live_steam_moves(req: LiveSteamRequest):
     tracker_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'live_odds_tracker.json')
@@ -825,7 +994,7 @@ def get_live_steam_moves(req: LiveSteamRequest):
                         except Exception:
                             pass
                             
-                        from backend.smart_money import calculate_time_decay_adjusted_drop
+                        from ..smart_money import calculate_time_decay_adjusted_drop
                         odd_decay, adjusted_drop_pct = calculate_time_decay_adjusted_drop(
                             norm_market=norm_market,
                             opening=opening,
@@ -837,7 +1006,7 @@ def get_live_steam_moves(req: LiveSteamRequest):
                         
                         if trigger_drop >= req.minDropPct:
                             sport_key = match_info.get('sport', '')
-                            from backend.smart_money import calculate_confidence_score, classify_drop_profile, calculate_odds_metrics
+                            from ..smart_money import calculate_confidence_score, classify_drop_profile, calculate_odds_metrics
                             score, confidence_level, tier_name = calculate_confidence_score(trigger_drop, sport_key)
                             sharpness_score, profile_type = classify_drop_profile(
                                 drop_pct=trigger_drop,
@@ -865,7 +1034,7 @@ def get_live_steam_moves(req: LiveSteamRequest):
                             if req.profileFilter == 'squares' and profile_type != 'Squares':
                                 continue
                                 
-                            from backend.live_odds_tracker import map_sport_to_league_code
+                            from ..live_odds_tracker import map_sport_to_league_code
                             league_code = map_sport_to_league_code(sport_key)
                             
                             results.append({
@@ -973,7 +1142,7 @@ def get_autopilot_predictions(source: str = 'api'):
             odds_over25 = float(row.get('B365>2.5', np.nan))
             odds_under25 = float(row.get('B365<2.5', np.nan))
             
-            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, pred['lambda_home'], pred['lambda_away'])
+            est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, pred['lambda_home'], pred['lambda_away'], pred.get('rho', RHO_FALLBACK))
             
             for strategy in valid_strategies:
                 p = strategy.get('params', {})
@@ -1137,3 +1306,31 @@ def api_get_cluster_ai_config():
 def api_save_cluster_ai_config(req: ClusterAIConfigReq):
     save_cluster_ai_config(req.dict())
     return {"status": "success"}
+
+@router.post("/telegram/cluster_ai_test")
+def api_test_cluster_ai_alerts():
+    """Manually trigger cluster AI alerts for testing."""
+    import asyncio
+    import traceback
+    from ..cluster_ai_tracker import run_cluster_ai_alerts
+
+    logs = []
+    try:
+        config = get_cluster_ai_config()
+        tg_config = get_telegram_config()
+
+        if not tg_config.get('enabled'):
+            return {"status": "warning", "message": "Telegram não está habilitado.", "config": config}
+        if not tg_config.get('token') or not tg_config.get('chat_id'):
+            return {"status": "warning", "message": "Token ou Chat ID do Telegram não configurados.", "config": config}
+
+        diag = asyncio.run(run_cluster_ai_alerts())
+        return {
+            "status": "success" if not diag.get("errors") else "partial",
+            "message": "Varredura concluída.",
+            "diagnostics": diag,
+            "config": config,
+        }
+    except Exception as e:
+        logs.append(f"Erro: {traceback.format_exc()}")
+        return {"status": "error", "message": str(e), "logs": logs}

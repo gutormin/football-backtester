@@ -1,8 +1,30 @@
+import math
 import os
+import numpy as np
 from fastapi import APIRouter, HTTPException
 from ..history_manager import load_history, add_strategy, delete_strategy, save_history
 
 router = APIRouter()
+
+
+def _sanitize_for_json(obj):
+    """Recursively walk obj, converting numpy types to native Python and NaN/Inf to None."""
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_sanitize_for_json(item) for item in obj]
+    if isinstance(obj, np.ndarray):
+        return _sanitize_for_json(obj.tolist())
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        f = float(obj)
+        return None if (math.isnan(f) or math.isinf(f)) else f
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    return obj
 
 @router.get("/history")
 def api_get_history():
@@ -24,7 +46,8 @@ def api_debug_db():
 @router.post("/history")
 def api_save_history(payload: dict):
     try:
-        new_entry = add_strategy(payload)
+        sanitized = _sanitize_for_json(payload)
+        new_entry = add_strategy(sanitized)
         return {"status": "ok", "entry": new_entry}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

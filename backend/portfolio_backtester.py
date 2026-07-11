@@ -1,26 +1,27 @@
 import pandas as pd
 import numpy as np
 import math
+import logging
 import scipy.stats as stats
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 from collections import defaultdict
 from .backtester import ChronologicalBacktester
 from .history_manager import load_history
 from .ai_predictor import (predict_strategy_sustainability, compute_brier_score,
                            compute_bootstrap_ci, compute_power_analysis, compute_rolling_roi,
                            compute_pvalue_binomial, compute_edge_quality_score)
+from .backtest.helpers import allocate_core_satellite
 
 
-def _get_stake(risk_method, initial_bankroll, current_bankroll, prob, odds):
+def _get_stake(risk_method, initial_bankroll, current_bankroll, prob, odds, max_stake_pct=10.0):
     """
     Calculate stake for a bet.
 
-    For the HISTORICAL simulation, we use the initial_bankroll as the base
-    for proportional/Kelly calculations to prevent compounding explosion.
-    The current_bankroll is only used to ensure we don't bet more than available.
-
-    This gives realistic results while still showing meaningful differences
-    between risk methods.
+    For fixed_X% methods: stake base is initial_bankroll (definition of fixed stake).
+    For Kelly methods: stake base is current_bankroll to enable compounding.
+    Caps via max_stake_pct (overridable per strategy tier).
     """
     if risk_method.startswith('fixed_'):
         try:
@@ -29,24 +30,24 @@ def _get_stake(risk_method, initial_bankroll, current_bankroll, prob, odds):
             pct = 1.0
         stake = initial_bankroll * (pct / 100.0)
     elif risk_method == 'kelly_quarter':
-        # Kelly fraction calculated per-bet using prob/odds, but applied to initial_bankroll
-        # This shows realistic per-bet Kelly stakes without compounding explosion
         if odds > 1.0:
             k_fraction = ((prob * odds) - 1.0) / (odds - 1.0)
             k_fraction = max(0.0, min(k_fraction, 0.20))   # cap at 20% full Kelly
-            stake = initial_bankroll * (k_fraction / 4.0)  # Quarter-Kelly on initial
+            stake = current_bankroll * (k_fraction / 4.0)  # Quarter-Kelly on current bankroll
         else:
-            stake = initial_bankroll * 0.01
+            stake = current_bankroll * 0.01
     else:
-        stake = initial_bankroll * 0.01
+        stake = current_bankroll * 0.01
 
-    # Minimum $1, maximum 10% of current available bankroll
+    # Minimum $1, maximum absolute dollar cap: never bet more than 5% of initial
+    # allocated bankroll per bet, regardless of compounding growth.
     stake = max(1.0, stake)
-    stake = min(stake, current_bankroll * 0.10)
+    absolute_cap = initial_bankroll * 0.05  # 5% of initial = prevents absurd compounding
+    stake = min(stake, absolute_cap)
     return stake
 
 
-def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
+def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', strategies_inline=None):
     """
     Runs a combined portfolio backtest across multiple saved strategies.
 
@@ -62,25 +63,65 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
     history = load_history()
     selected_strategies = [s for s in history if s['id'] in strategy_ids]
 
+    # Fallback: use inline strategies when server DB is empty (post-deploy cold start)
+    if not selected_strategies and strategies_inline:
+        selected_strategies = strategies_inline
+        logger.info(f"Usando {len(selected_strategies)} estratégias inline (DB vazio pós-deploy).")
+
     if not selected_strategies:
         return {"error": "Nenhuma estratégia válida selecionada."}
+
+    # Deduplicate equivalent market pairs: lay_X and lay_X_ex are identical aliases
+    LAY_ALIASES = {
+        'lay_home': 'lay_home',
+        'lay_home_ex': 'lay_home',
+        'lay_away': 'lay_away',
+        'lay_away_ex': 'lay_away',
+        'lay_draw': 'lay_draw',
+        'lay_draw_ex': 'lay_draw',
+    }
+    seen_canonical = {}
+    deduped = []
+    dedup_warnings = []
+    for s in selected_strategies:
+        raw_mkt = s['params'].get('market', '')
+        # Normalize: market can be a single string or a list of strings
+        mkt = raw_mkt[0] if isinstance(raw_mkt, list) and len(raw_mkt) > 0 else (raw_mkt if not isinstance(raw_mkt, list) else '')
+        canonical = LAY_ALIASES.get(mkt, mkt)
+        key = (canonical, tuple(s['params'].get('leagues', [])))
+        if key in seen_canonical:
+            dedup_warnings.append(
+                f"'{s['name']}' usa o mesmo mercado/liga que '{seen_canonical[key]}'. "
+                f"Mantendo apenas a primeira para evitar dupla contagem."
+            )
+        else:
+            seen_canonical[key] = s['name']
+            deduped.append(s)
+
+    if deduped:
+        selected_strategies = deduped
 
     if len(selected_strategies) > 4:
         return {"error": "Servidor gratuito excedido! Selecione no máximo 4 estratégias para rodar o portfólio sem travar a memória."}
 
     all_bets = []
 
-    print(f"[Portfolio] Rodando backtests individuais para {len(selected_strategies)} estratégias...")
-    
+    logger.info(f"Rodando backtests individuais para {len(selected_strategies)} estratégias...")
+
+    # Collect aggregated stats from individual backtests (matches analyzed, seasons)
+    total_matches_in_file = 0
+    all_seasons = set()
     for s in selected_strategies:
         try:
             p = s['params']
+            raw_mkt = p.get('market', '')
+            mkt_str = raw_mkt[0] if isinstance(raw_mkt, list) and len(raw_mkt) > 0 else (raw_mkt if not isinstance(raw_mkt, list) else '')
             bt = ChronologicalBacktester()
             res = bt.run(
                 leagues=p.get('leagues', []),
                 start_date=p.get('startDate', p.get('start_date', '2021-01-01')),
                 end_date=p.get('endDate', p.get('end_date', datetime.today().strftime('%Y-%m-%d'))),
-                market=p.get('market'),
+                market=mkt_str,
                 value_threshold=p.get('valueThreshold', p.get('value_threshold', 1.05)),
                 initial_bankroll=1000.0,
                 staking_rule='fixed',
@@ -102,8 +143,14 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
                     b['strategy_id'] = s['id']
                     b['strategy_name'] = s['name']
                     all_bets.append(b)
+            # Collect matches/seasons from individual summary
+            s_summary = res.get('summary', {}) if "error" not in res else {}
+            total_matches_in_file = max(total_matches_in_file, s_summary.get('matches_total_in_file', 0))
+            for season in s_summary.get('seasons_analyzed', []):
+                all_seasons.add(str(season))
         except Exception as e:
-            print(f"Error processing strategy {s['id']}: {e}")
+            import traceback
+            logger.error(f"Error processing strategy {s.get('id','?')} '{s.get('name','?')}': {e}\n{traceback.format_exc()}")
             continue
 
     if not all_bets:
@@ -120,21 +167,30 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
         str(x.get('match_id', x.get('home_team', '') + x.get('away_team', '')))
     ))
 
-
     # ---------------------------------------------------------------
-    # HISTORICAL SIMULATION
-    # Stakes use chosen risk method applied to INITIAL bankroll.
-    # This is realistic: Kelly/proportional differences ARE visible,
-    # but the base never explodes because it's always anchored to initial_bankroll.
+    # CORE/SATELLITE ALLOCATION
+    # Classify each strategy by its individual backtest quality.
+    # Core (ROI > 0 and profitable) gets 80% bankroll + full limits.
+    # Satellite gets 20% bankroll + tighter caps (12.5% Kelly, 2.5% stake).
     # ---------------------------------------------------------------
-    bankroll = initial_bankroll
-    peak_bankroll = initial_bankroll
-    max_drawdown = 0.0
-    max_dd_duration = 0
-    current_dd_duration = 0
+    strat_classifications = []
+    for s in selected_strategies:
+        sid = s['id']
+        s_bets = [b for b in all_bets if b.get('strategy_id') == sid]
+        s_wins = sum(1 for b in s_bets if b.get('won', False))
+        s_profit = sum(b.get('profit', 0) for b in s_bets)
+        s_staked = sum(b.get('stake', 0) for b in s_bets)
+        s_roi = (s_profit / s_staked * 100) if s_staked > 0 else 0.0
+        is_profitable = s_profit > 0 and s_roi > 0
 
-    equity_curve = []
-    bet_index = 0
+        strat_classifications.append({
+            'name': s['name'],
+            'allocation': 'core' if is_profitable else 'satellite',
+            'kelly_fraction': 0.25,
+            'max_stake_pct': 5.0,
+        })
+
+    core_sat_alloc = allocate_core_satellite(initial_bankroll, strat_classifications)
 
     strategy_stats = {
         s['id']: {
@@ -145,28 +201,56 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
             'profit': 0.0,
             'recommended_stake': 0.0,
             'win_rate': 0.0,
-            'roi': 0.0
+            'roi': 0.0,
+            # Per-strategy bankroll from core/satellite allocation
+            'allocated_bankroll': core_sat_alloc.get(s['name'], {}).get('bankroll', initial_bankroll / max(len(selected_strategies), 1)),
+            'tier': core_sat_alloc.get(s['name'], {}).get('tier', 'core'),
+            'kelly_cap': core_sat_alloc.get(s['name'], {}).get('kelly_fraction', 0.25),
+            'max_stake_pct': core_sat_alloc.get(s['name'], {}).get('max_stake_pct', 5.0),
         } for s in selected_strategies
     }
+
+    # Total bankroll starts as sum of allocated slices
+    deployed_bankroll = sum(st['allocated_bankroll'] for st in strategy_stats.values())
+    idle_cash = initial_bankroll - deployed_bankroll
+    bankroll = deployed_bankroll
+
+    # ---------------------------------------------------------------
+    # HISTORICAL SIMULATION
+    # Fixed% uses initial_bankroll as base (definition of fixed stake).
+    # Kelly uses current_bankroll for true compounding.
+    # Caps (10% per bet, 20% portfolio) prevent explosion.
+    # ---------------------------------------------------------------
+    peak_bankroll = bankroll + idle_cash
+    max_drawdown = 0.0
+    max_dd_duration = 0
+    current_dd_duration = 0
+
+    equity_curve = []
+    bet_index = 0
 
     league_stats = defaultdict(lambda: {'profit': 0.0, 'bets': 0, 'wins': 0})
     monthly_stats = defaultdict(lambda: {'profit': 0.0, 'bets': 0})
     odds_stats = defaultdict(lambda: {'profit': 0.0, 'bets': 0})
 
-    # Record initial bankroll as first point
-    equity_curve.append({'date': all_bets[0]['date'], 'bankroll': round(bankroll, 2), 'bet_index': 0})
+    # Record initial bankroll as first point (total = deployed + idle)
+    equity_curve.append({'date': all_bets[0]['date'], 'bankroll': round(bankroll + idle_cash, 2), 'bet_index': 0})
 
     for b in all_bets:
         b_date = b['date']
+        sid = b['strategy_id']
 
         bet_odds = float(b.get('odds', 2.0))
         prob = float(b.get('prob', 50.0)) / 100.0
         bet_won = bool(b.get('won', False))
 
-        # Stake uses initial_bankroll as base to prevent compounding explosion
-        stake = _get_stake(risk_method, initial_bankroll, bankroll, prob, bet_odds)
+        # Use strategy's allocated bankroll and tier-specific cap
+        strat_bankroll = strategy_stats[sid]['allocated_bankroll']
+        max_stake_pct = strategy_stats[sid]['max_stake_pct']
 
-        if bankroll < stake or bankroll < 1.0:
+        stake = _get_stake(risk_method, initial_bankroll, strat_bankroll, prob, bet_odds, max_stake_pct=max_stake_pct)
+
+        if strat_bankroll < stake or strat_bankroll < 1.0:
             b['stake'] = 0.0
             b['profit'] = 0.0
             continue
@@ -179,30 +263,29 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
 
         b['stake'] = round(stake, 2)
         b['profit'] = round(profit, 2)
-        b['bankroll'] = round(bankroll + profit, 2)
+        b['bankroll'] = round(bankroll + idle_cash + profit, 2)
         bankroll += profit
+        strategy_stats[sid]['allocated_bankroll'] += profit
         bet_index += 1
 
-        # Record equity curve after EVERY bet (not just at date boundaries)
-        # This reveals true intraday drawdowns when multiple strategies
-        # have bets on the same day.
-        equity_curve.append({'date': b_date, 'bankroll': round(bankroll, 2), 'bet_index': bet_index})
+        # Record equity curve after EVERY bet (total = deployed + idle)
+        equity_curve.append({'date': b_date, 'bankroll': round(bankroll + idle_cash, 2), 'bet_index': bet_index})
 
-        # Drawdown
-        if bankroll > peak_bankroll:
-            peak_bankroll = bankroll
+        # Drawdown (on total portfolio, including idle cash)
+        total_bankroll = bankroll + idle_cash
+        if total_bankroll > peak_bankroll:
+            peak_bankroll = total_bankroll
             current_dd_duration = 0
         else:
             current_dd_duration += 1
             if current_dd_duration > max_dd_duration:
                 max_dd_duration = current_dd_duration
 
-        dd = (peak_bankroll - bankroll) / peak_bankroll * 100 if peak_bankroll > 0 else 0
+        dd = (peak_bankroll - total_bankroll) / peak_bankroll * 100 if peak_bankroll > 0 else 0
         if dd > max_drawdown:
             max_drawdown = dd
 
         # Strategy stats
-        sid = b['strategy_id']
         strategy_stats[sid]['bets'] += 1
         strategy_stats[sid]['staked'] += stake
         strategy_stats[sid]['profit'] += profit
@@ -243,12 +326,12 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
                 pct = float(risk_method.split('_')[1])
             except:
                 pct = 1.0
-            st['recommended_stake'] = round(initial_bankroll * (pct / 100.0), 2)
+            st['recommended_stake'] = round(total_bankroll * (pct / 100.0), 2)
         elif risk_method == 'kelly_quarter':
             if avg_odds_s > 1.0:
                 k_fraction = ((prob_s * avg_odds_s) - 1) / (avg_odds_s - 1)
                 k_fraction = max(0.0, min(k_fraction, 0.20))
-                st['recommended_stake'] = round(initial_bankroll * (k_fraction / 4.0), 2)
+                st['recommended_stake'] = round(total_bankroll * (k_fraction / 4.0), 2)
             else:
                 st['recommended_stake'] = 0.0
 
@@ -265,7 +348,7 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
     MAX_PORTFOLIO_EXPOSURE = 0.20  # Never risk more than 20% of bankroll across all simultaneous bets
 
     total_recommended = sum(st['recommended_stake'] for st in strategy_stats.values())
-    max_allowed_total = initial_bankroll * MAX_PORTFOLIO_EXPOSURE
+    max_allowed_total = total_bankroll * MAX_PORTFOLIO_EXPOSURE
 
     if total_recommended > max_allowed_total and total_recommended > 0:
         scale_factor = max_allowed_total / total_recommended
@@ -275,7 +358,8 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
     # ---------------------------------------------------------------
     # SUMMARY METRICS
     # ---------------------------------------------------------------
-    net_profit = bankroll - initial_bankroll
+    total_bankroll = bankroll + idle_cash
+    net_profit = total_bankroll - initial_bankroll
     total_staked = sum(st['staked'] for st in strategy_stats.values())
     total_roi = (net_profit / total_staked * 100) if total_staked > 0 else 0.0
 
@@ -299,11 +383,11 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
         if len(daily_returns) > 1:
             avg_return = float(np.mean(daily_returns))
             std_return = float(np.std(daily_returns))
-            sharpe_ratio = (avg_return / std_return * math.sqrt(252)) if std_return > 0 else 0.0
+            sharpe_ratio = (avg_return / std_return * math.sqrt(156)) if std_return > 0 else 0.0  # ~3 matches/week
             
             downside_returns = [r for r in daily_returns if r < 0]
             downside_dev = math.sqrt(np.mean([r**2 for r in downside_returns])) if downside_returns else 0.0
-            sortino_ratio = (avg_return / downside_dev * math.sqrt(252)) if downside_dev > 0 else 0.0
+            sortino_ratio = (avg_return / downside_dev * math.sqrt(156)) if downside_dev > 0 else 0.0  # ~3 matches/week
             
             skewness = float(stats.skew(daily_returns)) if len(daily_returns) > 2 else 0.0
         else:
@@ -327,7 +411,7 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
 
     summary = {
         'initial_bankroll': round(initial_bankroll, 2),
-        'final_bankroll': round(bankroll, 2),
+        'final_bankroll': round(total_bankroll, 2),
         'net_profit': round(net_profit, 2),
         'profit_in_stakes': profit_in_units,
         'total_bets': total_bets_placed,
@@ -355,8 +439,16 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
             summary.update({'brier_score': brier['brier_score'], 'brier_score_market': brier['brier_score_market'], 'brier_improvement': brier['brier_improvement']})
         except: pass
         try:
-            bootstrap = compute_bootstrap_ci(all_bets)
-            summary.update({'bootstrap_roi_ci_lower': bootstrap['bootstrap_roi_ci_lower'], 'bootstrap_roi_ci_upper': bootstrap['bootstrap_roi_ci_upper'], 'bootstrap_roi_median': bootstrap['bootstrap_roi_median'], 'prob_positive_roi': bootstrap['prob_positive_roi']})
+            bootstrap = compute_bootstrap_ci(all_bets, initial_bankroll=initial_bankroll)
+            summary.update({
+                'bootstrap_roi_ci_lower': bootstrap['bootstrap_roi_ci_lower'],
+                'bootstrap_roi_ci_upper': bootstrap['bootstrap_roi_ci_upper'],
+                'bootstrap_roi_median': bootstrap['bootstrap_roi_median'],
+                'prob_positive_roi': bootstrap['prob_positive_roi'],
+                'bootstrap_drawdown_median': bootstrap['bootstrap_drawdown_median'],
+                'bootstrap_drawdown_ci_lower': bootstrap['bootstrap_drawdown_ci_lower'],
+                'bootstrap_drawdown_ci_upper': bootstrap['bootstrap_drawdown_ci_upper'],
+            })
         except: pass
         try:
             power = compute_power_analysis(summary['roi'], avg_odds, total_bets_placed)
@@ -423,11 +515,13 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
     return {
         "status": "success",
         "initial_bankroll": initial_bankroll,
-        "final_bankroll": round(bankroll, 2),
+        "final_bankroll": round(total_bankroll, 2),
         "net_profit": round(net_profit, 2),
         "total_roi": round(total_roi, 2),
         "max_drawdown": round(max_drawdown, 2),
         "total_bets": total_bets_placed,
+        "deployed_bankroll": round(deployed_bankroll, 2),
+        "idle_cash": round(idle_cash, 2),
         "equity_curve": equity_curve,
         "equity_curve_fixed": eq_bankrolls,
         "equity_curve_proportional": eq_bankrolls,
@@ -444,5 +538,8 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1'):
         "quartiles": quartiles,
         "bets": all_bets,
         "total_recommended_exposure": round(sum(st['recommended_stake'] for st in strategy_stats.values()), 2),
-        "max_portfolio_exposure_pct": round(MAX_PORTFOLIO_EXPOSURE * 100, 0)
+        "max_portfolio_exposure_pct": round(MAX_PORTFOLIO_EXPOSURE * 100, 0),
+        "dedup_warnings": dedup_warnings,
+        "matches_total_in_file": total_matches_in_file,
+        "seasons_analyzed": sorted(all_seasons, key=lambda x: int(x) if x.isdigit() else 0)
     }

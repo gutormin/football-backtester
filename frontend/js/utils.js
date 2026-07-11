@@ -26,6 +26,21 @@ export function showToast(message, type = 'info') {
     }, 4000);
 }
 
+// Shared AbortController for fetch race-condition prevention
+let _activeAbortController = null;
+
+export function getActiveAbortController() {
+  return _activeAbortController;
+}
+
+export function createAbortController() {
+  if (_activeAbortController) {
+    _activeAbortController.abort();
+  }
+  _activeAbortController = new AbortController();
+  return _activeAbortController;
+}
+
 // Navigation Tab Switching
 export function switchTab(tabId) {
     // Esconder todos os painéis de abas
@@ -33,27 +48,41 @@ export function switchTab(tabId) {
         panel.classList.remove('active');
         panel.style.display = 'none';
     });
-    
-    // Remover classe ativa de todos os botões de aba
+
+    // Remover classe ativa de todos os botões de aba (old tab bar)
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
         btn.style.color = 'var(--text-muted)';
         btn.style.borderBottomColor = 'transparent';
     });
-    
+
+    // Remover classe ativa da nova side nav
+    document.querySelectorAll('.sidenav-item').forEach(item => item.classList.remove('active'));
+
     // Mostrar o painel selecionado
     const activePanel = document.getElementById(tabId);
     if (activePanel) {
         activePanel.classList.add('active');
         activePanel.style.display = 'block';
     }
-    
-    // Marcar botão correspondente como ativo
+
+    // Marcar botão correspondente como ativo (old tab bar)
     const correspondingBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
     if (correspondingBtn) {
         correspondingBtn.classList.add('active');
         correspondingBtn.style.color = 'var(--text-primary)';
         correspondingBtn.style.borderBottomColor = 'var(--primary)';
+    }
+
+    // Marcar item da side nav como ativo
+    const sideNavItem = document.querySelector(`.sidenav-item[onclick*="${tabId}"]`);
+    if (sideNavItem) {
+        sideNavItem.classList.add('active');
+    }
+
+    // Auto-load history when switching to history tab
+    if (tabId === 'tab-history' && typeof window.loadHistoryTab === 'function') {
+        window.loadHistoryTab();
     }
 }
 
@@ -92,6 +121,31 @@ export function toggleGroup(groupEl, event) {
             cb.dispatchEvent(new Event('change'));
         });
     }
+}
+
+// Count-up animation for metric values
+export function animateValue(el, start, end, duration = 600, formatter = (v) => v) {
+    if (!el) return;
+    // Cancel any previous animation on this element
+    if (el._animFrame) { cancelAnimationFrame(el._animFrame); }
+    if (el._animFallback) { clearTimeout(el._animFallback); }
+    const startTime = performance.now();
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) { el.textContent = formatter(end); return; }
+    function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        const current = start + (end - start) * eased;
+        el.textContent = formatter(current);
+        if (progress < 1) { el._animFrame = requestAnimationFrame(step); }
+    }
+    el._animFrame = requestAnimationFrame(step);
+    // Safety net: ensure final value is set even if rAF never fires (headless browsers, background tabs)
+    el._animFallback = setTimeout(() => {
+        cancelAnimationFrame(el._animFrame);
+        el.textContent = formatter(end);
+    }, duration + 100);
 }
 
 export function toggleStakeLabel() {
