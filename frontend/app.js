@@ -4838,6 +4838,8 @@ window.runSpecificEqsBacktest = async function(scanType, code, optRange) {
 // ==========================================================================
 
 window.runBacktest = async function(overrideParams) {
+    if (!window._backtestSeq) window._backtestSeq = 0;
+    const mySeq = ++window._backtestSeq;
     let btn = null;
     try {
         // --- Portfolio Fix: Restore standard UI panels ---
@@ -5007,6 +5009,12 @@ window.runBacktest = async function(overrideParams) {
         console.log("Backtest Response Status:", response.status);
         console.log("Backtest Response Summary:", JSON.stringify(data.summary || {}));
         if (data.error) console.error("Backtest Response Error:", data.error);
+
+        // Discard stale responses from older concurrent requests
+        if (mySeq !== window._backtestSeq) {
+            console.warn(`Dropping stale backtest response seq=${mySeq}, current=${window._backtestSeq}`);
+            return;
+        }
 
         if (response.ok && !data.error) {
             // Check if walk-forward result (different structure from standard backtest)
