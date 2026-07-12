@@ -1,7 +1,11 @@
 {
     "E1": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -11,7 +15,11 @@
     },
     "E3": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -21,7 +29,11 @@
     },
     "SP2": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -31,7 +43,11 @@
     },
     "I2": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -41,7 +57,11 @@
     },
     "F2": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -51,7 +71,11 @@
     },
     "G1": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -61,7 +85,11 @@
     },
     "SC1": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -71,7 +99,11 @@
     },
     "ARG": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -81,7 +113,11 @@
     },
     "BRA": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -91,7 +127,11 @@
     },
     "JPN": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -101,7 +141,11 @@
     },
     "ALGERIA_LIGUE_1": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -111,7 +155,11 @@
     },
     "ARGENTINA_PRIM_B_NACIONAL": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -121,7 +169,11 @@
     },
     "AZERBAIJAN_PREMYER_LIQAS": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -131,7 +183,11 @@
     },
     "BELARUS_VYSHEYSHAYA_LIGA": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -141,7 +197,11 @@
     },
     "BOSNIA_AND_HERZEGOVINA_PREMIER_LEAGUE_OF_BOSNIA": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -151,7 +211,11 @@
     },
     "BRAZIL_SERIE_B": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -161,7 +225,11 @@
     },
     "BRAZIL_SERIE_C": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -171,7 +239,11 @@
     },
     "BULGARIA_FIRST_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -181,7 +253,11 @@
     },
     "CHILE_PRIMERA_B": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -191,7 +267,11 @@
     },
     "CHINA_CHINA_LEAGUE_ONE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -201,7 +281,11 @@
     },
     "CROATIA_PRVA_HNL": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -211,7 +295,11 @@
     },
     "ECUADOR_PRIMERA_CATEGORA_SERIE_A": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -221,7 +309,11 @@
     },
     "EGYPT_EGYPTIAN_PREMIER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -231,7 +323,11 @@
     },
     "FYR_MACEDONIA_FIRST_FOOTBALL_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -241,7 +337,11 @@
     },
     "FRANCE_NATIONAL": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -251,7 +351,11 @@
     },
     "HUNGARY_NB_II": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -261,7 +365,11 @@
     },
     "INDIA_INDIAN_SUPER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -271,7 +379,11 @@
     },
     "IRAN_PERSIAN_GULF_PRO_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -281,7 +393,11 @@
     },
     "ISRAEL_ISRAELI_PREMIER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -291,7 +407,11 @@
     },
     "ISRAEL_LIGA_LEUMIT": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -301,7 +421,11 @@
     },
     "ITALY_SERIE_C": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -311,7 +435,11 @@
     },
     "ITALY_SERIE_C_GROUP_A": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -321,7 +449,11 @@
     },
     "ITALY_SERIE_C_GROUP_B": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -331,7 +463,11 @@
     },
     "ITALY_SERIE_C_GROUP_C": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -341,7 +477,11 @@
     },
     "ITALY_SERIE_D_GROUP_A": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -351,7 +491,11 @@
     },
     "ITALY_SERIE_D_GROUP_B": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -361,7 +505,11 @@
     },
     "ITALY_SERIE_D_GROUP_C": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -371,7 +519,11 @@
     },
     "ITALY_SERIE_D_GROUP_D": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -381,7 +533,11 @@
     },
     "ITALY_SERIE_D_GROUP_E": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -391,7 +547,11 @@
     },
     "ITALY_SERIE_D_GROUP_F": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -401,7 +561,11 @@
     },
     "ITALY_SERIE_D_GROUP_G": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -411,7 +575,11 @@
     },
     "ITALY_SERIE_D_GROUP_H": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -421,7 +589,11 @@
     },
     "ITALY_SERIE_D_GROUP_I": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -431,7 +603,11 @@
     },
     "JAMAICA_JAMAICA_NATIONAL_PREMIER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -441,7 +617,11 @@
     },
     "JAPAN_J2_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -451,7 +631,11 @@
     },
     "JORDAN_JORDANIAN_PRO_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -461,7 +645,11 @@
     },
     "KAZAKHSTAN_KAZAKHSTAN_PREMIER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -471,7 +659,11 @@
     },
     "LITHUANIA_A_LYGA": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -481,7 +673,11 @@
     },
     "MONTENEGRO_MONTENEGRIN_FIRST_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -491,7 +687,11 @@
     },
     "MOROCCO_BOTOLA_PRO": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -501,7 +701,11 @@
     },
     "NIGERIA_NPFL": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -511,7 +715,11 @@
     },
     "OMAN_PROFESSIONAL_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -521,7 +729,11 @@
     },
     "PARAGUAY_DIVISION_PROFESIONAL": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -531,7 +743,11 @@
     },
     "POLAND_EKSTRAKLASA": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -541,7 +757,11 @@
     },
     "PORTUGAL_CAMPEONATO_DE_PORTUGAL_GROUP_A": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -551,7 +771,11 @@
     },
     "PORTUGAL_CAMPEONATO_DE_PORTUGAL_GROUP_B": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -561,7 +785,11 @@
     },
     "PORTUGAL_CAMPEONATO_DE_PORTUGAL_GROUP_C": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -571,7 +799,11 @@
     },
     "PORTUGAL_CAMPEONATO_DE_PORTUGAL_GROUP_D": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -581,7 +813,11 @@
     },
     "PORTUGAL_LIGA_3": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -591,7 +827,11 @@
     },
     "PORTUGAL_LIGAPRO": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -601,7 +841,11 @@
     },
     "REPUBLIC_OF_IRELAND_PREMIER_DIVISION": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -611,7 +855,11 @@
     },
     "ROMANIA_LIGA_I": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -621,7 +869,11 @@
     },
     "RUSSIA_FNL": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -631,7 +883,11 @@
     },
     "SERBIA_PRVA_LIGA": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -641,7 +897,11 @@
     },
     "SLOVENIA_PRVALIGA": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -651,7 +911,11 @@
     },
     "SOUTH_AFRICA_PREMIER_SOCCER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -661,7 +925,11 @@
     },
     "SOUTH_AMERICA_COPA_LIBERTADORES": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -671,7 +939,11 @@
     },
     "SOUTH_KOREA_K_LEAGUE_1": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -681,7 +953,11 @@
     },
     "SOUTH_KOREA_K_LEAGUE_2": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -691,7 +967,11 @@
     },
     "SPAIN_PRIMERA_DIVISION_RFEF_GROUP_1": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -701,7 +981,11 @@
     },
     "SPAIN_PRIMERA_DIVISION_RFEF_GROUP_2": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -711,7 +995,11 @@
     },
     "SPAIN_SEGUNDA_DIVISIN_RFEF_GROUP_1": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -721,7 +1009,11 @@
     },
     "SPAIN_SEGUNDA_DIVISIN_RFEF_GROUP_2": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -731,7 +1023,11 @@
     },
     "SPAIN_SEGUNDA_DIVISIN_RFEF_GROUP_3": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -741,7 +1037,11 @@
     },
     "SPAIN_SEGUNDA_DIVISIN_RFEF_GROUP_4": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -751,7 +1051,11 @@
     },
     "SPAIN_SEGUNDA_DIVISIN_RFEF_GROUP_5": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -761,7 +1065,11 @@
     },
     "TAIWAN_TAIWAN_FOOTBALL_PREMIER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -771,7 +1079,11 @@
     },
     "TUNISIA_LIGUE_1": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -781,7 +1093,11 @@
     },
     "UKRAINE_UKRAINIAN_PREMIER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -791,7 +1107,11 @@
     },
     "URUGUAY_PRIMERA_DIVISIN": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -801,7 +1121,11 @@
     },
     "UZBEKISTAN_UZBEKISTAN_SUPER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -811,7 +1135,11 @@
     },
     "VIETNAM_VLEAGUE_1": {
         "profile": "Ligas Truncadas (Under)",
-        "avg_goals": 2.361871321684227,
+        "avg_goals": 2.36011902744104,
+        "over25_pct": 0.4257742619931573,
+        "btts_pct": 0.46858914576381167,
+        "home_win_pct": 0.4154059429448158,
+        "draw_pct": 0.2936919456498101,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -821,7 +1149,11 @@
     },
     "E0": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -831,7 +1163,11 @@
     },
     "E2": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -841,7 +1177,11 @@
     },
     "SP1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -851,7 +1191,11 @@
     },
     "I1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -861,7 +1205,11 @@
     },
     "D1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -871,7 +1219,11 @@
     },
     "D2": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -881,7 +1233,11 @@
     },
     "F1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -891,7 +1247,11 @@
     },
     "N1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -901,7 +1261,11 @@
     },
     "B1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -911,7 +1275,11 @@
     },
     "P1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -921,7 +1289,11 @@
     },
     "T1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -931,7 +1303,11 @@
     },
     "SC0": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -941,7 +1317,11 @@
     },
     "USA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -951,7 +1331,11 @@
     },
     "MEX": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -961,7 +1345,11 @@
     },
     "SWEDEN_ALLSVENSKAN": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -971,7 +1359,11 @@
     },
     "NORWAY_ELITESERIEN": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -981,7 +1373,11 @@
     },
     "AUSTRALIA_A_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -991,7 +1387,11 @@
     },
     "AUSTRALIA_NEW_SOUTH_WALES_NPL": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1001,7 +1401,11 @@
     },
     "AUSTRALIA_NORTHERN_NSW_NPL": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1011,7 +1415,11 @@
     },
     "AUSTRIA_2_LIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1021,7 +1429,11 @@
     },
     "AUSTRIA_BUNDESLIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1031,7 +1443,11 @@
     },
     "BELGIUM_FIRST_DIVISION_B": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1041,7 +1457,11 @@
     },
     "BOLIVIA_LFPB": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1051,7 +1471,11 @@
     },
     "CANADA_CANADIAN_PREMIER_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1061,7 +1485,11 @@
     },
     "CHILE_PRIMERA_DIVISIN": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1071,7 +1499,11 @@
     },
     "CHINA_CHINESE_SUPER_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1081,7 +1513,11 @@
     },
     "CROATIA_DRUGA_HNL": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1091,7 +1527,11 @@
     },
     "CYPRUS_FIRST_DIVISION": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1101,7 +1541,11 @@
     },
     "CZECH_REPUBLIC_FNL": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1111,7 +1555,11 @@
     },
     "CZECH_REPUBLIC_FIRST_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1121,7 +1569,11 @@
     },
     "DENMARK_SUPERLIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1131,7 +1583,11 @@
     },
     "ENGLAND_FA_WOMENS_SUPER_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1141,7 +1597,11 @@
     },
     "ESTONIA_MEISTRILIIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1151,7 +1611,11 @@
     },
     "EUROPE_UEFA_CHAMPIONS_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1161,7 +1625,11 @@
     },
     "FAROE_ISLANDS_FAROE_ISLANDS_PREMIER_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1171,7 +1639,11 @@
     },
     "FINLAND_VEIKKAUSLIIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1181,7 +1653,11 @@
     },
     "GEORGIA_EROVNULI_LIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1191,7 +1667,11 @@
     },
     "GERMANY_3_LIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1201,7 +1681,11 @@
     },
     "HUNGARY_NB_I": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1211,7 +1695,11 @@
     },
     "ICELAND_RVALSDEILD": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1221,7 +1709,11 @@
     },
     "INDONESIA_LIGA_1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1231,7 +1723,11 @@
     },
     "LATVIA_VIRSLIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1241,7 +1737,11 @@
     },
     "LUXEMBOURG_NATIONAL_DIVISION": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1251,7 +1751,11 @@
     },
     "MALAYSIA_SUPER_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1261,7 +1765,11 @@
     },
     "NETHERLANDS_EERSTE_DIVISIE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1271,7 +1779,11 @@
     },
     "NETHERLANDS_EREDIVISIE_WOMEN": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1281,7 +1793,11 @@
     },
     "NORTHERN_IRELAND_NIFL_PREMIERSHIP": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1291,7 +1807,11 @@
     },
     "NORWAY_FIRST_DIVISION": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1301,7 +1821,11 @@
     },
     "NORWAY_TOPPSERIEN": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1311,7 +1835,11 @@
     },
     "POLAND_1_LIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1321,7 +1849,11 @@
     },
     "QATAR_STARS_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1331,7 +1863,11 @@
     },
     "REPUBLIC_OF_IRELAND_FIRST_DIVISION": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1341,7 +1877,11 @@
     },
     "RUSSIA_RUSSIAN_PREMIER_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1351,7 +1891,11 @@
     },
     "SAUDI_ARABIA_PROFESSIONAL_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1361,7 +1905,11 @@
     },
     "SERBIA_SUPERLIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1371,7 +1919,11 @@
     },
     "SINGAPORE_SLEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1381,7 +1933,11 @@
     },
     "SLOVAKIA_SUPER_LIGA": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1391,7 +1947,11 @@
     },
     "SPAIN_PRIMERA_DIVISION_WOMEN": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1401,7 +1961,11 @@
     },
     "SWEDEN_DAMALLSVENSKAN": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1411,7 +1975,11 @@
     },
     "SWEDEN_SUPERETTAN": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1421,7 +1989,11 @@
     },
     "SWITZERLAND_CHALLENGE_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1431,7 +2003,11 @@
     },
     "SWITZERLAND_SUPER_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1441,7 +2017,11 @@
     },
     "THAILAND_THAI_LEAGUE_T1": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1451,7 +2031,11 @@
     },
     "TURKEY_1_LIG": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1461,7 +2045,11 @@
     },
     "UAE_ARABIAN_GULF_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1471,7 +2059,11 @@
     },
     "USA_MLS_NEXT_PRO": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1481,7 +2073,11 @@
     },
     "USA_NWSL": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1491,7 +2087,11 @@
     },
     "USA_USL_CHAMPIONSHIP": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1501,7 +2101,11 @@
     },
     "WALES_WELSH_PREMIER_LEAGUE": {
         "profile": "Ligas de Gols (Over)",
-        "avg_goals": 2.924455355161422,
+        "avg_goals": 2.9247596795977095,
+        "over25_pct": 0.5580556162185891,
+        "btts_pct": 0.5416189585234529,
+        "home_win_pct": 0.4368173461139982,
+        "draw_pct": 0.23955797424048927,
         "markets": [
             "Over 2.5",
             "BTTS Yes",
@@ -1512,6 +2116,10 @@
     "ETHIOPIA_ETHIOPIA_PREMIER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
         "avg_goals": 1.4985440320018824,
+        "over25_pct": 0.23763162538972882,
+        "btts_pct": 0.3246220365903877,
+        "home_win_pct": 0.23086652156009174,
+        "draw_pct": 0.4704688511088888,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
@@ -1523,6 +2131,10 @@
     "KENYA_KENYAN_PREMIER_LEAGUE": {
         "profile": "Ligas Truncadas (Under)",
         "avg_goals": 1.4985440320018824,
+        "over25_pct": 0.23763162538972882,
+        "btts_pct": 0.3246220365903877,
+        "home_win_pct": 0.23086652156009174,
+        "draw_pct": 0.4704688511088888,
         "markets": [
             "Under 2.5",
             "Under 0.5 HT",
