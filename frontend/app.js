@@ -4413,7 +4413,7 @@ function renderEqsResults(results, scanType, requestData, diagnostics) {
         `;
 
     } else if (scanType === 'staking') {
-        // Staking Comparison Table
+        // Staking Comparison Table with sortable columns
         const leaguesCount = requestData.leagues.length;
         const marketsCount = requestData.market.length || 33;
         leaguesContextHtml = `
@@ -4429,11 +4429,121 @@ function renderEqsResults(results, scanType, requestData, diagnostics) {
             proportional: { label: "Prop (2%)",    color: "#3b82f6" },
             kelly:        { label: "Kelly (1/4)",  color: "#34d399" },
         };
+
+        // Sort state for this staking table
+        window._stakingSort = { col: null, asc: true };
+
+        const COLUMNS = [
+            { key: 'name',         label: 'Liga / Mercado',  align: 'left',   color: 'var(--text-muted)', sortType: 'str' },
+            { key: 'total_bets',   label: 'Apostas',         align: 'center', color: 'var(--text-muted)', sortType: 'num' },
+            { key: 'fixed_roi',    label: 'Fixed ROI',       align: 'right',  color: '#f59e0b',             sortType: 'num' },
+            { key: 'fixed_dd',     label: 'Fixed DD',        align: 'right',  color: '#f59e0b',             sortType: 'num' },
+            { key: 'prop_roi',     label: 'Prop ROI',        align: 'right',  color: '#3b82f6',             sortType: 'num' },
+            { key: 'prop_dd',      label: 'Prop DD',         align: 'right',  color: '#3b82f6',             sortType: 'num' },
+            { key: 'kelly_roi',    label: 'Kelly ROI',       align: 'right',  color: '#34d399',             sortType: 'num' },
+            { key: 'kelly_dd',     label: 'Kelly DD',        align: 'right',  color: '#34d399',             sortType: 'num' },
+            { key: 'best_method',  label: 'Melhor Gestao',   align: 'center', color: 'var(--text-muted)', sortType: 'str' },
+        ];
+
+        function _extractValue(r, colKey) {
+            switch (colKey) {
+                case 'name':         return r.name || '';
+                case 'total_bets':   return r.total_bets || 0;
+                case 'fixed_roi':    return (r.fixed && r.fixed.roi) || 0;
+                case 'fixed_dd':     return (r.fixed && r.fixed.max_drawdown) || 0;
+                case 'prop_roi':     return (r.proportional && r.proportional.roi) || 0;
+                case 'prop_dd':      return (r.proportional && r.proportional.max_drawdown) || 0;
+                case 'kelly_roi':    return (r.kelly && r.kelly.roi) || 0;
+                case 'kelly_dd':     return (r.kelly && r.kelly.max_drawdown) || 0;
+                case 'best_method':  return r.best_method || 'fixed';
+                default: return 0;
+            }
+        }
+
+        function _renderStakingTbody(sortedResults) {
+            return sortedResults.map(r => {
+                const methods = ['fixed', 'proportional', 'kelly'];
+                const best = r.best_method || 'fixed';
+                return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <td style="padding: 10px 15px; font-size: 11px;">
+                            ${r.name.replace(' / ', ' <i class="fa-solid fa-angle-right" style="color:var(--text-muted); font-size:9px;"></i> ')}
+                        </td>
+                        <td style="padding: 10px 15px; text-align: center; font-size: 12px;">${r.total_bets}</td>
+                        ${methods.map(m => {
+                            const d = r[m] || {};
+                            const roiColor = d.roi >= 0 ? 'var(--success)' : 'var(--danger)';
+                            const methodColor = METHOD_LABELS[m].color;
+                            return `
+                                <td style="padding: 10px 15px; text-align: right; color: ${roiColor}; font-weight: 500; font-size: 13px; background: ${best === m ? methodColor + '15' : 'transparent'};">${(d.roi || 0).toFixed(1)}%</td>
+                                <td style="padding: 10px 15px; text-align: right; color: var(--danger); font-size: 12px; opacity: ${(d.max_drawdown || 0) > 20 ? 1 : 0.6}; background: ${best === m ? methodColor + '15' : 'transparent'};">-${(d.max_drawdown || 0).toFixed(1)}%</td>
+                            `;
+                        }).join('')}
+                        <td style="padding: 10px 15px; text-align: center;">
+                            <span style="background: ${METHOD_LABELS[best].color}20; color: ${METHOD_LABELS[best].color}; padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                                ${METHOD_LABELS[best].label}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Store sort helpers on window so inline onclick can reach them
+        window._stakingSortData = {
+            results,
+            COLUMNS,
+            METHOD_LABELS,
+            _extractValue,
+            _renderStakingTbody,
+        };
+        window._stakingSortClick = function(colKey) {
+            const s = window._stakingSort;
+            const d = window._stakingSortData;
+            if (s.col === colKey) {
+                s.asc = !s.asc;
+            } else {
+                s.col = colKey;
+                s.asc = true;
+            }
+            const colDef = d.COLUMNS.find(c => c.key === colKey);
+            const sorted = [...d.results].sort((a, b) => {
+                const va = d._extractValue(a, colKey);
+                const vb = d._extractValue(b, colKey);
+                let cmp;
+                if (colDef && colDef.sortType === 'num') {
+                    cmp = (va || 0) - (vb || 0);
+                } else {
+                    cmp = String(va).localeCompare(String(vb));
+                }
+                return s.asc ? cmp : -cmp;
+            });
+            const tbody = document.getElementById('staking-comparison-tbody');
+            if (tbody) tbody.innerHTML = d._renderStakingTbody(sorted);
+            document.querySelectorAll('#staking-comparison-table thead th').forEach(th => {
+                const arrow = th.querySelector('.sort-arrow');
+                if (arrow) {
+                    const thKey = th.getAttribute('data-sort-key');
+                    if (thKey === s.col) {
+                        arrow.textContent = s.asc ? ' ▲' : ' ▼';
+                        arrow.style.opacity = '1';
+                    } else {
+                        arrow.textContent = ' ▲';
+                        arrow.style.opacity = '0.3';
+                    }
+                }
+            });
+        };
+
+        const headerCells = COLUMNS.map(c => {
+            return `<th data-sort-key="${c.key}" onclick="window._stakingSortClick('${c.key}')" style="padding: 12px 15px; text-align: ${c.align}; font-size: 12px; color: ${c.color}; text-transform: uppercase; cursor: pointer; user-select: none; white-space: nowrap;">${c.label}<span class="sort-arrow" style="opacity: 0.3; font-size: 10px;"> ▲</span></th>`;
+        }).join('');
+
         const stakingHtml = `
             ${leaguesContextHtml}
             <div class="eqs-legend" style="margin-bottom: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
                 <h4 style="margin: 0 0 10px 0; font-size: 14px; color: var(--text-primary);"><i class="fa-solid fa-scale-balanced"></i> Comparacao de Gestoes de Banca</h4>
-                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px;">
                     ${Object.entries(METHOD_LABELS).map(([k,v]) => `
                         <div style="display: flex; align-items: center; gap: 6px;">
                             <span style="width: 12px; height: 12px; border-radius: 3px; background: ${v.color};"></span>
@@ -4441,51 +4551,20 @@ function renderEqsResults(results, scanType, requestData, diagnostics) {
                         </div>
                     `).join('')}
                 </div>
+                <span style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-arrow-up-wide-short"></i> Clique nos cabecalhos para ordenar</span>
             </div>
-            <table class="scanner-table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <table id="staking-comparison-table" class="scanner-table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
                 <thead>
                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
-                        <th style="padding: 12px 15px; text-align: left; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Liga / Mercado</th>
-                        <th style="padding: 12px 15px; text-align: center; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Apostas</th>
-                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #f59e0b;">Fixed ROI</th>
-                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #f59e0b;">Fixed DD</th>
-                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #3b82f6;">Prop ROI</th>
-                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #3b82f6;">Prop DD</th>
-                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #34d399;">Kelly ROI</th>
-                        <th style="padding: 12px 15px; text-align: right; font-size: 12px; color: #34d399;">Kelly DD</th>
-                        <th style="padding: 12px 15px; text-align: center; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Melhor Gestao</th>
+                        ${headerCells}
                     </tr>
                 </thead>
-                <tbody>
-                    ${results.map(r => {
-                        const methods = ['fixed', 'proportional', 'kelly'];
-                        const best = r.best_method || 'fixed';
-                        return `
-                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                                <td style="padding: 10px 15px; font-size: 11px;">
-                                    ${r.name.replace(' / ', ' <i class="fa-solid fa-angle-right" style="color:var(--text-muted); font-size:9px;"></i> ')}
-                                </td>
-                                <td style="padding: 10px 15px; text-align: center; font-size: 12px;">${r.total_bets}</td>
-                                ${methods.map(m => {
-                                    const d = r[m] || {};
-                                    const roiColor = d.roi >= 0 ? 'var(--success)' : 'var(--danger)';
-                                    const methodColor = METHOD_LABELS[m].color;
-                                    return `
-                                        <td style="padding: 10px 15px; text-align: right; color: ${roiColor}; font-weight: 500; font-size: 13px; background: ${best === m ? methodColor + '15' : 'transparent'};">${(d.roi || 0).toFixed(1)}%</td>
-                                        <td style="padding: 10px 15px; text-align: right; color: var(--danger); font-size: 12px; opacity: ${(d.max_drawdown || 0) > 20 ? 1 : 0.6}; background: ${best === m ? methodColor + '15' : 'transparent'};">-${(d.max_drawdown || 0).toFixed(1)}%</td>
-                                    `;
-                                }).join('')}
-                                <td style="padding: 10px 15px; text-align: center;">
-                                    <span style="background: ${METHOD_LABELS[best].color}20; color: ${METHOD_LABELS[best].color}; padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
-                                        ${METHOD_LABELS[best].label}
-                                    </span>
-                                </td>
-                            </tr>
-                        `;
-                    }).join('')}
+                <tbody id="staking-comparison-tbody">
+                    ${_renderStakingTbody(results)}
                 </tbody>
             </table>
         `;
+        window._stakingSort = { col: null, asc: true };
         resultsContainer.innerHTML = stakingHtml;
         window.lastEqsScanParams = requestData;
         return;
