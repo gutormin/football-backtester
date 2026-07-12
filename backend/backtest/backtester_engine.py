@@ -2086,6 +2086,8 @@ class ChronologicalBacktester:
                     'total_staked': 0.0,
                     'total_bets': 0,
                     'wins': 0,
+                    'losses': 0,
+                    'pushes': 0,
                     'bets_for_ai': [],
                     'daily_exposure': defaultdict(float),
                     'daily_bet_count': defaultdict(int)
@@ -2098,6 +2100,8 @@ class ChronologicalBacktester:
                     'total_staked': 0.0,
                     'total_bets': 0,
                     'wins': 0,
+                    'losses': 0,
+                    'pushes': 0,
                     'bets_for_ai': [],
                     'daily_exposure': defaultdict(float),
                     'daily_bet_count': defaultdict(int)
@@ -2111,6 +2115,8 @@ class ChronologicalBacktester:
                         'total_staked': 0.0,
                         'total_bets': 0,
                         'wins': 0,
+                        'losses': 0,
+                        'pushes': 0,
                         'bets_for_ai': [],
                         'daily_exposure': defaultdict(float),
                         'daily_bet_count': defaultdict(int)
@@ -2130,6 +2136,8 @@ class ChronologicalBacktester:
                     'total_staked': 0.0,
                     'total_bets': 0,
                     'wins': 0,
+                    'losses': 0,
+                    'pushes': 0,
                     'bets_for_ai': [],
                     'daily_exposure': defaultdict(float),
                     'daily_bet_count': defaultdict(int)
@@ -2898,14 +2906,21 @@ class ChronologicalBacktester:
                         state_ref['bankroll'] += p_profit
                         if multiplier == 1.0:
                             state_ref['wins'] += 1
+                        else:
+                            state_ref['pushes'] += 1
                     elif multiplier < 0:
                         if p_mkt.startswith('lay_'):
                             p_profit = p_stake * (p_odds - 1.0) * multiplier
                         else:
                             p_profit = p_stake * multiplier
                         state_ref['bankroll'] += p_profit
+                        if multiplier == -1.0:
+                            state_ref['losses'] += 1
+                        else:
+                            state_ref['pushes'] += 1
                     else:
                         p_profit = 0.0
+                        state_ref['pushes'] += 1
 
                     # Track peak bankroll for drawdown circuit breaker
                     if state_ref['bankroll'] > state_ref['peak_bankroll']:
