@@ -3976,15 +3976,21 @@ function renderEdgeQualityScore(eqs) {
 
         eqs.breakdown.forEach(item => {
 
-            const pct = (item.points / item.max) * 100;
+            const maxVal = item.max || 1;
+            const isInsufficient = item.insufficient === true || item.max === 0;
+            const pct = isInsufficient ? 0 : (item.points / maxVal) * 100;
 
             let iconColor = 'var(--danger)';
 
             let iconClass = 'fa-xmark';
 
-            
+            if (isInsufficient) {
 
-            if (pct >= 80) {
+                iconColor = 'var(--text-muted)';
+
+                iconClass = 'fa-minus';
+
+            } else if (pct >= 80) {
 
                 iconColor = 'var(--success)';
 
@@ -4070,7 +4076,7 @@ function renderEdgeQualityScore(eqs) {
 
                 <div style="text-align: right;">
 
-                    <div style="font-size: 16px; font-weight: bold; font-family: var(--font-heading); color: ${iconColor};">${item.points}<span style="font-size: 12px; color: var(--text-muted);">/${item.max}</span></div>
+                    <div style="font-size: 16px; font-weight: bold; font-family: var(--font-heading); color: ${iconColor};">${isInsufficient ? '—' : item.points}<span style="font-size: 12px; color: var(--text-muted);">${isInsufficient ? '' : '/' + item.max}</span></div>
 
                 </div>
 
@@ -4608,6 +4614,12 @@ function renderEqsResults(results, scanType, requestData, diagnostics) {
 
                 </div>
 
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+
+                    <span style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-sliders"></i> Thresholds adaptativos: amostras pequenas (&lt;80 apostas) usam criterios relaxados de significancia.</span>
+
+                </div>
+
             </div>
 
         </div>
@@ -4667,6 +4679,8 @@ function renderEqsResults(results, scanType, requestData, diagnostics) {
                                     ${r.eqs_score}
 
                                 </div>
+                                ${r.eqs_percentile_market != null ? `<div style="font-size: 9px; color: var(--primary); margin-top: 3px; white-space: nowrap;"><i class="fa-solid fa-trophy"></i> Top ${100 - r.eqs_percentile_market}% mercado</div>` : ''}
+                                ${r.eqs_percentile_bets != null ? `<div style="font-size: 9px; color: var(--text-muted); margin-top: 1px; white-space: nowrap;">Top ${100 - r.eqs_percentile_bets}% ${r.eqs_percentile_bets_label ? r.eqs_percentile_bets_label.replace('Top entre ', '') : ''}</div>` : ''}
 
                             </td>
 

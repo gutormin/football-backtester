@@ -728,6 +728,50 @@ def run_scan(req: ScanRequest):
                     r['p_value_adjusted'] = adjusted[i]
                     r['significant'] = adjusted[i] < 0.05
 
+        # Calcula percentis EQS relativos por grupo de peer
+        # Skip staking scan — structure is different (nested methods)
+        if scan_results and req.scanType != 'staking':
+            from collections import defaultdict
+
+            def _bets_band(n):
+                if n < 30: return '<30'
+                if n < 80: return '30-79'
+                if n < 200: return '80-199'
+                return '200+'
+
+            def _percentile(score, scores_list):
+                if not scores_list or len(scores_list) < 2:
+                    return None
+                return round(sum(1 for s in scores_list if s < score) / len(scores_list) * 100)
+
+            # Grupo: por mercado (market code) — extrai do campo 'code'
+            market_scores = defaultdict(list)
+            for r in scan_results:
+                code = r.get('code', '')
+                # 'leagues' scan: code = league_code; 'markets': code = market_code;
+                # 'combinations': code = "league|market"; 'staking': code = "league|market"
+                if '|' in code:
+                    m_key = code.split('|')[1] if len(code.split('|')) > 1 else code
+                else:
+                    m_key = code
+                market_scores[m_key].append(r['eqs_score'])
+
+            # Grupo: por faixa de bets
+            bets_scores = defaultdict(list)
+            for r in scan_results:
+                bets_scores[_bets_band(r.get('total_bets', 0))].append(r['eqs_score'])
+
+            for r in scan_results:
+                code = r.get('code', '')
+                if '|' in code:
+                    m_key = code.split('|')[1] if len(code.split('|')) > 1 else code
+                else:
+                    m_key = code
+                band = _bets_band(r.get('total_bets', 0))
+                r['eqs_percentile_market'] = _percentile(r['eqs_score'], market_scores.get(m_key, []))
+                r['eqs_percentile_bets'] = _percentile(r['eqs_score'], bets_scores.get(band, []))
+                r['eqs_percentile_bets_label'] = f'Top entre {band} apostas' if r['eqs_percentile_bets'] is not None else None
+
         return {
             "status": "success",
             "scan_type": req.scanType,

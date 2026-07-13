@@ -1239,6 +1239,77 @@ DEFAULT_EQS_WEIGHTS = {
     'pvalue': 13, 'power': 10, 'brier': 5,
 }
 
+def _get_sample_tier(total_bets):
+    """Classifica o tamanho da amostra para thresholds adaptativos."""
+    if total_bets < 30: return 'tiny'
+    if total_bets < 80: return 'small'
+    if total_bets < 200: return 'medium'
+    return 'large'
+
+def _get_eqt_thresholds(tier):
+    """Retorna thresholds por tier para cada métrica do EQS.
+
+    Cada entry: (full_pts_threshold, partial_pts_threshold, zero_pts_threshold, partial_fraction)
+    partial_fraction é a fração dos pontos máximos dada no nível parcial.
+    """
+    return {
+        'pvalue': {
+            'tiny':    (0.15, 0.30, 4/13),
+            'small':   (0.10, 0.20, 4/13),
+            'medium':  (0.05, 0.10, 4/13),
+            'large':   (0.01, 0.05, 9/13),
+        },
+        'power': {
+            'tiny':    (0.15, 0.30, 5/10),
+            'small':   (0.30, 0.50, 5/10),
+            'medium':  (0.50, 1.00, 5/10),
+            'large':   (1.00, None, None),
+        },
+        'bootstrap': {
+            'tiny':    (-5.0, -10.0, 8/20),
+            'small':   (-2.0, -5.0, 8/20),
+            'medium':  (0.0, -2.0, 8/20),
+            'large':   (1.0, 0.0, 15/20),
+        },
+        'decay': {
+            'tiny':    (-35.0, -50.0, 6/12),
+            'small':   (-25.0, -40.0, 6/12),
+            'medium':  (-15.0, -25.0, 6/12),
+            'large':   (-10.0, -25.0, 6/12),
+        },
+        'oos': {
+            'tiny':    (0.20, 0.10, 8/25),
+            'small':   (0.30, 0.15, 8/25),
+            'medium':  (0.40, 0.20, 8/25),
+            'large':   (0.80, 0.40, 17/25),
+        },
+    }
+
+def _redistribute_weights(w, missing_keys):
+    """Rateia o peso das métricas ausentes entre as métricas ativas.
+
+    Retorna (adjusted_weights_dict, redistributed_max_per_metric_dict).
+    """
+    active = {k: v for k, v in w.items() if k not in missing_keys}
+    missing_weight = sum(w.get(k, 0) for k in missing_keys)
+    total_active = sum(active.values())
+
+    if total_active == 0 or missing_weight == 0:
+        return dict(w), dict(w)
+
+    adjusted = {}
+    redist_max = {}
+    for k, base in active.items():
+        bonus = round((base / total_active) * missing_weight)
+        adjusted[k] = base + bonus
+        redist_max[k] = base + bonus
+
+    for k in missing_keys:
+        adjusted[k] = w.get(k, 0)
+        redist_max[k] = 0
+
+    return adjusted, redist_max
+
 
 def _pearson_r(x, y):
     """Pure-numpy Pearson correlation (avoids scipy dependency)."""
@@ -1252,25 +1323,28 @@ def _pearson_r(x, y):
     return float((xm * ym).sum() / denom) if denom > 1e-15 else 0.0
 
 
-def _eqs_metric_scores(summary, oos_summary=None):
+def _eqs_metric_scores(summary, oos_summary=None, tier='large'):
     """Compute normalized (0-1) scores for each EQS metric from a single strategy summary.
 
     Returns dict with keys matching DEFAULT_EQS_WEIGHTS, each value in [0, 1].
+    Uses adaptive thresholds from _get_eqt_thresholds when tier != 'large'.
     """
     scores = {}
+    thresholds = _get_eqt_thresholds(tier)
 
     # 1. OOS
     if oos_summary:
         in_sample_roi = summary.get('roi', 0)
         oos_roi = oos_summary.get('roi', 0)
+        t = thresholds['oos'][tier]
         if in_sample_roi > 0 and oos_roi > 0:
             ratio = oos_roi / max(in_sample_roi, 0.001)
-            if ratio >= 0.8:
+            if ratio >= t[0]:
                 scores['oos'] = 1.0
-            elif ratio >= 0.4:
-                scores['oos'] = 17 / 25
+            elif ratio >= t[1]:
+                scores['oos'] = t[2]
             else:
-                scores['oos'] = 8 / 25
+                scores['oos'] = max(0.05, t[2] * 0.4)
         elif oos_roi > 0:
             scores['oos'] = 5 / 25
         else:
@@ -1281,12 +1355,11 @@ def _eqs_metric_scores(summary, oos_summary=None):
     # 2. Bootstrap CI
     ci_lower = summary.get('bootstrap_roi_ci_lower')
     if ci_lower is not None:
-        if ci_lower > 1.0:
+        t = thresholds['bootstrap'][tier]
+        if ci_lower > t[0]:
             scores['bootstrap'] = 1.0
-        elif ci_lower > 0.0:
-            scores['bootstrap'] = 15 / 20
-        elif ci_lower > -2.0:
-            scores['bootstrap'] = 8 / 20
+        elif ci_lower > t[1]:
+            scores['bootstrap'] = t[2]
         else:
             scores['bootstrap'] = 0.0
     else:
@@ -1309,10 +1382,11 @@ def _eqs_metric_scores(summary, oos_summary=None):
     # 4. Edge Decay
     decay = summary.get('edge_decay_pct')
     if decay is not None:
-        if decay > -10.0:
+        t = thresholds['decay'][tier]
+        if decay > t[0]:
             scores['decay'] = 1.0
-        elif decay > -25.0:
-            scores['decay'] = 6 / 12
+        elif decay > t[1]:
+            scores['decay'] = t[2]
         else:
             scores['decay'] = 0.0
     else:
@@ -1324,12 +1398,11 @@ def _eqs_metric_scores(summary, oos_summary=None):
     avg_odds = summary.get('avg_odds', 2.0)
     try:
         p_val = compute_pvalue_binomial(wins, total, avg_odds)
-        if p_val < 0.01:
+        t = thresholds['pvalue'][tier]
+        if p_val < t[0]:
             scores['pvalue'] = 1.0
-        elif p_val < 0.05:
-            scores['pvalue'] = 9 / 13
-        elif p_val < 0.10:
-            scores['pvalue'] = 4 / 13
+        elif p_val < t[1]:
+            scores['pvalue'] = t[2]
         else:
             scores['pvalue'] = 0.0
     except Exception:
@@ -1338,10 +1411,11 @@ def _eqs_metric_scores(summary, oos_summary=None):
     # 6. Power Ratio
     pr = summary.get('power_ratio')
     if pr is not None:
-        if pr >= 1.0:
+        t = thresholds['power'][tier]
+        if t[0] is not None and pr >= t[0]:
             scores['power'] = 1.0
-        elif pr >= 0.5:
-            scores['power'] = 5 / 10
+        elif t[1] is not None and pr >= t[1]:
+            scores['power'] = t[2]
         else:
             scores['power'] = 0.0
     else:
@@ -1385,7 +1459,8 @@ def calibrate_equity_weights(strategy_results, min_strategies=5):
     for sr in strategy_results:
         summary = sr.get('summary', {})
         oos = sr.get('oos_summary')
-        scores = _eqs_metric_scores(summary, oos)
+        tier = _get_sample_tier(summary.get('total_bets', 0))
+        scores = _eqs_metric_scores(summary, oos, tier)
         oos_roi = (oos or {}).get('roi', summary.get('roi', 0))
         oos_rois.append(oos_roi)
         for m in metrics:
@@ -1415,7 +1490,7 @@ def calibrate_equity_weights(strategy_results, min_strategies=5):
     return calibrated
 
 
-def compute_edge_quality_score(summary, oos_summary=None, weights=None):
+def compute_edge_quality_score(summary, oos_summary=None, weights=None, total_bets=None, min_oos_bets=10):
     """Computes a composite Edge Quality Score (0-100) based on statistical metrics.
 
     Args:
@@ -1423,200 +1498,284 @@ def compute_edge_quality_score(summary, oos_summary=None, weights=None):
         oos_summary: optional OOS validation summary
         weights: optional custom weight dict from calibrate_equity_weights().
                  If None, uses DEFAULT_EQS_WEIGHTS.
+        total_bets: optional int — used to determine sample-size tier for adaptive thresholds.
+                    Defaults to summary['total_bets'] if not provided.
+        min_oos_bets: minimum OOS bets required before the OOS metric is counted.
+                      Below this, OOS is marked "insufficient" and excluded from scoring.
 
     Phase 2: The OOS section now receives true out-of-sample data (models frozen after cutoff date)
     rather than a simple chronological tail slice, eliminating data leakage from the calibration/ML pipeline.
+
+    Phase 3: Adaptive thresholds per sample-size tier, weight redistribution for missing metrics,
+    and OOS partial-credit with insufficient-data state.
     """
     w = weights if weights is not None else DEFAULT_EQS_WEIGHTS
+    if total_bets is None:
+        total_bets = summary.get('total_bets', 0)
+    tier = _get_sample_tier(total_bets)
+    thresholds = _get_eqt_thresholds(tier)
+
     score = 0.0
     details = []
 
-    # 1. Out-of-Sample (OOS) — weight-driven
+    # --- Collect missing metrics for weight redistribution ---
     w_oos = w.get('oos', 25)
-    if oos_summary:
+    w_bs = w.get('bootstrap', 20)
+    w_clv = w.get('clv', 15)
+    w_decay = w.get('decay', 12)
+    w_pv = w.get('pvalue', 13)
+    w_pwr = w.get('power', 10)
+    w_brier = w.get('brier', 5)
+
+    missing = set()
+    oos_insufficient = False
+
+    avg_clv = summary.get('avg_clv')
+    if avg_clv is None:
+        missing.add('clv')
+
+    ci_lower = summary.get('bootstrap_roi_ci_lower')
+    if ci_lower is None:
+        missing.add('bootstrap')
+
+    decay = summary.get('edge_decay_pct')
+    if decay is None:
+        missing.add('decay')
+
+    pr = summary.get('power_ratio')
+    if pr is None:
+        missing.add('power')
+
+    brier_imp = summary.get('brier_improvement')
+    if brier_imp is None:
+        missing.add('brier')
+
+    # Check OOS insufficiency before handling
+    oos_bets_count = oos_summary.get('total_bets', 0) if oos_summary else 0
+    if oos_summary is None or oos_bets_count < min_oos_bets:
+        oos_insufficient = True
+        missing.add('oos')
+
+    # Redistribute weights of missing metrics across active ones
+    adj_w, redist_max = _redistribute_weights(w, missing)
+
+    # --- 1. Out-of-Sample (OOS) ---
+    t_oos = thresholds['oos'][tier]
+    effective_w_oos = adj_w.get('oos', 0)
+
+    if oos_insufficient:
+        pts = None  # sentinel: excluded from score
+        if oos_summary is None:
+            msg = f"OOS: Não calculado (requer min {min_oos_bets} apostas)"
+        else:
+            msg = f"OOS: Amostra insuficiente ({oos_bets_count}/{min_oos_bets} apostas)"
+    elif oos_summary:
         in_sample_roi = summary.get('roi', 0)
         oos_roi = oos_summary.get('roi', 0)
         if in_sample_roi > 0 and oos_roi > 0:
             ratio = oos_roi / max(in_sample_roi, 0.001)
-            if ratio >= 0.8:
-                pts = w_oos
+            if ratio >= t_oos[0]:
+                pts = effective_w_oos
                 msg = f"OOS Excelente: ROI {oos_roi:.1f}% (Mantido)"
-            elif ratio >= 0.4:
-                pts = int(round(w_oos * 17 / 25))
+            elif ratio >= t_oos[1]:
+                pts = int(round(effective_w_oos * t_oos[2]))
                 msg = f"OOS Bom: ROI {oos_roi:.1f}% (Degradado)"
             else:
-                pts = int(round(w_oos * 8 / 25))
+                pts = max(1, int(round(effective_w_oos * t_oos[2] * 0.4)))
                 msg = f"OOS Fraco: ROI {oos_roi:.1f}% (Queda forte)"
         elif oos_roi > 0:
-            pts = int(round(w_oos * 5 / 25))
+            pts = int(round(effective_w_oos * 5 / 25))
             msg = f"OOS Positivo ({oos_roi:.1f}%), mas In-Sample Negativo"
         else:
             pts = 0
             msg = f"OOS Falhou: ROI negativo {oos_roi:.1f}%"
     else:
-        pts = 0
-        msg = f"OOS Não Calculado (0/{w_oos} pts)"
+        pts = None
+        msg = f"OOS: Dados indisponiveis"
 
-    score += pts
-    details.append({'metric': 'Validação OOS', 'points': pts, 'max': w_oos, 'message': msg})
+    if pts is not None:
+        score += pts
+    display_max_oos = effective_w_oos if not oos_insufficient and oos_summary is not None else 0
+    details.append({'metric': 'Validação OOS', 'points': pts if pts is not None else 0,
+                    'max': display_max_oos, 'message': msg,
+                    'insufficient': oos_insufficient})
 
-    # 2. Bootstrap CI Lower Bound
-    w_bs = w.get('bootstrap', 20)
-    ci_lower = summary.get('bootstrap_roi_ci_lower')
+    # --- 2. Bootstrap CI Lower Bound ---
+    t_bs = thresholds['bootstrap'][tier]
+    effective_w_bs = adj_w.get('bootstrap', 0)
+
     if ci_lower is not None:
-        if ci_lower > 1.0:
-            pts = w_bs
+        if ci_lower > t_bs[0]:
+            pts = effective_w_bs
             msg = f"Limite Inferior Forte: {ci_lower:.1f}%"
-        elif ci_lower > 0.0:
-            pts = int(round(w_bs * 15 / 20))
+        elif ci_lower > t_bs[1]:
+            pts = int(round(effective_w_bs * t_bs[2]))
             msg = f"Limite Inferior Positivo: {ci_lower:.1f}%"
-        elif ci_lower > -2.0:
-            pts = int(round(w_bs * 8 / 20))
-            msg = f"Risco Moderado: {ci_lower:.1f}%"
         else:
             pts = 0
-            msg = f"Risco Alto de Ruína: {ci_lower:.1f}%"
+            msg = f"Risco Alto de Ruina: {ci_lower:.1f}%"
     else:
         pts = 0
-        msg = "CI Não Calculado"
+        msg = "CI Nao Calculado"
 
     score += pts
-    details.append({'metric': 'Bootstrap CI (95%)', 'points': pts, 'max': w_bs, 'message': msg})
+    details.append({'metric': 'Bootstrap CI (95%)', 'points': pts,
+                    'max': adj_w.get('bootstrap', 0), 'message': msg})
 
-    # 3. Closing Line Value (CLV)
-    w_clv = w.get('clv', 15)
-    avg_clv = summary.get('avg_clv')
+    # --- 3. Closing Line Value (CLV) ---
+    effective_w_clv = adj_w.get('clv', 0)
+
     if avg_clv is not None:
         if avg_clv > 2.0:
-            pts = w_clv
+            pts = effective_w_clv
             msg = f"CLV Excelente: +{avg_clv:.1f}% (Bate a Linha de Fechamento)"
         elif avg_clv > 0.5:
-            pts = int(round(w_clv * 10 / 15))
+            pts = int(round(effective_w_clv * 10 / 15))
             msg = f"CLV Positivo: +{avg_clv:.1f}% (Edge Confirmado)"
         elif avg_clv > 0.0:
-            pts = int(round(w_clv * 5 / 15))
+            pts = int(round(effective_w_clv * 5 / 15))
             msg = f"CLV Marginal: +{avg_clv:.1f}%"
         else:
             pts = 0
             msg = f"CLV Negativo: {avg_clv:.1f}% (Sem Vantagem vs Mercado)"
     else:
         pts = 0
-        msg = "CLV Não Disponível"
+        msg = "CLV Indisponivel (peso redistribuido)"
 
     score += pts
     details.append({'metric': 'Closing Line Value (CLV)', 'points': pts,
-                    'max': w_clv if avg_clv is not None else 0, 'message': msg})
+                    'max': effective_w_clv if avg_clv is not None else 0, 'message': msg})
 
-    # 4. Edge Decay
-    w_decay = w.get('decay', 12)
-    decay = summary.get('edge_decay_pct')
+    # --- 4. Edge Decay ---
+    t_decay = thresholds['decay'][tier]
+    effective_w_decay = adj_w.get('decay', 0)
+
     if decay is not None:
-        if decay > -10.0:
-            pts = w_decay
-            msg = f"Edge Estável ({decay:.1f}%)"
-        elif decay > -25.0:
-            pts = int(round(w_decay * 6 / 12))
+        if decay > t_decay[0]:
+            pts = effective_w_decay
+            msg = f"Edge Estavel ({decay:.1f}%)"
+        elif decay > t_decay[1]:
+            pts = int(round(effective_w_decay * t_decay[2]))
             msg = f"Decaimento Leve ({decay:.1f}%)"
         else:
             pts = 0
             msg = f"Decaimento Severo ({decay:.1f}%)"
     else:
         pts = 0
-        msg = "Decay Não Calculado"
+        msg = "Decay Nao Calculado"
 
     score += pts
-    details.append({'metric': 'Estabilidade Temporal', 'points': pts, 'max': w_decay, 'message': msg})
+    details.append({'metric': 'Estabilidade Temporal', 'points': pts,
+                    'max': adj_w.get('decay', 0), 'message': msg})
 
-    # 5. P-Value
-    w_pv = w.get('pvalue', 13)
+    # --- 5. P-Value ---
+    t_pv = thresholds['pvalue'][tier]
+    effective_w_pv = adj_w.get('pvalue', 0)
     wins = summary.get('wins', 0)
     total = summary.get('total_bets', 1)
     avg_odds = summary.get('avg_odds', 2.0)
 
     try:
         p_val = compute_pvalue_binomial(wins, total, avg_odds)
-        if p_val < 0.01:
-            pts = w_pv
-            msg = f"Significância Alta (p={p_val:.3f})"
-        elif p_val < 0.05:
-            pts = int(round(w_pv * 9 / 13))
-            msg = f"Significância Boa (p={p_val:.3f})"
-        elif p_val < 0.10:
-            pts = int(round(w_pv * 4 / 13))
-            msg = f"Significância Marginal (p={p_val:.3f})"
+        if p_val < t_pv[0]:
+            pts = effective_w_pv
+            msg = f"Significancia Alta (p={p_val:.3f})"
+        elif p_val < t_pv[1]:
+            pts = int(round(effective_w_pv * t_pv[2]))
+            msg = f"Significancia Boa (p={p_val:.3f})"
         else:
             pts = 0
-            msg = f"Resultado Aleatório (p={p_val:.3f})"
+            msg = f"Resultado Aleatorio (p={p_val:.3f})"
     except Exception:
         pts = 0
-        msg = "P-Valor Indisponível"
+        msg = "P-Valor Indisponivel"
 
     score += pts
-    details.append({'metric': 'P-Valor Binomial', 'points': pts, 'max': w_pv, 'message': msg})
+    details.append({'metric': 'P-Valor Binomial', 'points': pts,
+                    'max': effective_w_pv, 'message': msg})
 
-    # 6. Power Ratio
-    w_pwr = w.get('power', 10)
-    pr = summary.get('power_ratio')
+    # --- 6. Power Ratio ---
+    t_pwr = thresholds['power'][tier]
+    effective_w_pwr = adj_w.get('power', 0)
+
     if pr is not None:
-        if pr >= 1.0:
-            pts = w_pwr
+        if t_pwr[0] is not None and pr >= t_pwr[0]:
+            pts = effective_w_pwr
             msg = f"Amostra Suficiente ({pr:.1f}x)"
-        elif pr >= 0.5:
-            pts = int(round(w_pwr * 5 / 10))
+        elif t_pwr[1] is not None and pr >= t_pwr[1]:
+            pts = int(round(effective_w_pwr * t_pwr[2]))
             msg = f"Amostra Parcial ({pr:.1f}x)"
         else:
             pts = 0
             msg = f"Amostra Insuficiente ({pr:.1f}x)"
     else:
         pts = 0
-        msg = "Power Ratio Não Calculado"
+        msg = "Power Ratio Nao Calculado"
 
     score += pts
-    details.append({'metric': 'Power Analysis (Amostra)', 'points': pts, 'max': w_pwr, 'message': msg})
+    details.append({'metric': 'Power Analysis (Amostra)', 'points': pts,
+                    'max': adj_w.get('power', 0), 'message': msg})
 
-    # 7. Brier Score Improvement
-    w_brier = w.get('brier', 5)
-    brier_imp = summary.get('brier_improvement')
+    # --- 7. Brier Score Improvement ---
+    effective_w_brier = adj_w.get('brier', 0)
+
     if brier_imp is not None:
         if brier_imp > 2.0:
-            pts = w_brier
+            pts = effective_w_brier
             msg = f"Supera Mercado ({brier_imp:.1f}%)"
         elif brier_imp > 0.0:
-            pts = int(round(w_brier * 3 / 5))
+            pts = int(round(effective_w_brier * 3 / 5))
             msg = f"Ligeira Vantagem ({brier_imp:.1f}%)"
         else:
             pts = 0
             msg = f"Perde pro Mercado ({brier_imp:.1f}%)"
     else:
         pts = 0
-        msg = "Brier Não Calculado"
+        msg = "Brier Nao Calculado"
 
     score += pts
-    details.append({'metric': 'Precisão Brier', 'points': pts, 'max': w_brier, 'message': msg})
+    details.append({'metric': 'Precisao Brier', 'points': pts,
+                    'max': adj_w.get('brier', 0), 'message': msg})
 
-    # Final Verdict & Risk Recommendation
-    # Max possible points adjusts for missing data (CLV typically unavailable for BTTS)
-    max_pts = sum(w.values())
-    if avg_clv is None:
-        max_pts -= w_clv
-        
-    total_score = int(round((score / max_pts) * 100)) if max_pts > 0 else 0
-    
+    # --- Final Verdict & Risk Recommendation ---
+    # Calculate max possible points: sum of adjusted weights for active metrics
+    # (metrics with insufficient data already had their weights redistributed)
+    max_pts = sum(adj_w.values())
+    # Zero out max for completely absent metrics to avoid frontend confusion
+    max_pts_active = sum(
+        adj_w.get(k, 0) for k in ['oos', 'bootstrap', 'clv', 'decay', 'pvalue', 'power', 'brier']
+        if k not in missing
+    )
+    if max_pts_active == 0:
+        max_pts_active = max_pts
+
+    total_score = int(round((score / max_pts_active) * 100)) if max_pts_active > 0 else 0
+
+    # Tier-specific verdict caveat
+    tier_note = ''
+    if tier == 'tiny':
+        tier_note = f' [Amostra minuscula: {total_bets} apostas — thresholds relaxados. Valide com mais dados.]'
+    elif tier == 'small':
+        tier_note = f' [Amostra pequena: {total_bets} apostas — thresholds relaxados.]'
+
     if total_score >= 80:
         verdict = "Aprovado para Dinheiro Real"
         verdict_color = "success"
         kelly_mult = 1.0
-        risk_msg = "Sinal Verde. Recomendamos utilizar 1x (Full) ou 0.5x (Half) da fração de Kelly, respeitando seu limite máximo por aposta (ex: 2%)."
+        risk_msg = "Sinal Verde. Recomendamos utilizar 1x (Full) ou 0.5x (Half) da fracao de Kelly, respeitando seu limite maximo por aposta (ex: 2%)."
     elif total_score >= 50:
         verdict = "Quarentena / Risco Moderado"
         verdict_color = "warning"
         kelly_mult = 0.25
         risk_msg = "Sinal Amarelo. O modelo tem lucro, mas apresenta falhas de robustez. Recomendamos usar Quarter Kelly (0.25x) ou reduzir sua stake fixa pela metade."
     else:
-        verdict = "Rejeitado / Artefato Estatístico"
+        verdict = "Rejeitado / Artefato Estatistico"
         verdict_color = "danger"
         kelly_mult = 0.0
-        risk_msg = "Sinal Vermelho. O edge é ilusório ou instável. Operar apenas em Paper Trading (Apostas Virtuais) até que o modelo prove consistência fora da amostra."
+        risk_msg = "Sinal Vermelho. O edge e ilusorio ou instavel. Operar apenas em Paper Trading (Apostas Virtuais) ate que o modelo prove consistencia fora da amostra."
+
+    if tier_note:
+        risk_msg = tier_note + ' ' + risk_msg
 
     return {
         'score': total_score,
@@ -1624,5 +1783,6 @@ def compute_edge_quality_score(summary, oos_summary=None, weights=None):
         'verdict_color': verdict_color,
         'kelly_multiplier': kelly_mult,
         'risk_recommendation': risk_msg,
-        'breakdown': details
+        'breakdown': details,
+        'sample_tier': tier,
     }
