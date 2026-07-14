@@ -60,6 +60,27 @@ def api_delete_history(strategy_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/history/bulk_import")
+def api_bulk_import(payload: list):
+    """Importa múltiplas estratégias/portfolios de uma vez (ex: após perda do banco no redeploy)."""
+    try:
+        if not isinstance(payload, list):
+            raise HTTPException(status_code=400, detail="Esperado um array de objetos JSON.")
+        imported = 0
+        for item in payload:
+            try:
+                sanitized = _sanitize_for_json(item)
+                add_strategy(sanitized)
+                imported += 1
+            except Exception as e:
+                logger = __import__('logging').getLogger(__name__)
+                logger.warning(f"Bulk import: skipping item {item.get('name', '?')[:40]}: {e}")
+        return {"status": "ok", "imported": imported, "total": len(payload)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/history/{strategy_id}/toggle_active")
 def api_toggle_active_portfolio(strategy_id: str):
     try:
