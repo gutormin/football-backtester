@@ -52,14 +52,6 @@ def api_save_history(payload: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/history/{strategy_id}")
-def api_delete_history(strategy_id: str):
-    try:
-        delete_strategy(strategy_id)
-        return {"status": "ok"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/history/bulk_import")
 def api_bulk_import(payload: list):
     """Importa múltiplas estratégias/portfolios de uma vez (ex: após perda do banco no redeploy)."""
@@ -78,6 +70,14 @@ def api_bulk_import(payload: list):
         return {"status": "ok", "imported": imported, "total": len(payload)}
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/history/{strategy_id}")
+def api_delete_history(strategy_id: str):
+    try:
+        delete_strategy(strategy_id)
+        return {"status": "ok"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
