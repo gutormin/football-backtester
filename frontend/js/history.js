@@ -164,7 +164,15 @@ async function loadHistoryTab() {
 
     const emptyState = document.getElementById('history-empty');
 
-
+    // Visual feedback: disable refresh button and show spinner
+    const refreshBtn = document.querySelector('#tab-history .btn-clear i.fa-rotate-right');
+    const refreshBtnParent = refreshBtn ? refreshBtn.closest('button') : null;
+    if (refreshBtnParent) {
+        refreshBtnParent.disabled = true;
+        refreshBtnParent.style.opacity = '0.6';
+        refreshBtn.className = 'fa-solid fa-spinner fa-spin';
+    }
+    showToast('Sincronizando histórico com o servidor...', 'info', 3000);
 
     grid.innerHTML = '<div style="text-align:center; grid-column: 1/-1;"><div class="loading-spinner"></div> Carregando histórico...</div>';
 
@@ -246,6 +254,17 @@ async function loadHistoryTab() {
                 grid.innerHTML = `<div style="color: var(--danger); padding: 20px;">Erro ao carregar o histórico: ${err.message}</div>`;
             }
         }
+    } finally {
+        // Restore refresh button
+        const rb = document.querySelector('#tab-history .btn-clear i.fa-spinner');
+        const rbp = rb ? rb.closest('button') : null;
+        if (rbp) {
+            rbp.disabled = false;
+            rbp.style.opacity = '1';
+            rb.className = 'fa-solid fa-rotate-right';
+        }
+        const count = (window.loadedHistoryStrategies || []).length;
+        showToast(`Histórico sincronizado: ${count} itens carregados.`, 'success', 3000);
     }
 
 }
