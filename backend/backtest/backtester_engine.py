@@ -912,277 +912,277 @@ class ChronologicalBacktester:
                         model_prob = 1.0 - back_prob
                         bookie_odds = 1.0 / (1.0 - 1.0/back_odds) if (back_odds > 1.0001) else np.nan
                         bet_won = not is_cs
-                    elif mkt == 'dnb_h':
-                        model_prob = prob_h / (prob_h + prob_a) if (prob_h + prob_a) > 0 else 0.5
-                        try:
-                            _dnb_h = float(str(row.get('DNB_1')).replace(',', '.')) if row.get('DNB_1') is not None and not pd.isna(row.get('DNB_1')) else np.nan
-                            odds_dnb_h_real = _dnb_h if _dnb_h > 1.0 else np.nan
-                        except Exception:
-                            odds_dnb_h_real = np.nan
-                        odds_dnb_h_synth = odds_h * (odds_d - 1.0) / odds_d if (odds_h and odds_d and odds_d > 1.0) else np.nan
-                        bookie_odds = odds_dnb_h_real if not pd.isna(odds_dnb_h_real) else odds_dnb_h_synth
+                elif mkt == 'dnb_h':
+                    model_prob = prob_h / (prob_h + prob_a) if (prob_h + prob_a) > 0 else 0.5
+                    try:
+                        _dnb_h = float(str(row.get('DNB_1')).replace(',', '.')) if row.get('DNB_1') is not None and not pd.isna(row.get('DNB_1')) else np.nan
+                        odds_dnb_h_real = _dnb_h if _dnb_h > 1.0 else np.nan
+                    except Exception:
+                        odds_dnb_h_real = np.nan
+                    odds_dnb_h_synth = odds_h * (odds_d - 1.0) / odds_d if (odds_h and odds_d and odds_d > 1.0) else np.nan
+                    bookie_odds = odds_dnb_h_real if not pd.isna(odds_dnb_h_real) else odds_dnb_h_synth
+                    
+                    kelly_probs = [prob_h, prob_d, prob_a]
+                    kelly_outcomes = [bookie_odds - 1.0, 0.0, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0]
+                    
+                    if is_home_win:
+                        result_factor = 1.0
+                        bet_won = True
+                    elif is_draw:
+                        result_factor = 0.0
+                        bet_won = False
+                    else:
+                        result_factor = -1.0
+                        bet_won = False
+                    market_label = "DNB Mandante"
+                    
+                elif mkt == 'dnb_a':
+                    model_prob = prob_a / (prob_h + prob_a) if (prob_h + prob_a) > 0 else 0.5
+                    try:
+                        _dnb_a = float(str(row.get('DNB_2')).replace(',', '.')) if row.get('DNB_2') is not None and not pd.isna(row.get('DNB_2')) else np.nan
+                        odds_dnb_a_real = _dnb_a if _dnb_a > 1.0 else np.nan
+                    except Exception:
+                        odds_dnb_a_real = np.nan
+                    odds_dnb_a_synth = odds_a * (odds_d - 1.0) / odds_d if (odds_a and odds_d and odds_d > 1.0) else np.nan
+                    bookie_odds = odds_dnb_a_real if not pd.isna(odds_dnb_a_real) else odds_dnb_a_synth
+                    
+                    kelly_probs = [prob_a, prob_d, prob_h]
+                    kelly_outcomes = [bookie_odds - 1.0, 0.0, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0]
+                    
+                    if is_away_win:
+                        result_factor = 1.0
+                        bet_won = True
+                    elif is_draw:
+                        result_factor = 0.0
+                        bet_won = False
+                    else:
+                        result_factor = -1.0
+                        bet_won = False
+                    market_label = "DNB Visitante"
+                    
+                elif mkt == 'ah_home':
+                    line = row.get('AHh')
+                    if pd.isna(line):
+                        line = 0.0
+                    if odds_source == 'B365':
+                        odds_ah_h = row.get('B365AHH')
+                        odds_ah_a = row.get('B365AHA')
+                        if pd.isna(odds_ah_h) or odds_ah_h <= 1.0:
+                            odds_ah_h = get_futpython_ah_odd(row, line, "Home")
+                        if pd.isna(odds_ah_a) or odds_ah_a <= 1.0:
+                            odds_ah_a = get_futpython_ah_odd(row, -line, "Away")
+                    elif odds_source == 'Avg':
+                        odds_ah_h = row.get('AvgAHH')
+                        odds_ah_a = row.get('AvgAHA')
+                    else:
+                        odds_ah_h = row.get('MaxAHH')
+                        odds_ah_a = row.get('MaxAHA')
                         
-                        kelly_probs = [prob_h, prob_d, prob_a]
-                        kelly_outcomes = [bookie_odds - 1.0, 0.0, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0]
-                        
-                        if is_home_win:
-                            result_factor = 1.0
-                            bet_won = True
-                        elif is_draw:
-                            result_factor = 0.0
-                            bet_won = False
+                    if pd.isna(odds_ah_h) or pd.isna(odds_ah_a) or odds_ah_h <= 1.0:
+                        if line == 0.0:
+                            odds_ah_h = odds_h * (odds_d - 1.0) / odds_d if (odds_h and odds_d and odds_d > 1.0) else np.nan
+                        elif line == -0.5:
+                            odds_ah_h = odds_h
+                        elif line == 0.5:
+                            odds_ah_h = 1.0 / (1.0/odds_h + 1.0/odds_d) if (odds_h and odds_d and odds_h > 1.0 and odds_d > 1.0) else np.nan
                         else:
-                            result_factor = -1.0
-                            bet_won = False
-                        market_label = "DNB Mandante"
+                            ah_probs_h = calculate_ah_probabilities(prob_matrix, line)
+                            odds_ah_h = get_fair_ah_odds(ah_probs_h) / 1.05
+                    bookie_odds = odds_ah_h
+                    
+                    ah_probs = calculate_ah_probabilities(prob_matrix, line)
+                    expected_return_factor = (ah_probs['win'] * bookie_odds + 
+                                              ah_probs['half_win'] * (bookie_odds + 1.0) / 2.0 + 
+                                              ah_probs['push'] * 1.0 + 
+                                              ah_probs['half_loss'] * 0.5) if not pd.isna(bookie_odds) else 0.0
+                    model_prob = expected_return_factor / bookie_odds if (not pd.isna(bookie_odds) and bookie_odds > 0.0) else 0.0
+                    
+                    kelly_probs = [ah_probs['win'], ah_probs['half_win'], ah_probs['push'], ah_probs['half_loss'], ah_probs['loss']]
+                    kelly_outcomes = [bookie_odds - 1.0, (bookie_odds - 1.0) / 2.0, 0.0, -0.5, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0, 0.0, 0.0]
+                    
+                    margin = float(fthg - ftag)
+                    score = margin + line
+                    score = round(score * 4) / 4
+                    
+                    if score >= 0.5:
+                        result_factor = 1.0
+                        bet_won = True
+                    elif score == 0.25:
+                        result_factor = 0.5
+                        bet_won = True
+                    elif score == 0.0:
+                        result_factor = 0.0
+                        bet_won = False
+                    elif score == -0.25:
+                        result_factor = -0.5
+                        bet_won = False
+                    else:
+                        result_factor = -1.0
+                        bet_won = False
+                    market_label = f"AH Mandante ({'+' if line > 0 else ''}{line})"
+                    
+                elif mkt == 'ah_away':
+                    home_line = row.get('AHh')
+                    if pd.isna(home_line):
+                        line = 0.0
+                    else:
+                        line = -home_line
+                    if odds_source == 'B365':
+                        odds_ah_h = row.get('B365AHH')
+                        odds_ah_a = row.get('B365AHA')
+                        if pd.isna(odds_ah_h) or odds_ah_h <= 1.0:
+                            odds_ah_h = get_futpython_ah_odd(row, -line, "Home")
+                        if pd.isna(odds_ah_a) or odds_ah_a <= 1.0:
+                            odds_ah_a = get_futpython_ah_odd(row, line, "Away")
+                    elif odds_source == 'Avg':
+                        odds_ah_h = row.get('AvgAHH')
+                        odds_ah_a = row.get('AvgAHA')
+                    else:
+                        odds_ah_h = row.get('MaxAHH')
+                        odds_ah_a = row.get('MaxAHA')
                         
-                    elif mkt == 'dnb_a':
-                        model_prob = prob_a / (prob_h + prob_a) if (prob_h + prob_a) > 0 else 0.5
-                        try:
-                            _dnb_a = float(str(row.get('DNB_2')).replace(',', '.')) if row.get('DNB_2') is not None and not pd.isna(row.get('DNB_2')) else np.nan
-                            odds_dnb_a_real = _dnb_a if _dnb_a > 1.0 else np.nan
-                        except Exception:
-                            odds_dnb_a_real = np.nan
-                        odds_dnb_a_synth = odds_a * (odds_d - 1.0) / odds_d if (odds_a and odds_d and odds_d > 1.0) else np.nan
-                        bookie_odds = odds_dnb_a_real if not pd.isna(odds_dnb_a_real) else odds_dnb_a_synth
-                        
-                        kelly_probs = [prob_a, prob_d, prob_h]
-                        kelly_outcomes = [bookie_odds - 1.0, 0.0, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0]
-                        
-                        if is_away_win:
-                            result_factor = 1.0
-                            bet_won = True
-                        elif is_draw:
-                            result_factor = 0.0
-                            bet_won = False
+                    if pd.isna(odds_ah_h) or pd.isna(odds_ah_a) or odds_ah_a <= 1.0:
+                        if line == 0.0:
+                            odds_ah_a = odds_a * (odds_d - 1.0) / odds_d if (odds_a and odds_d and odds_d > 1.0) else np.nan
+                        elif line == -0.5:
+                            odds_ah_a = odds_a
+                        elif line == 0.5:
+                            odds_ah_a = 1.0 / (1.0/odds_a + 1.0/odds_d) if (odds_a and odds_d and odds_a > 1.0 and odds_d > 1.0) else np.nan
                         else:
-                            result_factor = -1.0
-                            bet_won = False
-                        market_label = "DNB Visitante"
+                            ah_probs_a = calculate_ah_probabilities(prob_matrix, line)
+                            odds_ah_a = get_fair_ah_odds(ah_probs_a) / 1.05
+                    bookie_odds = odds_ah_a
+                    
+                    ah_probs = calculate_ah_probabilities(prob_matrix, line)
+                    expected_return_factor = (ah_probs['win'] * bookie_odds + 
+                                              ah_probs['half_win'] * (bookie_odds + 1.0) / 2.0 + 
+                                              ah_probs['push'] * 1.0 + 
+                                              ah_probs['half_loss'] * 0.5) if not pd.isna(bookie_odds) else 0.0
+                    model_prob = expected_return_factor / bookie_odds if (not pd.isna(bookie_odds) and bookie_odds > 0.0) else 0.0
+                    
+                    kelly_probs = [ah_probs['win'], ah_probs['half_win'], ah_probs['push'], ah_probs['half_loss'], ah_probs['loss']]
+                    kelly_outcomes = [bookie_odds - 1.0, (bookie_odds - 1.0) / 2.0, 0.0, -0.5, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0, 0.0, 0.0]
+                    
+                    margin = float(ftag - fthg)
+                    score = margin + line
+                    score = round(score * 4) / 4
+                    
+                    if score >= 0.5:
+                        result_factor = 1.0
+                        bet_won = True
+                    elif score == 0.25:
+                        result_factor = 0.5
+                        bet_won = True
+                    elif score == 0.0:
+                        result_factor = 0.0
+                        bet_won = False
+                    elif score == -0.25:
+                        result_factor = -0.5
+                        bet_won = False
+                    else:
+                        result_factor = -1.0
+                        bet_won = False
+                    market_label = f"AH Visitante ({'+' if line > 0 else ''}{line})"
+                elif mkt == 'win_to_nil_home':
+                    bookie_odds = odds_win_to_nil_h
+                    model_prob = sum(float(prob_matrix[i, 0]) for i in range(1, min(6, max_goals + 1)))
+                    bet_won = (fthg > ftag and ftag == 0)
+                    market_label = "Vitória sem sofrer gols Casa"
+                elif mkt == 'win_to_nil_away':
+                    bookie_odds = odds_win_to_nil_a
+                    model_prob = sum(float(prob_matrix[0, j]) for j in range(1, min(6, max_goals + 1)))
+                    bet_won = (ftag > fthg and fthg == 0)
+                    market_label = "Vitória sem sofrer gols Fora"
+                elif mkt == 'corners_1':
+                    bookie_odds = odds_corners_h
+                    model_prob = corners_probs['corners_1']
+                    bet_won = (row.get('HC', 0) > row.get('AC', 0)) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
+                    market_label = "Mais Cantos Casa"
+                elif mkt == 'corners_x':
+                    bookie_odds = odds_corners_d
+                    model_prob = corners_probs['corners_x']
+                    bet_won = (row.get('HC', 0) == row.get('AC', 0)) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
+                    market_label = "Mais Cantos Empate"
+                elif mkt == 'corners_2':
+                    bookie_odds = odds_corners_a
+                    model_prob = corners_probs['corners_2']
+                    bet_won = (row.get('HC', 0) < row.get('AC', 0)) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
+                    market_label = "Mais Cantos Fora"
+                elif mkt.startswith('corners_over_'):
+                    line = float(mkt.replace('corners_over_', '')) / 10.0
+                    line_str = mkt.replace('corners_over_', '')
+                    bookie_odds = row.get(f'odds_corners_over_{line_str}')
+                    model_prob = corners_probs['corners_over'](line)
+                    bet_won = (row.get('HC', 0) + row.get('AC', 0) > line) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
+                    market_label = f"Escanteios Over {line}"
+                elif mkt.startswith('corners_under_'):
+                    line = float(mkt.replace('corners_under_', '')) / 10.0
+                    line_str = mkt.replace('corners_under_', '')
+                    bookie_odds = row.get(f'odds_corners_under_{line_str}')
+                    model_prob = corners_probs['corners_under'](line)
+                    bet_won = (row.get('HC', 0) + row.get('AC', 0) < line) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
+                    market_label = f"Escanteios Under {line}"
+                elif mkt in ('sh_home', 'sh_draw', 'sh_away') or mkt.startswith('sh_over_') or mkt.startswith('sh_under_'):
+                    lambda_h_2h = lambda_home * 0.55
+                    lambda_a_2h = lambda_away * 0.55
+                    home_probs_2h = [math.exp(-lambda_h_2h) * (lambda_h_2h**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
+                    away_probs_2h = [math.exp(-lambda_a_2h) * (lambda_a_2h**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
+                    prob_matrix_2h = np.outer(home_probs_2h, away_probs_2h)
+                    tau_00_2h = 1.0 - lambda_h_2h * lambda_a_2h * rho
+                    tau_10_2h = 1.0 + lambda_a_2h * rho
+                    tau_01_2h = 1.0 + lambda_h_2h * rho
+                    tau_11_2h = 1.0 - rho
+                    prob_matrix_2h[0, 0] *= max(0.0, tau_00_2h)
+                    prob_matrix_2h[1, 0] *= max(0.0, tau_10_2h)
+                    prob_matrix_2h[0, 1] *= max(0.0, tau_01_2h)
+                    prob_matrix_2h[1, 1] *= max(0.0, tau_11_2h)
+                    matrix_sum_2h = np.sum(prob_matrix_2h)
+                    if matrix_sum_2h > 0:
+                        prob_matrix_2h = prob_matrix_2h / matrix_sum_2h
                         
-                    elif mkt == 'ah_home':
-                        line = row.get('AHh')
-                        if pd.isna(line):
-                            line = 0.0
-                        if odds_source == 'B365':
-                            odds_ah_h = row.get('B365AHH')
-                            odds_ah_a = row.get('B365AHA')
-                            if pd.isna(odds_ah_h) or odds_ah_h <= 1.0:
-                                odds_ah_h = get_futpython_ah_odd(row, line, "Home")
-                            if pd.isna(odds_ah_a) or odds_ah_a <= 1.0:
-                                odds_ah_a = get_futpython_ah_odd(row, -line, "Away")
-                        elif odds_source == 'Avg':
-                            odds_ah_h = row.get('AvgAHH')
-                            odds_ah_a = row.get('AvgAHA')
-                        else:
-                            odds_ah_h = row.get('MaxAHH')
-                            odds_ah_a = row.get('MaxAHA')
-                            
-                        if pd.isna(odds_ah_h) or pd.isna(odds_ah_a) or odds_ah_h <= 1.0:
-                            if line == 0.0:
-                                odds_ah_h = odds_h * (odds_d - 1.0) / odds_d if (odds_h and odds_d and odds_d > 1.0) else np.nan
-                            elif line == -0.5:
-                                odds_ah_h = odds_h
-                            elif line == 0.5:
-                                odds_ah_h = 1.0 / (1.0/odds_h + 1.0/odds_d) if (odds_h and odds_d and odds_h > 1.0 and odds_d > 1.0) else np.nan
-                            else:
-                                ah_probs_h = calculate_ah_probabilities(prob_matrix, line)
-                                odds_ah_h = get_fair_ah_odds(ah_probs_h) / 1.05
-                        bookie_odds = odds_ah_h
-                        
-                        ah_probs = calculate_ah_probabilities(prob_matrix, line)
-                        expected_return_factor = (ah_probs['win'] * bookie_odds + 
-                                                  ah_probs['half_win'] * (bookie_odds + 1.0) / 2.0 + 
-                                                  ah_probs['push'] * 1.0 + 
-                                                  ah_probs['half_loss'] * 0.5) if not pd.isna(bookie_odds) else 0.0
-                        model_prob = expected_return_factor / bookie_odds if (not pd.isna(bookie_odds) and bookie_odds > 0.0) else 0.0
-                        
-                        kelly_probs = [ah_probs['win'], ah_probs['half_win'], ah_probs['push'], ah_probs['half_loss'], ah_probs['loss']]
-                        kelly_outcomes = [bookie_odds - 1.0, (bookie_odds - 1.0) / 2.0, 0.0, -0.5, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0, 0.0, 0.0]
-                        
-                        margin = float(fthg - ftag)
-                        score = margin + line
-                        score = round(score * 4) / 4
-                        
-                        if score >= 0.5:
-                            result_factor = 1.0
-                            bet_won = True
-                        elif score == 0.25:
-                            result_factor = 0.5
-                            bet_won = True
-                        elif score == 0.0:
-                            result_factor = 0.0
-                            bet_won = False
-                        elif score == -0.25:
-                            result_factor = -0.5
-                            bet_won = False
-                        else:
-                            result_factor = -1.0
-                            bet_won = False
-                        market_label = f"AH Mandante ({'+' if line > 0 else ''}{line})"
-                        
-                    elif mkt == 'ah_away':
-                        home_line = row.get('AHh')
-                        if pd.isna(home_line):
-                            line = 0.0
-                        else:
-                            line = -home_line
-                        if odds_source == 'B365':
-                            odds_ah_h = row.get('B365AHH')
-                            odds_ah_a = row.get('B365AHA')
-                            if pd.isna(odds_ah_h) or odds_ah_h <= 1.0:
-                                odds_ah_h = get_futpython_ah_odd(row, -line, "Home")
-                            if pd.isna(odds_ah_a) or odds_ah_a <= 1.0:
-                                odds_ah_a = get_futpython_ah_odd(row, line, "Away")
-                        elif odds_source == 'Avg':
-                            odds_ah_h = row.get('AvgAHH')
-                            odds_ah_a = row.get('AvgAHA')
-                        else:
-                            odds_ah_h = row.get('MaxAHH')
-                            odds_ah_a = row.get('MaxAHA')
-                            
-                        if pd.isna(odds_ah_h) or pd.isna(odds_ah_a) or odds_ah_a <= 1.0:
-                            if line == 0.0:
-                                odds_ah_a = odds_a * (odds_d - 1.0) / odds_d if (odds_a and odds_d and odds_d > 1.0) else np.nan
-                            elif line == -0.5:
-                                odds_ah_a = odds_a
-                            elif line == 0.5:
-                                odds_ah_a = 1.0 / (1.0/odds_a + 1.0/odds_d) if (odds_a and odds_d and odds_a > 1.0 and odds_d > 1.0) else np.nan
-                            else:
-                                ah_probs_a = calculate_ah_probabilities(prob_matrix, line)
-                                odds_ah_a = get_fair_ah_odds(ah_probs_a) / 1.05
-                        bookie_odds = odds_ah_a
-                        
-                        ah_probs = calculate_ah_probabilities(prob_matrix, line)
-                        expected_return_factor = (ah_probs['win'] * bookie_odds + 
-                                                  ah_probs['half_win'] * (bookie_odds + 1.0) / 2.0 + 
-                                                  ah_probs['push'] * 1.0 + 
-                                                  ah_probs['half_loss'] * 0.5) if not pd.isna(bookie_odds) else 0.0
-                        model_prob = expected_return_factor / bookie_odds if (not pd.isna(bookie_odds) and bookie_odds > 0.0) else 0.0
-                        
-                        kelly_probs = [ah_probs['win'], ah_probs['half_win'], ah_probs['push'], ah_probs['half_loss'], ah_probs['loss']]
-                        kelly_outcomes = [bookie_odds - 1.0, (bookie_odds - 1.0) / 2.0, 0.0, -0.5, -1.0] if not pd.isna(bookie_odds) else [0.0, 0.0, 0.0, 0.0, 0.0]
-                        
-                        margin = float(ftag - fthg)
-                        score = margin + line
-                        score = round(score * 4) / 4
-                        
-                        if score >= 0.5:
-                            result_factor = 1.0
-                            bet_won = True
-                        elif score == 0.25:
-                            result_factor = 0.5
-                            bet_won = True
-                        elif score == 0.0:
-                            result_factor = 0.0
-                            bet_won = False
-                        elif score == -0.25:
-                            result_factor = -0.5
-                            bet_won = False
-                        else:
-                            result_factor = -1.0
-                            bet_won = False
-                        market_label = f"AH Visitante ({'+' if line > 0 else ''}{line})"
-                    elif mkt == 'win_to_nil_home':
-                        bookie_odds = odds_win_to_nil_h
-                        model_prob = sum(float(prob_matrix[i, 0]) for i in range(1, min(6, max_goals + 1)))
-                        bet_won = (fthg > ftag and ftag == 0)
-                        market_label = "Vitória sem sofrer gols Casa"
-                    elif mkt == 'win_to_nil_away':
-                        bookie_odds = odds_win_to_nil_a
-                        model_prob = sum(float(prob_matrix[0, j]) for j in range(1, min(6, max_goals + 1)))
-                        bet_won = (ftag > fthg and fthg == 0)
-                        market_label = "Vitória sem sofrer gols Fora"
-                    elif mkt == 'corners_1':
-                        bookie_odds = odds_corners_h
-                        model_prob = corners_probs['corners_1']
-                        bet_won = (row.get('HC', 0) > row.get('AC', 0)) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
-                        market_label = "Mais Cantos Casa"
-                    elif mkt == 'corners_x':
-                        bookie_odds = odds_corners_d
-                        model_prob = corners_probs['corners_x']
-                        bet_won = (row.get('HC', 0) == row.get('AC', 0)) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
-                        market_label = "Mais Cantos Empate"
-                    elif mkt == 'corners_2':
-                        bookie_odds = odds_corners_a
-                        model_prob = corners_probs['corners_2']
-                        bet_won = (row.get('HC', 0) < row.get('AC', 0)) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
-                        market_label = "Mais Cantos Fora"
-                    elif mkt.startswith('corners_over_'):
-                        line = float(mkt.replace('corners_over_', '')) / 10.0
-                        line_str = mkt.replace('corners_over_', '')
-                        bookie_odds = row.get(f'odds_corners_over_{line_str}')
-                        model_prob = corners_probs['corners_over'](line)
-                        bet_won = (row.get('HC', 0) + row.get('AC', 0) > line) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
-                        market_label = f"Escanteios Over {line}"
-                    elif mkt.startswith('corners_under_'):
-                        line = float(mkt.replace('corners_under_', '')) / 10.0
-                        line_str = mkt.replace('corners_under_', '')
-                        bookie_odds = row.get(f'odds_corners_under_{line_str}')
-                        model_prob = corners_probs['corners_under'](line)
-                        bet_won = (row.get('HC', 0) + row.get('AC', 0) < line) if not pd.isna(row.get('HC')) and not pd.isna(row.get('AC')) else False
-                        market_label = f"Escanteios Under {line}"
-                    elif mkt in ('sh_home', 'sh_draw', 'sh_away') or mkt.startswith('sh_over_') or mkt.startswith('sh_under_'):
-                        lambda_h_2h = lambda_home * 0.55
-                        lambda_a_2h = lambda_away * 0.55
-                        home_probs_2h = [math.exp(-lambda_h_2h) * (lambda_h_2h**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-                        away_probs_2h = [math.exp(-lambda_a_2h) * (lambda_a_2h**i) / _FACTORIALS[i] for i in range(max_goals + 1)]
-                        prob_matrix_2h = np.outer(home_probs_2h, away_probs_2h)
-                        tau_00_2h = 1.0 - lambda_h_2h * lambda_a_2h * rho
-                        tau_10_2h = 1.0 + lambda_a_2h * rho
-                        tau_01_2h = 1.0 + lambda_h_2h * rho
-                        tau_11_2h = 1.0 - rho
-                        prob_matrix_2h[0, 0] *= max(0.0, tau_00_2h)
-                        prob_matrix_2h[1, 0] *= max(0.0, tau_10_2h)
-                        prob_matrix_2h[0, 1] *= max(0.0, tau_01_2h)
-                        prob_matrix_2h[1, 1] *= max(0.0, tau_11_2h)
-                        matrix_sum_2h = np.sum(prob_matrix_2h)
-                        if matrix_sum_2h > 0:
-                            prob_matrix_2h = prob_matrix_2h / matrix_sum_2h
-                            
-                        if mkt == 'sh_home':
-                            bookie_odds = odds_h_2h
-                            model_prob = float(np.sum(np.tril(prob_matrix_2h, -1)))
-                            bet_won = (fthg - hthg > ftag - htag)
-                            market_label = "2H Mandante"
-                        elif mkt == 'sh_draw':
-                            bookie_odds = odds_d_2h
-                            model_prob = float(np.sum(np.diag(prob_matrix_2h)))
-                            bet_won = (fthg - hthg == ftag - htag)
-                            market_label = "2H Empate"
-                        elif mkt == 'sh_away':
-                            bookie_odds = odds_a_2h
-                            model_prob = float(np.sum(np.triu(prob_matrix_2h, 1)))
-                            bet_won = (fthg - hthg < ftag - htag)
-                            market_label = "2H Visitante"
-                        elif mkt.startswith('sh_over_'):
-                            line = float(mkt.replace('sh_over_', '')) / 10.0
-                            line_str = mkt.replace('sh_over_', '')
-                            bookie_odds = row.get(f'Over_2H_{line_str[0]}_{line_str[1]}')
-                            model_prob = sum(prob_matrix_2h[x, y] for x in range(max_goals + 1) for y in range(max_goals + 1) if x + y > line)
-                            bet_won = ((fthg - hthg) + (ftag - htag) > line)
-                            market_label = f"2H Over {line}"
-                        elif mkt.startswith('sh_under_'):
-                            line = float(mkt.replace('sh_under_', '')) / 10.0
-                            line_str = mkt.replace('sh_under_', '')
-                            bookie_odds = row.get(f'Under_2H_{line_str[0]}_{line_str[1]}')
-                            model_prob = sum(prob_matrix_2h[x, y] for x in range(max_goals + 1) for y in range(max_goals + 1) if x + y < line)
-                            bet_won = ((fthg - hthg) + (ftag - htag) < line)
-                            market_label = f"2H Under {line}"
-                    elif mkt.startswith('ht_over') and mkt not in ('ht_over05', 'ht_over15'):
-                        line = float(mkt.replace('ht_over', '')) / 10.0
-                        line_str = mkt.replace('ht_over', '')
-                        bookie_odds = row.get(f'Over_HT_{line_str[0]}_{line_str[1]}')
-                        model_prob = sum(prob_matrix_ht[x, y] for x in range(max_goals + 1) for y in range(max_goals + 1) if x + y > line)
-                        bet_won = (hthg + htag > line)
-                        market_label = f"HT Over {line}"
-                    elif mkt.startswith('ht_under') and mkt not in ('ht_under05', 'ht_under15'):
-                        line = float(mkt.replace('ht_under', '')) / 10.0
-                        line_str = mkt.replace('ht_under', '')
-                        bookie_odds = row.get(f'Under_HT_{line_str[0]}_{line_str[1]}')
-                        model_prob = sum(prob_matrix_ht[x, y] for x in range(max_goals + 1) for y in range(max_goals + 1) if x + y < line)
-                        bet_won = (hthg + htag < line)
-                        market_label = f"HT Under {line}"
+                    if mkt == 'sh_home':
+                        bookie_odds = odds_h_2h
+                        model_prob = float(np.sum(np.tril(prob_matrix_2h, -1)))
+                        bet_won = (fthg - hthg > ftag - htag)
+                        market_label = "2H Mandante"
+                    elif mkt == 'sh_draw':
+                        bookie_odds = odds_d_2h
+                        model_prob = float(np.sum(np.diag(prob_matrix_2h)))
+                        bet_won = (fthg - hthg == ftag - htag)
+                        market_label = "2H Empate"
+                    elif mkt == 'sh_away':
+                        bookie_odds = odds_a_2h
+                        model_prob = float(np.sum(np.triu(prob_matrix_2h, 1)))
+                        bet_won = (fthg - hthg < ftag - htag)
+                        market_label = "2H Visitante"
+                    elif mkt.startswith('sh_over_'):
+                        line = float(mkt.replace('sh_over_', '')) / 10.0
+                        line_str = mkt.replace('sh_over_', '')
+                        bookie_odds = row.get(f'Over_2H_{line_str[0]}_{line_str[1]}')
+                        model_prob = sum(prob_matrix_2h[x, y] for x in range(max_goals + 1) for y in range(max_goals + 1) if x + y > line)
+                        bet_won = ((fthg - hthg) + (ftag - htag) > line)
+                        market_label = f"2H Over {line}"
+                    elif mkt.startswith('sh_under_'):
+                        line = float(mkt.replace('sh_under_', '')) / 10.0
+                        line_str = mkt.replace('sh_under_', '')
+                        bookie_odds = row.get(f'Under_2H_{line_str[0]}_{line_str[1]}')
+                        model_prob = sum(prob_matrix_2h[x, y] for x in range(max_goals + 1) for y in range(max_goals + 1) if x + y < line)
+                        bet_won = ((fthg - hthg) + (ftag - htag) < line)
+                        market_label = f"2H Under {line}"
+                elif mkt.startswith('ht_over') and mkt not in ('ht_over05', 'ht_over15'):
+                    line = float(mkt.replace('ht_over', '')) / 10.0
+                    line_str = mkt.replace('ht_over', '')
+                    bookie_odds = row.get(f'Over_HT_{line_str[0]}_{line_str[1]}')
+                    model_prob = sum(prob_matrix_ht[x, y] for x in range(max_goals + 1) for y in range(max_goals + 1) if x + y > line)
+                    bet_won = (hthg + htag > line)
+                    market_label = f"HT Over {line}"
+                elif mkt.startswith('ht_under') and mkt not in ('ht_under05', 'ht_under15'):
+                    line = float(mkt.replace('ht_under', '')) / 10.0
+                    line_str = mkt.replace('ht_under', '')
+                    bookie_odds = row.get(f'Under_HT_{line_str[0]}_{line_str[1]}')
+                    model_prob = sum(prob_matrix_ht[x, y] for x in range(max_goals + 1) for y in range(max_goals + 1) if x + y < line)
+                    bet_won = (hthg + htag < line)
+                    market_label = f"HT Under {line}"
 
                 if mkt not in ('dnb_h', 'dnb_a', 'ah_home', 'ah_away'):
                     result_factor = 1.0 if bet_won else -1.0
