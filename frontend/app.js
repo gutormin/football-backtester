@@ -2809,6 +2809,10 @@ function renderOptimizedResultsToLaboratory(sug) {
     const dd = opt.max_drawdown || 0;
     const totalBets = opt.total_bets || 0;
 
+    // Only update metrics that exist in optimized_summary.
+    // All other fields (wins, losses, avg_odds, matches_analyzed, seasons,
+    // sharpe, sortino, clv, bcl, etc.) are NOT in optimized_summary —
+    // they only come from the full Poisson backtest. Don't touch them.
     animateValue(document.getElementById('metric-net-profit'), 0, netProfit, 600, v => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2));
     setElColor('metric-roi', roi.toFixed(1) + '%', roi >= 0);
     setElColor('metric-win-rate', winRate.toFixed(1) + '%', winRate >= 50);
@@ -2817,22 +2821,9 @@ function renderOptimizedResultsToLaboratory(sug) {
     setEl('metric-total-bets', totalBets);
     setEl('metric-profit-stakes', (opt.profit_in_stakes || 0).toFixed(2) + ' st.');
 
-    // Advanced metrics: show what we have, mark others
-    if (orig.final_bankroll) {
-        setEl('metric-final-bankroll', '$' + orig.final_bankroll.toFixed(2));
-    }
-    [
-        'metric-sharpe', 'metric-sortino', 'metric-skewness',
-        'metric-consec-wins', 'metric-consec-losses',
-        'metric-clv', 'metric-bcl', 'metric-avg-odds',
-        'metric-matches-analyzed', 'metric-seasons',
-        'metric-dd-duration'
-    ].forEach(id => setEl(id, '—'));
-
-    setEl('metric-wins', '—');
-    setEl('metric-losses', '—');
-    const pushesCard = document.getElementById('metric-pushes-card');
-    if (pushesCard) pushesCard.style.display = 'none';
+    // final_bankroll is derivable from original_summary
+    const fb = opt.final_bankroll || orig.final_bankroll;
+    if (fb) setEl('metric-final-bankroll', '$' + fb.toFixed(2));
 
     // --- Banner ---
     const banner = document.getElementById('active-strategy-banner');
