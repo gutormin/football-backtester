@@ -2171,6 +2171,9 @@ function displayOptimizationSuggestions(suggestions, isPortfolio = false) {
 
     
 
+    // Store all suggestions globally (needed by apply* functions)
+    window.allOptimizationSuggestions = suggestions || [];
+
     // Filter out already applied suggestions
 
     const filteredSuggestions = (suggestions || []).filter(sug => {
@@ -2434,14 +2437,36 @@ function displayOptimizationSuggestions(suggestions, isPortfolio = false) {
 let optComparisonChart = null;
 let currentSelectedSuggestion = null;
 
+// Helper: find a suggestion by type+key across all stored suggestions
+function findSuggestion(type, keyMatch) {
+    // First check currentSelectedSuggestion
+    if (currentSelectedSuggestion && currentSelectedSuggestion.type === type) {
+        if (type === 'ev' && currentSelectedSuggestion.value === keyMatch) return currentSelectedSuggestion;
+        if (type === 'leagues' && JSON.stringify(currentSelectedSuggestion.exclude_codes) === keyMatch) return currentSelectedSuggestion;
+        if (type === 'odds_warning' && currentSelectedSuggestion.value === keyMatch) return currentSelectedSuggestion;
+    }
+    // Fallback: search all suggestions
+    const all = window.allOptimizationSuggestions || [];
+    return all.find(s => {
+        if (s.type !== type) return false;
+        if (type === 'ev') return s.value === keyMatch;
+        if (type === 'leagues') return JSON.stringify(s.exclude_codes) === keyMatch;
+        if (type === 'odds_warning') return s.value === keyMatch;
+        return false;
+    });
+}
+
 function renderOptimizationTab(suggestions, results) {
     const listContainer = document.getElementById('opt-suggestions-list');
     const tableContainer = document.getElementById('opt-comparison-table-container');
-    
+
     if (!listContainer) return;
-    
+
+    // Store all suggestions globally (needed by apply* functions)
+    window.allOptimizationSuggestions = suggestions || [];
+
     listContainer.innerHTML = '';
-    
+
     const filteredSuggestions = (suggestions || []).filter(sug => {
         if (sug.type === 'odds_warning' && window.appliedOptimizationSuggestions.has(sug.value)) return false;
         if (sug.type === 'ev' && window.appliedOptimizationSuggestions.has(`ev_${sug.value}`)) return false;
@@ -2742,14 +2767,139 @@ function renderOptComparisonChart(sug, results) {
 
 
 
+// Immediately render pre-computed optimized results into the Laboratory
+// (the Optimization tab's optimized_summary comes from ai_predictor.py's
+// recalculate_sub_backtest() which simulates flat-staking in-process;
+// this is different from the full Poisson backtest engine, so we render
+// the optimized numbers right away, then refresh with the real backtest)
+function renderOptimizedResultsToLaboratory(sug) {
+    if (!sug || !sug.optimized_summary) return;
+
+    const showStandardPanels = () => {
+        const pPanel = document.getElementById('portfolio-results-panel');
+        if (pPanel) pPanel.style.display = 'none';
+        const smGrid = document.getElementById('standard-metrics-grid');
+        if (smGrid) smGrid.style.display = 'grid';
+        const mainCharts = document.querySelector('.main-charts');
+        if (mainCharts) mainCharts.style.display = 'block';
+        const stakingPanel = document.getElementById('staking-comparison-panel');
+        if (stakingPanel) stakingPanel.style.display = 'block';
+        const quartilesPanel = document.getElementById('quartiles-panel');
+        if (quartilesPanel) quartilesPanel.style.display = 'block';
+        const resultsTable = document.querySelector('.results-table-section');
+        if (resultsTable) resultsTable.style.display = 'block';
+    };
+    showStandardPanels();
+
+    const opt = sug.optimized_summary;
+    const orig = sug.original_summary || {};
+
+    // --- KPI Metrics ---
+    const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+    const setElColor = (id, val, positiveVal) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerText = val;
+        el.style.color = positiveVal ? 'var(--color-success)' : 'var(--color-danger)';
+    };
+
+    const netProfit = opt.net_profit || 0;
+    const roi = opt.roi || 0;
+    const winRate = opt.win_rate || 0;
+    const dd = opt.max_drawdown || 0;
+    const totalBets = opt.total_bets || 0;
+
+    animateValue(document.getElementById('metric-net-profit'), 0, netProfit, 600, v => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2));
+    setElColor('metric-roi', roi.toFixed(1) + '%', roi >= 0);
+    setElColor('metric-win-rate', winRate.toFixed(1) + '%', winRate >= 50);
+    setEl('metric-max-drawdown', dd.toFixed(1) + '%');
+    setEl('metric-drawdown', dd.toFixed(1) + '%');
+    setEl('metric-total-bets', totalBets);
+    setEl('metric-profit-stakes', (opt.profit_in_stakes || 0).toFixed(2) + ' st.');
+
+    // Advanced metrics: show what we have, mark others
+    if (orig.final_bankroll) {
+        setEl('metric-final-bankroll', '$' + orig.final_bankroll.toFixed(2));
+    }
+    [
+        'metric-sharpe', 'metric-sortino', 'metric-skewness',
+        'metric-consec-wins', 'metric-consec-losses',
+        'metric-clv', 'metric-bcl', 'metric-avg-odds',
+        'metric-matches-analyzed', 'metric-seasons',
+        'metric-dd-duration'
+    ].forEach(id => setEl(id, '—'));
+
+    setEl('metric-wins', '—');
+    setEl('metric-losses', '—');
+    const pushesCard = document.getElementById('metric-pushes-card');
+    if (pushesCard) pushesCard.style.display = 'none';
+
+    // --- Banner ---
+    const banner = document.getElementById('active-strategy-banner');
+    if (banner) banner.style.display = 'flex';
+    const optBanner = document.getElementById('optimization-active-banner');
+    if (!optBanner) {
+        const b = document.createElement('div');
+        b.id = 'optimization-active-banner';
+        b.style.cssText = 'margin:8px 0; padding:8px 14px; border-radius:8px; font-size:12px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); color:#6ee7b7;';
+        b.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> <strong>Otimização aplicada:</strong> Resultados pré-computados. Executando backtest real em segundo plano...';
+        const transPanel = document.getElementById('transparency-panel');
+        if (transPanel) {
+            transPanel.prepend(b);
+            transPanel.style.display = 'block';
+        }
+    } else {
+        optBanner.style.display = 'block';
+    }
+
+    // --- Equity Curve Chart ---
+    const optCurve = sug.optimized_curve || [];
+    if (optCurve.length > 0 && typeof updateCharts === 'function') {
+        const dates = optCurve.map(pt => pt.date || '');
+        const bankrolls = optCurve.map(pt => pt.bankroll || pt.Bankroll || 0);
+        updateCharts(dates, bankrolls, [], [], [], [], [], [], null);
+    }
+
+    // --- Show save button ---
+    const btnSave = document.getElementById('btn-save-strategy');
+    if (btnSave) btnSave.style.display = 'inline-block';
+
+    // --- Update status ---
+    const btnExport = document.getElementById('btn-export-backtest');
+    if (btnExport) btnExport.style.display = 'inline-flex';
+
+    // Clear transparency/synthetic banners (they need the full backtest)
+    const synthBanner = document.getElementById('synthetic-odds-banner');
+    if (synthBanner) synthBanner.style.display = 'none';
+    const slippageBanner = document.getElementById('slippage-banner');
+    if (slippageBanner) slippageBanner.style.display = 'none';
+    const mlBanner = document.getElementById('ml-active-warning-banner');
+    if (mlBanner) mlBanner.style.display = 'none';
+    const biasBanner = document.getElementById('selection-bias-banner');
+    if (biasBanner) biasBanner.style.display = 'none';
+
+    const btnRun = document.getElementById('btn-run-backtest');
+    if (btnRun) { btnRun.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btnRun.disabled = false; }
+    const btnTopbar = document.getElementById('btn-topbar-run');
+    if (btnTopbar) { btnTopbar.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; btnTopbar.disabled = false; }
+
+    // Also update the comparison chart in the Optimization tab
+    if (typeof renderOptComparisonChart === 'function') {
+        renderOptComparisonChart(sug, { equity_curve: sug.original_curve || [] });
+    }
+}
+
 function applyEvSuggestion(val) {
 
     const evInput = document.getElementById('val-threshold');
     if (evInput) {
         evInput.value = val;
         switchTab('tab-laboratory');
-        showToast(`Gatilho EV atualizado para ${val}. Rodando nova simulação...`, "success");
         window.appliedOptimizationSuggestions.add(`ev_${val}`);
+        // Render pre-computed optimized results immediately
+        const sug = findSuggestion('ev', val);
+        if (sug) renderOptimizedResultsToLaboratory(sug);
+        showToast(`Gatilho EV atualizado para ${val}. Rodando nova simulação...`, "success");
         runBacktest();
     }
 }
@@ -2763,8 +2913,11 @@ function applyLeagueSuggestion(codes) {
     });
 
     switchTab('tab-laboratory');
-    showToast(`Ligas problemáticas removidas. Reexecutando backtest...`, "success");
     window.appliedOptimizationSuggestions.add(`leagues_${JSON.stringify(codes)}`);
+    // Render pre-computed optimized results immediately
+    const sug = findSuggestion('leagues', JSON.stringify(codes));
+    if (sug) renderOptimizedResultsToLaboratory(sug);
+    showToast(`Ligas problemáticas removidas. Reexecutando backtest...`, "success");
     runBacktest();
 }
 
@@ -2791,14 +2944,18 @@ window.toggleCollapsibleSection = function(id) {
 
 function applyOddsSuggestion(rangeName) {
     switchTab('tab-laboratory');
+    // Render pre-computed optimized results immediately
+    const sug = findSuggestion('odds_warning', rangeName);
+    if (sug) renderOptimizedResultsToLaboratory(sug);
+
     if (rangeName.includes(':')) {
         const parts = rangeName.split(':');
         const field = parts[0];
         const subRange = parts[1];
-        
+
         let minFieldId = '';
         let maxFieldId = '';
-        
+
         if (field === 'odds_h') {
             minFieldId = 'min-odds-h';
             maxFieldId = 'max-odds-h';
@@ -2815,10 +2972,10 @@ function applyOddsSuggestion(rangeName) {
             minFieldId = 'min-odds-under25';
             maxFieldId = 'max-odds-under25';
         }
-        
+
         const minEl = document.getElementById(minFieldId);
         const maxEl = document.getElementById(maxFieldId);
-        
+
         // Expand collapsible section
         const coll = document.getElementById('advanced-odds-filters');
         if (coll && coll.style.display === 'none') {
@@ -2830,8 +2987,8 @@ function applyOddsSuggestion(rangeName) {
             const bounds = subRange.split('-');
             if (minEl) minEl.value = bounds[0];
             if (maxEl) maxEl.value = bounds[1];
-            showToast(`Filtro avançado de odds otimizado para ${bounds[0]} a ${bounds[1]}. Rodando simulação...`, "success");
             window.appliedOptimizationSuggestions.add(rangeName);
+            showToast(`Filtro avançado de odds otimizado para ${bounds[0]} a ${bounds[1]}. Rodando simulação...`, "success");
             runBacktest();
             return;
         }
@@ -2857,27 +3014,27 @@ function applyOddsSuggestion(rangeName) {
         } else if (subRange.includes('Zebra (>2.20)')) {
             if (maxEl) maxEl.value = "2.20";
         }
-        
-        showToast(`Filtro avançado de odds otimizado. Rodando simulação...`, "success");
+
         window.appliedOptimizationSuggestions.add(rangeName);
+        showToast(`Filtro avançado de odds otimizado. Rodando simulação...`, "success");
         runBacktest();
         return;
     }
 
     const minInput = document.getElementById('min-odds');
     const maxInput = document.getElementById('max-odds');
-    
+
     // Custom range parser like "1.50-3.00"
     if (rangeName.includes('-') && !rangeName.includes('Favoritos') && !rangeName.includes('Equilibrado') && !rangeName.includes('Baixo') && !rangeName.includes('Médio')) {
         const bounds = rangeName.split('-');
         if (minInput) minInput.value = bounds[0];
         if (maxInput) maxInput.value = bounds[1];
-        showToast(`Filtro de Odds otimizado para ${bounds[0]} a ${bounds[1]}. Rodando simulação...`, "success");
         window.appliedOptimizationSuggestions.add(rangeName);
+        showToast(`Filtro de Odds otimizado para ${bounds[0]} a ${bounds[1]}. Rodando simulação...`, "success");
         runBacktest();
         return;
     }
-    
+
     if (rangeName.includes('Super Favoritos') || rangeName.includes('<=1.50')) {
         minInput.value = "1.51";
     } else if (rangeName.includes('Zebras') || rangeName.includes('>3.00')) {
@@ -2887,9 +3044,9 @@ function applyOddsSuggestion(rangeName) {
     } else if (rangeName.includes('Médios (2.00-3.00)')) {
         maxInput.value = "2.00";
     }
-    
-    showToast(`Filtro de Odds otimizado para excluir ${rangeName}. Rodando simulação...`, "success");
+
     window.appliedOptimizationSuggestions.add(rangeName);
+    showToast(`Filtro de Odds otimizado para excluir ${rangeName}. Rodando simulação...`, "success");
     runBacktest();
 }
 
