@@ -2747,6 +2747,7 @@ function applyEvSuggestion(val) {
     const evInput = document.getElementById('val-threshold');
     if (evInput) {
         evInput.value = val;
+        switchTab('tab-laboratory');
         showToast(`Gatilho EV atualizado para ${val}. Rodando nova simulação...`, "success");
         window.appliedOptimizationSuggestions.add(`ev_${val}`);
         runBacktest();
@@ -2761,6 +2762,7 @@ function applyLeagueSuggestion(codes) {
         if (cb) cb.checked = false;
     });
 
+    switchTab('tab-laboratory');
     showToast(`Ligas problemáticas removidas. Reexecutando backtest...`, "success");
     window.appliedOptimizationSuggestions.add(`leagues_${JSON.stringify(codes)}`);
     runBacktest();
@@ -2788,6 +2790,7 @@ window.toggleCollapsibleSection = function(id) {
 };
 
 function applyOddsSuggestion(rangeName) {
+    switchTab('tab-laboratory');
     if (rangeName.includes(':')) {
         const parts = rangeName.split(':');
         const field = parts[0];
