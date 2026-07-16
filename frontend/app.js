@@ -1,5 +1,6 @@
 import './js/dutching.js?v=1';
 import './js/steam_live.js';
+import './js/state.js';
 
 // Import modular functions
 import { showToast, switchTab, toggleGroup, toggleStakeLabel, formatCurrency, formatPct, createAbortController, animateValue } from './js/utils.js';
