@@ -5027,6 +5027,8 @@ window.runBacktest = async function(overrideParams) {
         // Discard stale responses from older concurrent requests
         if (mySeq !== window._backtestSeq) {
             console.warn(`Dropping stale backtest response seq=${mySeq}, current=${window._backtestSeq}`);
+            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
+            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
             return;
         }
 
@@ -5412,8 +5414,11 @@ window.runBacktest = async function(overrideParams) {
     } catch(err) {
         console.error("Backtest error:", err);
         if (err.name === 'AbortError') {
-            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
-            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
+            // Only reset button if no newer request is in progress
+            if (mySeq === window._backtestSeq) {
+                if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
+                if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
+            }
             return;
         }
         if (err.message.includes("Unexpected end of JSON input")) {
@@ -5421,8 +5426,10 @@ window.runBacktest = async function(overrideParams) {
         } else {
             showToast("Erro: " + err.message, "error");
         }
-        if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
-        if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
+        if (mySeq === window._backtestSeq) {
+            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
+            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
+        }
     }
 };
 
