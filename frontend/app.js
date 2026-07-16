@@ -4857,6 +4857,7 @@ window.runBacktest = async function(overrideParams) {
     if (!window._backtestSeq) window._backtestSeq = 0;
     const mySeq = ++window._backtestSeq;
     let btn = null;
+    let topbarBtn = null;
     try {
         // --- Portfolio Fix: Restore standard UI panels ---
         const pPanel = document.getElementById('portfolio-results-panel');
@@ -4886,7 +4887,7 @@ window.runBacktest = async function(overrideParams) {
         });
 
         btn = document.getElementById('btn-run-backtest');
-        const topbarBtn = document.getElementById('btn-topbar-run');
+        topbarBtn = document.getElementById('btn-topbar-run');
         if(btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Rodando...'; btn.disabled = true; }
         if(topbarBtn) { topbarBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; topbarBtn.disabled = true; }
 
@@ -5036,8 +5037,6 @@ window.runBacktest = async function(overrideParams) {
             // Check if walk-forward result (different structure from standard backtest)
             if (data.method === 'walk_forward') {
                 renderWalkForwardResults(data);
-                if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
-                if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
                 return;
             }
 
@@ -5402,38 +5401,25 @@ window.runBacktest = async function(overrideParams) {
             const btnExport = document.getElementById('btn-export-backtest');
             if (btnExport) btnExport.style.display = 'inline-flex';
 
-            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
-            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
             if (typeof showToast === 'function') showToast("Backtest concluído!", "success");
 
         } else {
             const errMsg = data.error || data.detail || "Erro ao executar backtest.";
             console.error("Backtest error:", errMsg, data);
             showToast(errMsg, "error");
-            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
-            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
         }
     } catch(err) {
         console.error("Backtest error:", err);
-        if (err.name === 'AbortError') {
-            // Only reset button if no newer request is in progress
-            if (mySeq === window._backtestSeq) {
-                if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
-                if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
-            }
-            return;
-        }
+        if (err.name === 'AbortError') return;
         if (err.message.includes("Unexpected end of JSON input")) {
             showToast("Erro: O servidor encerrou a conexão inesperadamente (possível falta de memória / OOM).", "error");
         } else {
             showToast("Erro: " + err.message, "error");
         }
-        if (mySeq === window._backtestSeq) {
-            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
-            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
-        }
     } finally {
         window._backtestRunning = false;
+        if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
+        if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
     }
 };
 
