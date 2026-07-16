@@ -4852,6 +4852,8 @@ window.runSpecificEqsBacktest = async function(scanType, code, optRange) {
 // ==========================================================================
 
 window.runBacktest = async function(overrideParams) {
+    if (window._backtestRunning) return;
+    window._backtestRunning = true;
     if (!window._backtestSeq) window._backtestSeq = 0;
     const mySeq = ++window._backtestSeq;
     let btn = null;
@@ -5027,8 +5029,6 @@ window.runBacktest = async function(overrideParams) {
         // Discard stale responses from older concurrent requests
         if (mySeq !== window._backtestSeq) {
             console.warn(`Dropping stale backtest response seq=${mySeq}, current=${window._backtestSeq}`);
-            if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
-            if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
             return;
         }
 
@@ -5036,6 +5036,8 @@ window.runBacktest = async function(overrideParams) {
             // Check if walk-forward result (different structure from standard backtest)
             if (data.method === 'walk_forward') {
                 renderWalkForwardResults(data);
+                if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
+                if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
                 return;
             }
 
@@ -5430,6 +5432,8 @@ window.runBacktest = async function(overrideParams) {
             if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
             if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
         }
+    } finally {
+        window._backtestRunning = false;
     }
 };
 
