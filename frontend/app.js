@@ -5540,6 +5540,8 @@ window.runBacktest = async function(overrideParams) {
             // Apply metric colors at the very end (after ALL DOM updates, banners, text, etc.)
             applyMetricColors(summary);
 
+            const optBanner = document.getElementById('optimization-active-banner');
+            if (optBanner) optBanner.style.display = 'none';
             const banner = document.getElementById('active-strategy-banner');
             if (banner) banner.style.display = 'flex';
             const leagueNames = leagues.map(code => {
