@@ -2159,34 +2159,38 @@ function displayOptimizationSuggestions(suggestions, isPortfolio = false) {
 
     const optPanel = document.getElementById('ai-optimization-panel');
 
-    
+
 
     if (!optPanel || !suggestionsContainer) return;
 
-    
+
 
     optPanel.style.display = 'block';
 
     suggestionsContainer.innerHTML = '';
 
-    
+
 
     // Store all suggestions globally (needed by apply* functions)
     window.allOptimizationSuggestions = suggestions || [];
+
+    console.log('[displayOptimizationSuggestions] total suggestions:', (suggestions || []).length, 'applied:', [...window.appliedOptimizationSuggestions]);
 
     // Filter out already applied suggestions
 
     const filteredSuggestions = (suggestions || []).filter(sug => {
 
-        if (sug.type === 'odds_warning' && window.appliedOptimizationSuggestions.has(sug.value)) return false;
+        if (sug.type === 'odds_warning' && window.appliedOptimizationSuggestions.has(sug.value)) { console.log('[displayOptimizationSuggestions] filtering odds_warning:', sug.value); return false; }
 
-        if (sug.type === 'ev' && window.appliedOptimizationSuggestions.has(`ev_${sug.value}`)) return false;
+        if (sug.type === 'ev' && window.appliedOptimizationSuggestions.has(`ev_${sug.value}`)) { console.log('[displayOptimizationSuggestions] filtering ev:', sug.value); return false; }
 
-        if (sug.type === 'leagues' && window.appliedOptimizationSuggestions.has(`leagues_${JSON.stringify(sug.exclude_codes)}`)) return false;
+        if (sug.type === 'leagues' && window.appliedOptimizationSuggestions.has(`leagues_${JSON.stringify(sug.exclude_codes)}`)) { console.log('[displayOptimizationSuggestions] filtering leagues:', JSON.stringify(sug.exclude_codes)); return false; }
 
         return true;
 
     });
+
+    console.log('[displayOptimizationSuggestions] filtered count:', filteredSuggestions.length);
 
     
 
@@ -2852,13 +2856,14 @@ function renderOptimizedResultsToLaboratory(sug) {
     }
 
     // --- Re-render Optimization Tab immediately (remove applied suggestion) ---
-    if (typeof renderOptimizationTab === 'function') {
-        renderOptimizationTab(window.allOptimizationSuggestions || [], null);
-    }
-    // Also update the AI panel suggestions list
-    if (typeof displayOptimizationSuggestions === 'function') {
-        displayOptimizationSuggestions(window.allOptimizationSuggestions || [], false);
-    }
+    // Filter the global list in-place so that even if a later backtest response
+    // re-populates allOptimizationSuggestions, the re-render functions will still
+    // exclude already-applied suggestions (they filter against appliedOptimizationSuggestions Set).
+    const allSugs = window.allOptimizationSuggestions || [];
+    console.log('[renderOptimizedResultsToLaboratory] allOptimizationSuggestions count:', allSugs.length, 'appliedOptimizationSuggestions:', [...window.appliedOptimizationSuggestions]);
+    renderOptimizationTab(allSugs, null);
+    displayOptimizationSuggestions(allSugs, false);
+    console.log('[renderOptimizedResultsToLaboratory] re-render done');
 
     // --- Show save button ---
     const btnSave = document.getElementById('btn-save-strategy');
@@ -2896,8 +2901,15 @@ function applyEvSuggestion(val) {
         evInput.value = val;
         switchTab('tab-laboratory');
         window.appliedOptimizationSuggestions.add(`ev_${val}`);
+        console.log('[applyEvSuggestion] appliedOptimizationSuggestions:', [...window.appliedOptimizationSuggestions]);
+        // Re-render lists IMMEDIATELY (before async runBacktest overwrites them)
+        const allSugs = window.allOptimizationSuggestions || [];
+        console.log('[applyEvSuggestion] allSugs count before re-render:', allSugs.length);
+        renderOptimizationTab(allSugs, null);
+        displayOptimizationSuggestions(allSugs, false);
         // Render pre-computed optimized results immediately
         const sug = findSuggestion('ev', val);
+        console.log('[applyEvSuggestion] findSuggestion returned:', !!sug);
         if (sug) renderOptimizedResultsToLaboratory(sug);
         showToast(`Gatilho EV atualizado para ${val}. Rodando nova simulação...`, "success");
         runBacktest();
@@ -2914,8 +2926,15 @@ function applyLeagueSuggestion(codes) {
 
     switchTab('tab-laboratory');
     window.appliedOptimizationSuggestions.add(`leagues_${JSON.stringify(codes)}`);
+    console.log('[applyLeagueSuggestion] appliedOptimizationSuggestions:', [...window.appliedOptimizationSuggestions]);
+    // Re-render lists IMMEDIATELY (before async runBacktest overwrites them)
+    const allSugs = window.allOptimizationSuggestions || [];
+    console.log('[applyLeagueSuggestion] allSugs count before re-render:', allSugs.length);
+    renderOptimizationTab(allSugs, null);
+    displayOptimizationSuggestions(allSugs, false);
     // Render pre-computed optimized results immediately
     const sug = findSuggestion('leagues', JSON.stringify(codes));
+    console.log('[applyLeagueSuggestion] findSuggestion returned:', !!sug);
     if (sug) renderOptimizedResultsToLaboratory(sug);
     showToast(`Ligas problemáticas removidas. Reexecutando backtest...`, "success");
     runBacktest();
@@ -2944,8 +2963,16 @@ window.toggleCollapsibleSection = function(id) {
 
 function applyOddsSuggestion(rangeName) {
     switchTab('tab-laboratory');
+    window.appliedOptimizationSuggestions.add(rangeName);
+    console.log('[applyOddsSuggestion] appliedOptimizationSuggestions:', [...window.appliedOptimizationSuggestions]);
+    // Re-render lists IMMEDIATELY (before async runBacktest overwrites them)
+    const allSugs = window.allOptimizationSuggestions || [];
+    console.log('[applyOddsSuggestion] allSugs count before re-render:', allSugs.length);
+    renderOptimizationTab(allSugs, null);
+    displayOptimizationSuggestions(allSugs, false);
     // Render pre-computed optimized results immediately
     const sug = findSuggestion('odds_warning', rangeName);
+    console.log('[applyOddsSuggestion] findSuggestion returned:', !!sug);
     if (sug) renderOptimizedResultsToLaboratory(sug);
 
     if (rangeName.includes(':')) {
@@ -2987,7 +3014,6 @@ function applyOddsSuggestion(rangeName) {
             const bounds = subRange.split('-');
             if (minEl) minEl.value = bounds[0];
             if (maxEl) maxEl.value = bounds[1];
-            window.appliedOptimizationSuggestions.add(rangeName);
             showToast(`Filtro avançado de odds otimizado para ${bounds[0]} a ${bounds[1]}. Rodando simulação...`, "success");
             runBacktest();
             return;
@@ -3015,7 +3041,6 @@ function applyOddsSuggestion(rangeName) {
             if (maxEl) maxEl.value = "2.20";
         }
 
-        window.appliedOptimizationSuggestions.add(rangeName);
         showToast(`Filtro avançado de odds otimizado. Rodando simulação...`, "success");
         runBacktest();
         return;
@@ -3029,7 +3054,6 @@ function applyOddsSuggestion(rangeName) {
         const bounds = rangeName.split('-');
         if (minInput) minInput.value = bounds[0];
         if (maxInput) maxInput.value = bounds[1];
-        window.appliedOptimizationSuggestions.add(rangeName);
         showToast(`Filtro de Odds otimizado para ${bounds[0]} a ${bounds[1]}. Rodando simulação...`, "success");
         runBacktest();
         return;
@@ -3045,7 +3069,6 @@ function applyOddsSuggestion(rangeName) {
         maxInput.value = "2.00";
     }
 
-    window.appliedOptimizationSuggestions.add(rangeName);
     showToast(`Filtro de Odds otimizado para excluir ${rangeName}. Rodando simulação...`, "success");
     runBacktest();
 }
