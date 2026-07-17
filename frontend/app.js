@@ -2677,12 +2677,12 @@ function updateComparisonDisplay(sug, results) {
 function renderOptComparisonChart(sug, results) {
     const ctx = document.getElementById('opt-comparison-chart');
     if (!ctx) return;
-    
+
     if (optComparisonChart) {
         optComparisonChart.destroy();
     }
-    
-    const origCurve = results.equity_curve || [];
+
+    const origCurve = (results && results.equity_curve) || [];
     const optCurve = sug.optimized_curve || [];
     
     const allDates = Array.from(new Set([
@@ -2849,6 +2849,15 @@ function renderOptimizedResultsToLaboratory(sug) {
         const dates = optCurve.map(pt => pt.date || '');
         const bankrolls = optCurve.map(pt => pt.bankroll || pt.Bankroll || 0);
         updateCharts(dates, bankrolls, [], [], [], [], [], [], null);
+    }
+
+    // --- Re-render Optimization Tab immediately (remove applied suggestion) ---
+    if (typeof renderOptimizationTab === 'function') {
+        renderOptimizationTab(window.allOptimizationSuggestions || [], null);
+    }
+    // Also update the AI panel suggestions list
+    if (typeof displayOptimizationSuggestions === 'function') {
+        displayOptimizationSuggestions(window.allOptimizationSuggestions || [], false);
     }
 
     // --- Show save button ---
