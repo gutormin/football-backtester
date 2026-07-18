@@ -845,19 +845,23 @@ async function runScanner(scanType) {
     if (ruleInput.startsWith('kelly')) {
 
         stakingRule = 'kelly';
-
-        if (ruleInput === 'kelly') stakeValue = 1.0;
-
-        else if (ruleInput === 'kelly_half') stakeValue = 0.5;
-
-        else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
-
-        else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
-        else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
+        // Read Kelly fraction from the slider (consistent with runBacktest)
+        const kellyFractionEl = document.getElementById('kelly-fraction');
+        if (kellyFractionEl) {
+            stakeValue = parseFloat(kellyFractionEl.value);
+        } else {
+            // Fallback to legacy dropdown values
+            if (ruleInput === 'kelly') stakeValue = 1.0;
+            else if (ruleInput === 'kelly_half') stakeValue = 0.5;
+            else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
+            else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
+            else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
+            else stakeValue = 0.25;
+        }
 
     }
 
-    
+
 
     const requestData = {
 
@@ -4366,19 +4370,23 @@ async function runEqsScanner(scanType) {
     if (ruleInput.startsWith('kelly')) {
 
         stakingRule = 'kelly';
-
-        if (ruleInput === 'kelly') stakeValue = 1.0;
-
-        else if (ruleInput === 'kelly_half') stakeValue = 0.5;
-
-        else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
-
-        else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
-        else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
+        // Read Kelly fraction from the slider (consistent with runBacktest)
+        const kellyFractionEl = document.getElementById('kelly-fraction');
+        if (kellyFractionEl) {
+            stakeValue = parseFloat(kellyFractionEl.value);
+        } else {
+            // Fallback to legacy dropdown values
+            if (ruleInput === 'kelly') stakeValue = 1.0;
+            else if (ruleInput === 'kelly_half') stakeValue = 0.5;
+            else if (ruleInput === 'kelly_quarter') stakeValue = 0.25;
+            else if (ruleInput === 'kelly_eighth') stakeValue = 0.125;
+            else if (ruleInput === 'kelly_sixteenth') stakeValue = 0.0625;
+            else stakeValue = 0.25;
+        }
 
     }
 
-    
+
 
     const requestData = {
 
