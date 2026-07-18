@@ -725,6 +725,7 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
         net_profit = bankroll - initial_bankroll
         roi = (net_profit / total_staked_raw * 100) if total_staked_raw > 0 else 0.0
 
+    losses = total_bets - wins
     return {
         'summary': {
             'net_profit': round(net_profit, 2),
@@ -732,7 +733,9 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
             'roi': round(roi, 2),
             'win_rate': round(win_rate, 1),
             'max_drawdown': round(max_drawdown * 100, 2),
-            'total_bets': total_bets
+            'total_bets': total_bets,
+            'wins': wins,
+            'losses': losses
         },
         'equity_curve': equity_curve
     }

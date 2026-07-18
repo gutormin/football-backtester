@@ -3,7 +3,7 @@ import './js/steam_live.js';
 import './js/state.js';
 
 // Import modular functions
-import { showToast, switchTab, toggleGroup, toggleStakeLabel, formatCurrency, formatPct, createAbortController, animateValue } from './js/utils.js';
+import { showToast, switchTab, toggleGroup, toggleStakeLabel, formatCurrency, formatPct, createAbortController, getActiveAbortController, animateValue } from './js/utils.js';
 import { checkDatabaseStatus, syncDatabase, loadLeagues, fetchServerHistory, saveToServer, deleteFromServer, toggleServerActiveState } from './js/api.js';
 import { updateCharts, renderPortfolioChart, clearCharts } from './js/charts.js';
 // Bind imports to window so index.html and dynamic elements can call them
@@ -2813,8 +2813,20 @@ function renderOptimizedResultsToLaboratory(sug) {
     const dd = opt.max_drawdown || 0;
     const totalBets = opt.total_bets || 0;
 
-    // Only update metrics that exist in optimized_summary.
-    // All other fields (wins, losses, avg_odds, matches_analyzed, seasons,
+    // Update wins/losses from optimized_summary.
+    // Always derive from win_rate if available, so stale values never leak.
+    if (opt.wins !== undefined && opt.losses !== undefined) {
+        setEl('metric-wins', opt.wins);
+        setEl('metric-losses', opt.losses);
+    } else if (winRate > 0 && totalBets > 0) {
+        // Backfill from win_rate * total_bets (approx, ignores pushes)
+        const approxWins = Math.round(winRate / 100 * totalBets);
+        const approxLosses = totalBets - approxWins;
+        setEl('metric-wins', approxWins);
+        setEl('metric-losses', approxLosses);
+    }
+
+    // All other fields (avg_odds, matches_analyzed, seasons,
     // sharpe, sortino, clv, bcl, etc.) are NOT in optimized_summary —
     // they only come from the full Poisson backtest. Don't touch them.
     animateValue(document.getElementById('metric-net-profit'), 0, netProfit, 600, v => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2));
@@ -5036,7 +5048,12 @@ window.runSpecificEqsBacktest = async function(scanType, code, optRange) {
 // ==========================================================================
 
 window.runBacktest = async function(overrideParams) {
-    if (window._backtestRunning) return;
+    if (window._backtestRunning) {
+        // Abort in-flight request so the new params take over immediately
+        const prevCtrl = getActiveAbortController();
+        if (prevCtrl) prevCtrl.abort();
+        console.log('[runBacktest] Aborted in-flight backtest for new request');
+    }
     window._backtestRunning = true;
     if (!window._backtestSeq) window._backtestSeq = 0;
     const mySeq = ++window._backtestSeq;
@@ -5596,14 +5613,16 @@ window.runBacktest = async function(overrideParams) {
         }
     } catch(err) {
         console.error("Backtest error:", err);
-        if (err.name === 'AbortError') return;
+        if (err.name === 'AbortError') return;  // skip finally for aborted requests (mySeq won't match, but be explicit)
         if (err.message.includes("Unexpected end of JSON input")) {
             showToast("Erro: O servidor encerrou a conexão inesperadamente (possível falta de memória / OOM).", "error");
         } else {
             showToast("Erro: " + err.message, "error");
         }
     } finally {
-        window._backtestRunning = false;
+        if (mySeq === window._backtestSeq) {
+            window._backtestRunning = false;
+        }
         if(btn) { btn.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btn.disabled = false; }
         if(topbarBtn) { topbarBtn.innerHTML = '<i class="fa-solid fa-play"></i> Executar'; topbarBtn.disabled = false; }
     }
