@@ -2817,17 +2817,26 @@ function renderOptimizedResultsToLaboratory(sug) {
     const dd = opt.max_drawdown || 0;
     const totalBets = opt.total_bets || 0;
 
-    // Update wins/losses from optimized_summary.
-    // Always derive from win_rate if available, so stale values never leak.
-    if (opt.wins !== undefined && opt.losses !== undefined) {
-        setEl('metric-wins', opt.wins);
-        setEl('metric-losses', opt.losses);
-    } else if (winRate > 0 && totalBets > 0) {
-        // Backfill from win_rate * total_bets (approx, ignores pushes)
-        const approxWins = Math.round(winRate / 100 * totalBets);
-        const approxLosses = totalBets - approxWins;
-        setEl('metric-wins', approxWins);
-        setEl('metric-losses', approxLosses);
+    // Always update wins/losses from optimized_summary so stale values from a
+    // previous backtest callback never leak alongside the new total_bets.
+    // Defensive: if the suggestion data is internally inconsistent (old pre-fix
+    // cache), derive losses from total_bets - wins so the DOM never shows
+    // wins + losses > total_bets.
+    if (totalBets > 0) {
+        const enforceConsistency = (w, l, t) => (w + l > t) ? Math.max(0, t - w) : l;
+        if (opt.wins !== undefined) {
+            const w = opt.wins;
+            const l = opt.losses !== undefined ? enforceConsistency(w, opt.losses, totalBets) : Math.max(0, totalBets - w);
+            setEl('metric-wins', w);
+            setEl('metric-losses', l);
+        } else {
+            const approxWins = winRate > 0 ? Math.round(winRate / 100 * totalBets) : 0;
+            setEl('metric-wins', approxWins);
+            setEl('metric-losses', totalBets - approxWins);
+        }
+    } else {
+        setEl('metric-wins', 0);
+        setEl('metric-losses', 0);
     }
 
     // All other fields (avg_odds, matches_analyzed, seasons,
