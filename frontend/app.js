@@ -2175,14 +2175,34 @@ function displayOptimizationSuggestions(suggestions, isPortfolio = false) {
 
 
 
-    // Store all suggestions globally (needed by apply* functions)
-    window.allOptimizationSuggestions = suggestions || [];
+    // Preserve original suggestions: a subsequent backtest regenerates
+    // suggestions in the already-filtered context, which produces different
+    // optimized_summary data for each scenario. Never replace existing
+    // entries — only add genuinely new suggestions that don't already exist.
+    const current = window.allOptimizationSuggestions || [];
+    const keyOf = (s) => {
+        if (s.type === 'odds_warning') return s.value;
+        if (s.type === 'ev') return 'ev_' + s.value;
+        if (s.type === 'leagues') return 'leagues_' + JSON.stringify(s.exclude_codes || []);
+        return null;
+    };
+    const currentMap = new Map();
+    for (const s of current) {
+        const k = keyOf(s);
+        if (k) currentMap.set(k, s);
+    }
+    for (const s of (suggestions || [])) {
+        const k = keyOf(s);
+        if (k && !currentMap.has(k)) {
+            current.push(s);
+        }
+    }
+    window.allOptimizationSuggestions = current;
 
-    console.log('[displayOptimizationSuggestions] total suggestions:', (suggestions || []).length, 'applied:', [...window.appliedOptimizationSuggestions]);
+    console.log('[displayOptimizationSuggestions] total suggestions:', current.length, 'applied:', [...(window.appliedOptimizationSuggestions || [])]);
 
-    // Filter out already applied suggestions
-
-    const filteredSuggestions = (suggestions || []).filter(sug => {
+    // Filter out already applied suggestions (from the merged list)
+    const filteredSuggestions = (current || []).filter(sug => {
 
         if (sug.type === 'odds_warning' && window.appliedOptimizationSuggestions.has(sug.value)) { console.log('[displayOptimizationSuggestions] filtering odds_warning:', sug.value); return false; }
 
@@ -2990,17 +3010,39 @@ function applyOddsSuggestion(rangeName) {
     switchTab('tab-laboratory');
     window.appliedOptimizationSuggestions.add(rangeName);
     console.log('[applyOddsSuggestion] appliedOptimizationSuggestions:', [...window.appliedOptimizationSuggestions]);
+
+    // Snapshot the suggestion BEFORE runBacktest overwrites
+    // window.allOptimizationSuggestions with regenerated data.
+    const sug = findSuggestion('odds_warning', rangeName);
+    if (sug) {
+        window._optimizationCache = window._optimizationCache || {};
+        window._optimizationCache['odds_warning:' + rangeName] = sug;
+    }
+
     // Re-render lists IMMEDIATELY (before async runBacktest overwrites them)
     const allSugs = window.allOptimizationSuggestions || [];
     console.log('[applyOddsSuggestion] allSugs count before re-render:', allSugs.length);
     renderOptimizationTab(allSugs, null);
     displayOptimizationSuggestions(allSugs, false);
     // Render pre-computed optimized results immediately
-    const sug = findSuggestion('odds_warning', rangeName);
     console.log('[applyOddsSuggestion] findSuggestion returned:', !!sug);
     if (sug) renderOptimizedResultsToLaboratory(sug);
 
     if (rangeName.includes(':')) {
+        // Reset ALL advanced odds filters so each scenario is applied
+        // independently. Otherwise the 1st scenario's filter leaks into the
+        // 2nd scenario's backtest, producing totals/wins/losses that don't
+        // match the pre-computed optimized_summary.
+        const allMinFields = ['min-odds-h', 'min-odds-d', 'min-odds-a', 'min-odds-over25', 'min-odds-under25'];
+        const allMaxFields = ['max-odds-h', 'max-odds-d', 'max-odds-a', 'max-odds-over25', 'max-odds-under25'];
+        for (const id of allMinFields) { const el = document.getElementById(id); if (el) el.value = ''; }
+        for (const id of allMaxFields) { const el = document.getElementById(id); if (el) el.value = ''; }
+        // Also reset primary odds filters
+        const minOddsPri = document.getElementById('min-odds');
+        const maxOddsPri = document.getElementById('max-odds');
+        if (minOddsPri) minOddsPri.value = '';
+        if (maxOddsPri) maxOddsPri.value = '';
+
         const parts = rangeName.split(':');
         const field = parts[0];
         const subRange = parts[1];
@@ -3073,6 +3115,12 @@ function applyOddsSuggestion(rangeName) {
 
     const minInput = document.getElementById('min-odds');
     const maxInput = document.getElementById('max-odds');
+
+    // Reset advanced odds filters when applying a primary odds scenario
+    const allMinFields = ['min-odds-h', 'min-odds-d', 'min-odds-a', 'min-odds-over25', 'min-odds-under25'];
+    const allMaxFields = ['max-odds-h', 'max-odds-d', 'max-odds-a', 'max-odds-over25', 'max-odds-under25'];
+    for (const id of allMinFields) { const el = document.getElementById(id); if (el) el.value = ''; }
+    for (const id of allMaxFields) { const el = document.getElementById(id); if (el) el.value = ''; }
 
     // Custom range parser like "1.50-3.00"
     if (rangeName.includes('-') && !rangeName.includes('Favoritos') && !rangeName.includes('Equilibrado') && !rangeName.includes('Baixo') && !rangeName.includes('Médio')) {
@@ -5265,13 +5313,6 @@ window.runBacktest = async function(overrideParams) {
             if(btnSave) btnSave.style.display = 'inline-block';
 
             const summary = data.summary;
-            // When the optimization banner is visible, the pre-computed
-            // values from renderOptimizedResultsToLaboratory are canonical.
-            // Don't overwrite them with the full backtest summary (which uses
-            // different staking and may include pushes, skewing the numbers).
-            const optBanner = document.getElementById('optimization-active-banner');
-            const optBannerVisible = optBanner && optBanner.style.display !== 'none';
-            if (!optBannerVisible) {
             // KPI Hero — animated count-up
             animateValue(document.getElementById('metric-net-profit'), 0, summary.net_profit, 800, v => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2));
             if(document.getElementById('metric-profit-stakes')) document.getElementById('metric-profit-stakes').innerText = (summary.profit_in_stakes > 0 ? '+' : '') + summary.profit_in_stakes.toFixed(2) + ' st.';
@@ -5306,7 +5347,6 @@ window.runBacktest = async function(overrideParams) {
                 }
             }
             animateValue(document.getElementById('metric-final-bankroll'), payload.initialBankroll, summary.final_bankroll, 800, v => '$' + v.toFixed(2));
-            }
             if(document.getElementById('metric-sharpe')) document.getElementById('metric-sharpe').innerText = (summary.sharpe_ratio || 0).toFixed(2);
             if(document.getElementById('metric-sortino')) document.getElementById('metric-sortino').innerText = (summary.sortino_ratio || 0).toFixed(2);
             if(document.getElementById('metric-skewness')) document.getElementById('metric-skewness').innerText = (summary.skewness || 0).toFixed(2);
@@ -5353,7 +5393,7 @@ window.runBacktest = async function(overrideParams) {
                 colorCard('metric-roi', rr, 0);
                 colorCard('metric-win-rate', wr, 50);
             }
-            if (!optBannerVisible) { applyMetricColors(summary); }
+            applyMetricColors(summary);
 
             // Populate Transparency Panel (Phase 1)
             const transPanel = document.getElementById('transparency-panel');
@@ -5603,10 +5643,10 @@ window.runBacktest = async function(overrideParams) {
             }
 
             // Apply metric colors at the very end (after ALL DOM updates, banners, text, etc.)
-            if (!optBannerVisible) { applyMetricColors(summary); }
+            applyMetricColors(summary);
 
-            const bannerEl = document.getElementById('optimization-active-banner');
-            if (bannerEl) bannerEl.style.display = 'none';
+            const optBanner = document.getElementById('optimization-active-banner');
+            if (optBanner) optBanner.style.display = 'none';
             const banner = document.getElementById('active-strategy-banner');
             if (banner) banner.style.display = 'flex';
             const leagueNames = leagues.map(code => {
