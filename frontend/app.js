@@ -2870,6 +2870,26 @@ function renderOptimizedResultsToLaboratory(sug) {
     setEl('metric-total-bets', totalBets);
     setEl('metric-profit-stakes', (opt.profit_in_stakes || 0).toFixed(2) + ' st.');
 
+    // Apply card colors for pre-computed values
+    (function() {
+        const cc = (h2Id, value, neutralThreshold) => {
+            const h2 = document.getElementById(h2Id);
+            if (!h2) return;
+            const card = h2.closest('.metric-card');
+            const isPositive = neutralThreshold !== undefined ? value > neutralThreshold : value >= 0;
+            if (card) {
+                card.classList.remove('positive', 'negative');
+                if (isPositive) card.classList.add('positive');
+                else card.classList.add('negative');
+            }
+            h2.style.color = isPositive ? 'var(--color-success)' : 'var(--color-danger)';
+        };
+        cc('metric-net-profit', netProfit);
+        cc('metric-profit-stakes', opt.profit_in_stakes || 0);
+        cc('metric-roi', roi, 0);
+        cc('metric-win-rate', winRate, 50);
+    })();
+
     // final_bankroll is derivable from original_summary
     const fb = opt.final_bankroll || orig.final_bankroll;
     if (fb) setEl('metric-final-bankroll', '$' + fb.toFixed(2));
@@ -5313,40 +5333,49 @@ window.runBacktest = async function(overrideParams) {
             if(btnSave) btnSave.style.display = 'inline-block';
 
             const summary = data.summary;
-            // KPI Hero — animated count-up
-            animateValue(document.getElementById('metric-net-profit'), 0, summary.net_profit, 800, v => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2));
-            if(document.getElementById('metric-profit-stakes')) document.getElementById('metric-profit-stakes').innerText = (summary.profit_in_stakes > 0 ? '+' : '') + summary.profit_in_stakes.toFixed(2) + ' st.';
-            animateValue(document.getElementById('metric-roi'), 0, summary.roi, 800, v => v.toFixed(1) + '%');
-            animateValue(document.getElementById('metric-win-rate'), 0, summary.win_rate, 800, v => v.toFixed(1) + '%');
-            if(document.getElementById('metric-avg-odds')) document.getElementById('metric-avg-odds').innerText = summary.avg_odds.toFixed(2);
-            if(document.getElementById('metric-max-drawdown')) document.getElementById('metric-max-drawdown').innerText = (summary.max_drawdown || 0).toFixed(1) + '%';
-            if(document.getElementById('metric-drawdown')) {
-                document.getElementById('metric-drawdown').innerText = (summary.max_drawdown || 0).toFixed(1) + '%';
-                const ddDurationEl = document.getElementById('metric-dd-duration');
-                if (ddDurationEl) {
-                    const dur = summary.max_dd_duration || 0;
-                    ddDurationEl.innerText = 'Recup: ' + dur + ' aposta' + (dur !== 1 ? 's' : '');
+            // Do NOT overwrite lab KPIs when an optimization banner is
+            // active — renderOptimizedResultsToLaboratory already set
+            // pre-computed values that are canonical for the scenario.
+            // The backtest uses a full Poisson simulator which produces
+            // different numbers even with identical filters.
+            const optBannerCheck = document.getElementById('optimization-active-banner');
+            const isOptActive = optBannerCheck && optBannerCheck.style.display !== 'none';
+            if (!isOptActive) {
+                // KPI Hero — animated count-up
+                animateValue(document.getElementById('metric-net-profit'), 0, summary.net_profit, 800, v => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2));
+                if(document.getElementById('metric-profit-stakes')) document.getElementById('metric-profit-stakes').innerText = (summary.profit_in_stakes > 0 ? '+' : '') + summary.profit_in_stakes.toFixed(2) + ' st.';
+                animateValue(document.getElementById('metric-roi'), 0, summary.roi, 800, v => v.toFixed(1) + '%');
+                animateValue(document.getElementById('metric-win-rate'), 0, summary.win_rate, 800, v => v.toFixed(1) + '%');
+                if(document.getElementById('metric-avg-odds')) document.getElementById('metric-avg-odds').innerText = summary.avg_odds.toFixed(2);
+                if(document.getElementById('metric-max-drawdown')) document.getElementById('metric-max-drawdown').innerText = (summary.max_drawdown || 0).toFixed(1) + '%';
+                if(document.getElementById('metric-drawdown')) {
+                    document.getElementById('metric-drawdown').innerText = (summary.max_drawdown || 0).toFixed(1) + '%';
+                    const ddDurationEl = document.getElementById('metric-dd-duration');
+                    if (ddDurationEl) {
+                        const dur = summary.max_dd_duration || 0;
+                        ddDurationEl.innerText = 'Recup: ' + dur + ' aposta' + (dur !== 1 ? 's' : '');
+                    }
                 }
-            }
-            if(document.getElementById('metric-total-bets')) document.getElementById('metric-total-bets').innerText = summary.total_bets;
-            if(document.getElementById('metric-matches-analyzed')) document.getElementById('metric-matches-analyzed').innerText = (summary.matches_total_in_file || 0).toLocaleString();
-            if(document.getElementById('metric-seasons')) {
-                const seasons = summary.seasons_analyzed || [];
-                document.getElementById('metric-seasons').innerText = seasons.length > 0 ? seasons.join(', ') : '-';
-            }
-            if(document.getElementById('metric-wins')) document.getElementById('metric-wins').innerText = summary.wins || 0;
-            if(document.getElementById('metric-losses')) document.getElementById('metric-losses').innerText = summary.losses || 0;
-            const pushesCard = document.getElementById('metric-pushes-card');
-            if (pushesCard && document.getElementById('metric-pushes')) {
-                const pushes = summary.pushes || 0;
-                if (pushes > 0) {
-                    pushesCard.style.display = 'flex';
-                    document.getElementById('metric-pushes').innerText = pushes;
-                } else {
-                    pushesCard.style.display = 'none';
+                if(document.getElementById('metric-total-bets')) document.getElementById('metric-total-bets').innerText = summary.total_bets;
+                if(document.getElementById('metric-matches-analyzed')) document.getElementById('metric-matches-analyzed').innerText = (summary.matches_total_in_file || 0).toLocaleString();
+                if(document.getElementById('metric-seasons')) {
+                    const seasons = summary.seasons_analyzed || [];
+                    document.getElementById('metric-seasons').innerText = seasons.length > 0 ? seasons.join(', ') : '-';
                 }
+                if(document.getElementById('metric-wins')) document.getElementById('metric-wins').innerText = summary.wins || 0;
+                if(document.getElementById('metric-losses')) document.getElementById('metric-losses').innerText = summary.losses || 0;
+                const pushesCard = document.getElementById('metric-pushes-card');
+                if (pushesCard && document.getElementById('metric-pushes')) {
+                    const pushes = summary.pushes || 0;
+                    if (pushes > 0) {
+                        pushesCard.style.display = 'flex';
+                        document.getElementById('metric-pushes').innerText = pushes;
+                    } else {
+                        pushesCard.style.display = 'none';
+                    }
+                }
+                animateValue(document.getElementById('metric-final-bankroll'), payload.initialBankroll, summary.final_bankroll, 800, v => '$' + v.toFixed(2));
             }
-            animateValue(document.getElementById('metric-final-bankroll'), payload.initialBankroll, summary.final_bankroll, 800, v => '$' + v.toFixed(2));
             if(document.getElementById('metric-sharpe')) document.getElementById('metric-sharpe').innerText = (summary.sharpe_ratio || 0).toFixed(2);
             if(document.getElementById('metric-sortino')) document.getElementById('metric-sortino').innerText = (summary.sortino_ratio || 0).toFixed(2);
             if(document.getElementById('metric-skewness')) document.getElementById('metric-skewness').innerText = (summary.skewness || 0).toFixed(2);
@@ -5393,7 +5422,7 @@ window.runBacktest = async function(overrideParams) {
                 colorCard('metric-roi', rr, 0);
                 colorCard('metric-win-rate', wr, 50);
             }
-            applyMetricColors(summary);
+            if (!isOptActive) applyMetricColors(summary);
 
             // Populate Transparency Panel (Phase 1)
             const transPanel = document.getElementById('transparency-panel');
