@@ -5265,6 +5265,13 @@ window.runBacktest = async function(overrideParams) {
             if(btnSave) btnSave.style.display = 'inline-block';
 
             const summary = data.summary;
+            // When the optimization banner is visible, the pre-computed
+            // values from renderOptimizedResultsToLaboratory are canonical.
+            // Don't overwrite them with the full backtest summary (which uses
+            // different staking and may include pushes, skewing the numbers).
+            const optBanner = document.getElementById('optimization-active-banner');
+            const optBannerVisible = optBanner && optBanner.style.display !== 'none';
+            if (!optBannerVisible) {
             // KPI Hero — animated count-up
             animateValue(document.getElementById('metric-net-profit'), 0, summary.net_profit, 800, v => (v >= 0 ? '+' : '') + '$' + Math.abs(v).toFixed(2));
             if(document.getElementById('metric-profit-stakes')) document.getElementById('metric-profit-stakes').innerText = (summary.profit_in_stakes > 0 ? '+' : '') + summary.profit_in_stakes.toFixed(2) + ' st.';
@@ -5299,6 +5306,7 @@ window.runBacktest = async function(overrideParams) {
                 }
             }
             animateValue(document.getElementById('metric-final-bankroll'), payload.initialBankroll, summary.final_bankroll, 800, v => '$' + v.toFixed(2));
+            }
             if(document.getElementById('metric-sharpe')) document.getElementById('metric-sharpe').innerText = (summary.sharpe_ratio || 0).toFixed(2);
             if(document.getElementById('metric-sortino')) document.getElementById('metric-sortino').innerText = (summary.sortino_ratio || 0).toFixed(2);
             if(document.getElementById('metric-skewness')) document.getElementById('metric-skewness').innerText = (summary.skewness || 0).toFixed(2);
@@ -5345,7 +5353,7 @@ window.runBacktest = async function(overrideParams) {
                 colorCard('metric-roi', rr, 0);
                 colorCard('metric-win-rate', wr, 50);
             }
-            applyMetricColors(summary);
+            if (!optBannerVisible) { applyMetricColors(summary); }
 
             // Populate Transparency Panel (Phase 1)
             const transPanel = document.getElementById('transparency-panel');
@@ -5595,10 +5603,10 @@ window.runBacktest = async function(overrideParams) {
             }
 
             // Apply metric colors at the very end (after ALL DOM updates, banners, text, etc.)
-            applyMetricColors(summary);
+            if (!optBannerVisible) { applyMetricColors(summary); }
 
-            const optBanner = document.getElementById('optimization-active-banner');
-            if (optBanner) optBanner.style.display = 'none';
+            const bannerEl = document.getElementById('optimization-active-banner');
+            if (bannerEl) bannerEl.style.display = 'none';
             const banner = document.getElementById('active-strategy-banner');
             if (banner) banner.style.display = 'flex';
             const leagueNames = leagues.map(code => {
