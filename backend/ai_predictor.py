@@ -658,7 +658,7 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
     equity_curve = [{'date': str(dates[0]), 'bankroll': round(initial_bankroll, 2)}]
 
     for row in df_sub.to_dict('records'):
-        stake = float(stake_value)
+        stake = float(stake_value) if stake_value is not None else 10.0
         bet_won = float(row['profit']) > 0
         bookie_odds = float(row['odds'])
         if stake > 0.01 and bankroll >= stake:
