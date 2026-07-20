@@ -921,20 +921,18 @@ async function runScanner(scanType) {
 
 
         if (!res.ok) {
-
-            const errData = await res.json();
-
-            throw new Error(errData.detail || "Erro ao escanear");
-
+            let errMsg = "Erro ao escanear";
+            try { const errData = await res.json(); errMsg = errData.detail || errMsg; } catch (_) {}
+            throw new Error(errMsg);
         }
 
-
-
-        const data = await res.json();
-
+        let data;
+        try {
+            data = await res.json();
+        } catch (_) {
+            throw new Error("Servidor retornou resposta inválida (não-JSON). Possível timeout do Render (plano free).");
+        }
         const results = data.results;
-
-
 
         window.lastScanResults = results;
 
@@ -4517,41 +4515,30 @@ async function runEqsScanner(scanType) {
 
 
         if (!res.ok) {
-
-            const errData = await res.json();
-
-            throw new Error(errData.detail || "Erro ao escanear");
-
+            let errMsg = "Erro ao escanear";
+            try { const errData = await res.json(); errMsg = errData.detail || errMsg; } catch (_) {}
+            throw new Error(errMsg);
         }
 
-
-
-        const data = await res.json();
-
+        let data;
+        try {
+            data = await res.json();
+        } catch (_) {
+            throw new Error("Servidor retornou resposta inválida (não-JSON). Possível timeout do Render (plano free).");
+        }
         const results = data.results;
-
-
 
         const sortedResults = results.sort((a, b) => b.eqs_score - a.eqs_score);
 
         const approvedCount = sortedResults.filter(r => r.eqs_verdict && r.eqs_verdict.toLowerCase().includes('aprovado')).length;
 
-        
-
         if (approvedCount > 0) {
-
             showToast(`Escaneamento concluído! ${approvedCount} Aprovados encontrados.`, "success");
-
         } else {
-
             showToast(`Nenhum aprovado encontrado. Exibindo resultados reprovados para análise.`, "warning");
-
         }
 
-        
-
         renderEqsResults(sortedResults, scanType, requestData, data.diagnostics);
-
         switchTab('tab-scanner');
 
         
@@ -5308,7 +5295,15 @@ window.runBacktest = async function(overrideParams) {
             body: JSON.stringify(payload),
             signal: signal
         });
-        const data = await response.json();
+        let data;
+        try {
+            data = await response.json();
+        } catch (_) {
+            const err = new Error("Servidor retornou resposta inválida (não-JSON). Possível timeout do Render (plano free).");
+            console.error(err);
+            showToast(err.message, "error");
+            return;
+        }
         console.log("Backtest Response Status:", response.status);
         console.log("Backtest Response Summary:", JSON.stringify(data.summary || {}));
         if (data.error) console.error("Backtest Response Error:", data.error);
