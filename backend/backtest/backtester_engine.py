@@ -1389,13 +1389,14 @@ class ChronologicalBacktester:
                                         lay_liability = exposure_val
                                         stake = exposure_val / (effective_odds - 1.0)
 
-                            # Apply drawdown circuit breaker (all staking rules)
-                            dd_mult = compute_drawdown_multiplier(bankroll, peak_bankroll)
-                            if dd_mult < 1.0:
-                                stake = stake * dd_mult
-                                if lay_liability is not None:
-                                    lay_liability = lay_liability * dd_mult
-                                    exposure_val = lay_liability
+                            # Apply drawdown circuit breaker (skip fixed staking)
+                            if staking_rule != 'fixed':
+                                dd_mult = compute_drawdown_multiplier(bankroll, peak_bankroll)
+                                if dd_mult < 1.0:
+                                    stake = stake * dd_mult
+                                    if lay_liability is not None:
+                                        lay_liability = lay_liability * dd_mult
+                                        exposure_val = lay_liability
 
                             # Avoid placing bet if stake is tiny or bankroll can't cover liability
                             required_capital = exposure_val if lay_liability is not None else stake
@@ -2878,13 +2879,14 @@ class ChronologicalBacktester:
                             p_liability = p_exposure
                             p_stake = p_exposure / (p_odds - 1.0)
 
-                # Apply drawdown circuit breaker
-                dd_mult = compute_drawdown_multiplier(state_ref['bankroll'], state_ref['peak_bankroll'])
-                if dd_mult < 1.0:
-                    p_stake = p_stake * dd_mult
-                    if p_liability is not None:
-                        p_liability = p_liability * dd_mult
-                        p_exposure = p_liability
+                # Apply drawdown circuit breaker (skip fixed staking)
+                if staking_rule != 'fixed':
+                    dd_mult = compute_drawdown_multiplier(state_ref['bankroll'], state_ref['peak_bankroll'])
+                    if dd_mult < 1.0:
+                        p_stake = p_stake * dd_mult
+                        if p_liability is not None:
+                            p_liability = p_liability * dd_mult
+                            p_exposure = p_liability
 
                 p_required = p_exposure if p_liability is not None else p_stake
                 if p_stake > 0.01 and state_ref['bankroll'] >= p_required:
