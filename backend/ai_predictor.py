@@ -638,92 +638,50 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
 def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value):
     """
     Calculates performance metrics for a filtered subset of bets.
-    Uses direct sum of original profits/stakes for accurate ROI prediction.
+    Always uses the user's current staking configuration — never reuses
+    historical stakes from the CSV (which may be from a different staking rule).
     """
     if len(df_sub) == 0:
         return None
 
-    has_original_stakes = 'stake' in df_sub.columns and df_sub['stake'].sum() > 0
+    # Always recalculate with the user's current stake_value.
+    # The CSV may contain stakes from a previous backtest (e.g. Kelly),
+    # but the optimization preview must reflect the user's chosen staking rule.
+    bankroll = initial_bankroll
+    peak_bankroll = initial_bankroll
+    max_drawdown = 0.0
+    total_staked = 0.0
+    wins = 0
+    profit_in_stakes = 0.0
+    total_bets = len(df_sub)
+    dates = df_sub['date'].values
+    equity_curve = [{'date': str(dates[0]), 'bankroll': round(initial_bankroll, 2)}]
 
-    if has_original_stakes:
-        # ROI via direct sum - most accurate prediction of real backtest ROI
-        total_profit_raw = float(df_sub['profit'].sum())
-        total_staked_raw = float(df_sub['stake'].sum())
-        wins = int((df_sub['profit'] > 0).sum())
-        total_bets = len(df_sub)
-        win_rate = (wins / total_bets * 100) if total_bets > 0 else 0.0
-        roi = (total_profit_raw / total_staked_raw * 100) if total_staked_raw > 0 else 0.0
+    for row in df_sub.to_dict('records'):
+        stake = float(stake_value)
+        bet_won = float(row['profit']) > 0
+        bookie_odds = float(row['odds'])
+        if stake > 0.01 and bankroll >= stake:
+            total_staked += stake
+            if bet_won:
+                wins += 1
+                profit = stake * (bookie_odds - 1.0)
+                bankroll += profit
+                profit_in_stakes += (bookie_odds - 1.0)
+            else:
+                profit = -stake
+                bankroll += profit
+                profit_in_stakes += -1.0
+            if bankroll > peak_bankroll:
+                peak_bankroll = bankroll
+            dd = (peak_bankroll - bankroll) / peak_bankroll if peak_bankroll > 0 else 0.0
+            if dd > max_drawdown:
+                max_drawdown = dd
+            equity_curve.append({'date': str(row['date']), 'bankroll': round(bankroll, 2)})
 
-        # Scale to initial_bankroll for equity curve / net_profit display
-        first_row = df_sub.iloc[0]
-        orig_first_br = float(first_row['bankroll']) - float(first_row['profit'])
-        if orig_first_br <= 0:
-            orig_first_br = initial_bankroll
-        scale = initial_bankroll / orig_first_br if orig_first_br > 0 else 1.0
-
-        bankroll = initial_bankroll
-        peak_bankroll = initial_bankroll
-        max_drawdown = 0.0
-        profit_in_stakes = 0.0
-        dates = df_sub['date'].values
-        equity_curve = [{'date': str(dates[0]), 'bankroll': round(initial_bankroll, 2)}]
-
-        for row in df_sub.to_dict('records'):
-            sp = float(row['profit']) * scale
-            ss = float(row['stake']) * scale
-            bookie_odds = float(row['odds'])
-            if ss > 0.01:
-                bankroll += sp
-                if sp > 0:
-                    profit_in_stakes += (bookie_odds - 1.0)
-                else:
-                    profit_in_stakes += -1.0
-                if bankroll > peak_bankroll:
-                    peak_bankroll = bankroll
-                dd = (peak_bankroll - bankroll) / peak_bankroll if peak_bankroll > 0 else 0.0
-                if dd > max_drawdown:
-                    max_drawdown = dd
-                equity_curve.append({'date': str(row['date']), 'bankroll': round(bankroll, 2)})
-
-        net_profit = bankroll - initial_bankroll
-
-    else:
-        # Fallback: fixed staking without recorded stakes
-        bankroll = initial_bankroll
-        peak_bankroll = initial_bankroll
-        max_drawdown = 0.0
-        total_staked_raw = 0.0
-        wins = 0
-        profit_in_stakes = 0.0
-        total_bets = len(df_sub)
-        dates = df_sub['date'].values
-        equity_curve = [{'date': str(dates[0]), 'bankroll': round(initial_bankroll, 2)}]
-
-        for row in df_sub.to_dict('records'):
-            stake = stake_value
-            bet_won = float(row['profit']) > 0
-            bookie_odds = float(row['odds'])
-            if stake > 0.01 and bankroll >= stake:
-                total_staked_raw += stake
-                if bet_won:
-                    wins += 1
-                    profit = stake * (bookie_odds - 1.0)
-                    bankroll += profit
-                    profit_in_stakes += (bookie_odds - 1.0)
-                else:
-                    profit = -stake
-                    bankroll += profit
-                    profit_in_stakes += -1.0
-                if bankroll > peak_bankroll:
-                    peak_bankroll = bankroll
-                dd = (peak_bankroll - bankroll) / peak_bankroll if peak_bankroll > 0 else 0.0
-                if dd > max_drawdown:
-                    max_drawdown = dd
-                equity_curve.append({'date': str(row['date']), 'bankroll': round(bankroll, 2)})
-
-        win_rate = (wins / total_bets * 100) if total_bets > 0 else 0.0
-        net_profit = bankroll - initial_bankroll
-        roi = (net_profit / total_staked_raw * 100) if total_staked_raw > 0 else 0.0
+    win_rate = (wins / total_bets * 100) if total_bets > 0 else 0.0
+    net_profit = bankroll - initial_bankroll
+    roi = (net_profit / total_staked * 100) if total_staked > 0 else 0.0
 
     losses = total_bets - wins
     return {
