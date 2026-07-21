@@ -720,7 +720,8 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
             'max_drawdown': round(max_drawdown * 100, 2),
             'total_bets': total_bets,
             'wins': wins,
-            'losses': losses
+            'losses': losses,
+            'final_bankroll': round(bankroll, 2)
         },
         'equity_curve': equity_curve
     }
