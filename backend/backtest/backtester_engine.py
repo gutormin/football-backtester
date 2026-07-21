@@ -1584,7 +1584,7 @@ class ChronologicalBacktester:
                                     'score': f"{int(fthg)}-{int(ftag)}",
                                     'market': market_label,
                                     'market_code': mkt,
-                                    'odds': round(bookie_odds, 2),
+                                    'odds': round(effective_odds, 2),
                                     'prob': round(model_prob * 100, 1),
                                     'ev': round(expected_value, 2),
                                     'stake': round(stake, 2),
