@@ -701,7 +701,7 @@ function renderBetsPage() {
             <td>${bet.odds.toFixed(2)}</td>
             <td>${bet.prob}%</td>
             <td>${bet.ev.toFixed(2)}</td>
-            <td>$${bet.stake.toFixed(2)}${bet.lay_liability != null ? '<br><small style="color:var(--warning);">(Liab.)</small>' : ''}</td>
+            <td>$${(bet.lay_liability != null ? bet.lay_liability : bet.stake).toFixed(2)}${bet.lay_liability != null ? '<br><small style="color:var(--warning);">(Liab.)</small>' : ''}</td>
             <td class="${profitClass}">${bet.profit >= 0 ? '+' : ''}$${bet.profit.toFixed(2)} ${winBadge}</td>
             <td>$${bet.bankroll.toFixed(2)}</td>
         `;

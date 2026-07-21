@@ -59,7 +59,10 @@ def compile_backtest_summary(bets_record, initial_bankroll, bankroll, total_stak
     win_rate = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0.0
     net_profit = bankroll - initial_bankroll
     yield_roi = (net_profit / total_staked * 100) if total_staked > 0 else 0.0
-    profit_in_stakes = sum(b['profit'] / b['stake'] for b in bets_record) if bets_record else 0.0
+    profit_in_stakes = sum(
+        b['profit'] / (b.get('lay_liability') or b['stake'])
+        for b in bets_record
+    ) if bets_record else 0.0
 
     # Calculate advanced financial metrics
     daily_profits = defaultdict(float)
