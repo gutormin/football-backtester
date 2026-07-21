@@ -391,9 +391,9 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
         bankroll = 1000.0
         peak_bankroll = 1000.0
         max_drawdown = 0.0
-        wins = 0
+        total_bets = 0
         total_staked = 0.0
-        
+
         for row in df_sub.to_dict('records'):
             odds = float(row['odds'])
             won = float(row['profit']) > 0
@@ -402,31 +402,32 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
             required = stake
             if is_lay and odds > 1.001:
                 required = stake  # liability is the exposure
-            total_staked += required
-            if won:
-                wins += 1
-                if is_lay:
-                    profit = stake / (odds - 1.0)
+            if stake > 0.01 and bankroll >= required:
+                total_bets += 1
+                total_staked += required
+                if won:
+                    if is_lay:
+                        profit = stake / (odds - 1.0)
+                    else:
+                        profit = stake * (odds - 1.0)
+                    bankroll += profit
                 else:
-                    profit = stake * (odds - 1.0)
-                bankroll += profit
-            else:
-                profit = -required
-                bankroll += profit
-            
-            if bankroll > peak_bankroll:
-                peak_bankroll = bankroll
-            dd = (peak_bankroll - bankroll) / peak_bankroll if peak_bankroll > 0 else 0.0
-            if dd > max_drawdown:
-                max_drawdown = dd
-        
+                    profit = -required
+                    bankroll += profit
+
+                if bankroll > peak_bankroll:
+                    peak_bankroll = bankroll
+                dd = (peak_bankroll - bankroll) / peak_bankroll if peak_bankroll > 0 else 0.0
+                if dd > max_drawdown:
+                    max_drawdown = dd
+
         net_profit = bankroll - 1000.0
         roi = (net_profit / total_staked * 100) if total_staked > 0 else 0.0
         return {
             'roi': roi,
             'max_drawdown': max_drawdown,
             'net_profit': net_profit,
-            'total_bets': len(df_sub)
+            'total_bets': total_bets
         }
 
     # Baseline flat staking evaluation
@@ -660,8 +661,9 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
     max_drawdown = 0.0
     total_staked = 0.0
     wins = 0
+    losses = 0
     profit_in_stakes = 0.0
-    total_bets = len(df_sub)
+    total_bets = 0
     dates = df_sub['date'].values
     equity_curve = [{'date': str(dates[0]), 'bankroll': round(initial_bankroll, 2)}]
 
@@ -673,20 +675,18 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
         is_lay = mkt.startswith('lay_')
 
         if is_lay and bookie_odds > 1.001:
-            # Lay liability = user's stake_value (fixed max loss)
             lay_liability = stake
-            # Required capital = liability
             required_capital = lay_liability
         else:
             lay_liability = None
             required_capital = stake
 
         if stake > 0.01 and bankroll >= required_capital:
+            total_bets += 1
             total_staked += required_capital
             if bet_won:
                 wins += 1
                 if is_lay:
-                    # Backer's stake = liability / (odds - 1.0)
                     profit = lay_liability / (bookie_odds - 1.0)
                     profit_in_stakes += profit / lay_liability if lay_liability > 0 else 0
                 else:
@@ -694,6 +694,7 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
                     profit_in_stakes += (bookie_odds - 1.0)
                 bankroll += profit
             else:
+                losses += 1
                 if is_lay:
                     profit = -lay_liability
                 else:
@@ -710,8 +711,6 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
     win_rate = (wins / total_bets * 100) if total_bets > 0 else 0.0
     net_profit = bankroll - initial_bankroll
     roi = (net_profit / total_staked * 100) if total_staked > 0 else 0.0
-
-    losses = total_bets - wins
     return {
         'summary': {
             'net_profit': round(net_profit, 2),
