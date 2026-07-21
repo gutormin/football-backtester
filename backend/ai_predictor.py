@@ -397,13 +397,21 @@ def optimize_strategy_parameters(bets_record, current_val_threshold, initial_ban
         for row in df_sub.to_dict('records'):
             odds = float(row['odds'])
             won = float(row['profit']) > 0
-            total_staked += stake
+            mkt = str(row.get('market_code', row.get('market', '')))
+            is_lay = mkt.startswith('lay_')
+            required = stake
+            if is_lay and odds > 1.001:
+                required = stake  # liability is the exposure
+            total_staked += required
             if won:
                 wins += 1
-                profit = stake * (odds - 1.0)
+                if is_lay:
+                    profit = stake / (odds - 1.0)
+                else:
+                    profit = stake * (odds - 1.0)
                 bankroll += profit
             else:
-                profit = -stake
+                profit = -required
                 bankroll += profit
             
             if bankroll > peak_bankroll:
@@ -661,15 +669,35 @@ def recalculate_sub_backtest(df_sub, initial_bankroll, staking_rule, stake_value
         stake = float(stake_value) if stake_value is not None else 10.0
         bet_won = float(row['profit']) > 0
         bookie_odds = float(row['odds'])
-        if stake > 0.01 and bankroll >= stake:
-            total_staked += stake
+        mkt = str(row.get('market_code', row.get('market', '')))
+        is_lay = mkt.startswith('lay_')
+
+        if is_lay and bookie_odds > 1.001:
+            # Lay liability = user's stake_value (fixed max loss)
+            lay_liability = stake
+            # Required capital = liability
+            required_capital = lay_liability
+        else:
+            lay_liability = None
+            required_capital = stake
+
+        if stake > 0.01 and bankroll >= required_capital:
+            total_staked += required_capital
             if bet_won:
                 wins += 1
-                profit = stake * (bookie_odds - 1.0)
+                if is_lay:
+                    # Backer's stake = liability / (odds - 1.0)
+                    profit = lay_liability / (bookie_odds - 1.0)
+                    profit_in_stakes += profit / lay_liability if lay_liability > 0 else 0
+                else:
+                    profit = stake * (bookie_odds - 1.0)
+                    profit_in_stakes += (bookie_odds - 1.0)
                 bankroll += profit
-                profit_in_stakes += (bookie_odds - 1.0)
             else:
-                profit = -stake
+                if is_lay:
+                    profit = -lay_liability
+                else:
+                    profit = -stake
                 bankroll += profit
                 profit_in_stakes += -1.0
             if bankroll > peak_bankroll:
