@@ -7,6 +7,7 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 from collections import defaultdict
+from .data_loader import get_futpython_api_key
 from .backtester import ChronologicalBacktester
 from .history_manager import load_history
 from .ai_predictor import (predict_strategy_sustainability, compute_brier_score,
@@ -141,7 +142,7 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
                 max_odds=p.get('maxOdds', p.get('max_odds', 50.0)),
                 data_source=p.get('data_source', 'football-data'),
                 use_ml=p.get('use_ml', False),
-                futpython_api_key=p.get('futpython_api_key', ''),
+                futpython_api_key=get_futpython_api_key(),
                 min_odds_h=p.get('minOddsH', p.get('min_odds_h')), max_odds_h=p.get('maxOddsH', p.get('max_odds_h')),
                 min_odds_d=p.get('minOddsD', p.get('min_odds_d')), max_odds_d=p.get('maxOddsD', p.get('max_odds_d')),
                 min_odds_a=p.get('minOddsA', p.get('min_odds_a')), max_odds_a=p.get('maxOddsA', p.get('max_odds_a')),
