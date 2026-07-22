@@ -744,6 +744,10 @@ def _build_daily_blocks(df):
         sorted_odds = df['odds'].values[order].astype(float)
         sorted_probs = df['prob'].values[order].astype(float)
         sorted_won = df['won'].values[order].astype(bool)
+        sorted_lay = np.array([
+            str(df.iloc[idx].get('market_code', df.iloc[idx].get('market', ''))).startswith('lay_')
+            for idx in order
+        ])
         daily_blocks = []
         i = 0
         while i < len(sorted_dates):
@@ -755,12 +759,24 @@ def _build_daily_blocks(df):
                 'odds': sorted_odds[i:j],
                 'prob': sorted_probs[i:j],
                 'won': sorted_won[i:j],
+                'is_lay': sorted_lay[i:j],
             })
             i = j
         return daily_blocks
     except Exception:
-        return [{'odds': np.array([o]), 'prob': np.array([p]), 'won': np.array([w])}
-                for o, p, w in zip(df['odds'].values, df['prob'].values, df['won'].values)]
+        fallback_blocks = []
+        for idx in range(len(df)):
+            row_o = df['odds'].values[idx]
+            row_p = df['prob'].values[idx]
+            row_w = df['won'].values[idx]
+            mkt = str(df.iloc[idx].get('market_code', df.iloc[idx].get('market', '')))
+            fallback_blocks.append({
+                'odds': np.array([row_o]),
+                'prob': np.array([row_p]),
+                'won': np.array([row_w]),
+                'is_lay': np.array([mkt.startswith('lay_')])
+            })
+        return fallback_blocks
 
 
 def _simulate_path_dependent(day_blocks, n_bets, initial_bankroll, staking_rule, stake_value):
@@ -792,11 +808,17 @@ def _simulate_path_dependent(day_blocks, n_bets, initial_bankroll, staking_rule,
             odds_i = day_odds[i]
             prob_i = day_prob[i]
             won_i = day_won[i]
+            is_lay = day.get('is_lay', np.array([False] * len(day_odds)))[i] if 'is_lay' in day else False
 
             if staking_rule == 'fixed':
-                stake = stake_value
+                lay_liability = stake_value if is_lay else None
+                backer_stake = stake_value / (odds_i - 1.0) if (is_lay and odds_i > 1.001) else stake_value
+                required = lay_liability if lay_liability is not None else backer_stake
             elif staking_rule == 'proportional':
-                stake = bankroll * (stake_value / 100.0)
+                liability_val = bankroll * (stake_value / 100.0)
+                lay_liability = liability_val if is_lay else None
+                backer_stake = liability_val / (odds_i - 1.0) if (is_lay and odds_i > 1.001) else liability_val
+                required = lay_liability if lay_liability is not None else backer_stake
             elif staking_rule == 'kelly':
                 mult_k = stake_value
                 if odds_i > 1.0:
@@ -805,13 +827,26 @@ def _simulate_path_dependent(day_blocks, n_bets, initial_bankroll, staking_rule,
                     stake = bankroll * f_star * mult_k
                 else:
                     stake = 0.0
+                if is_lay and odds_i > 1.001:
+                    lay_liability = stake * (odds_i - 1.0)
+                    backer_stake = stake
+                    required = lay_liability
+                else:
+                    lay_liability = None
+                    backer_stake = stake
+                    required = stake
             else:
-                stake = 0.0
+                lay_liability = None
+                backer_stake = 0.0
+                required = 0.0
 
-            stake = min(stake, bankroll * 0.10)
+            required = min(required, bankroll * 0.10)
 
-            if stake > 0.01 and bankroll >= stake:
-                profit = stake * (odds_i - 1.0) if won_i else -stake
+            if required > 0.01 and bankroll >= required:
+                if is_lay and odds_i > 1.001:
+                    profit = backer_stake if won_i else -required
+                else:
+                    profit = backer_stake * (odds_i - 1.0) if won_i else -required
                 bankroll += profit
 
             if bankroll < initial_bankroll * 0.10:
@@ -849,11 +884,28 @@ def run_monte_carlo_simulation(bets_record, initial_bankroll=1000.0, staking_rul
 
     if staking_rule == 'fixed':
         # Fast path: stakes are constant, pre-compute profits
+        # Determine which bets are Lay (use liability math)
+        is_lay_col = np.array([
+            str(bets_record[i].get('market_code', bets_record[i].get('market', ''))).startswith('lay_')
+            for i in range(n_bets)
+        ])
         profits = np.zeros(n_bets)
         for i in range(n_bets):
-            stake = min(stake_value, initial_bankroll * 0.10)
-            if stake > 0.01:
-                profits[i] = stake * (df['odds'].values[i] - 1.0) if df['won'].values[i] else -stake
+            odds_i = df['odds'].values[i]
+            stake = stake_value
+            is_lay = is_lay_col[i]
+            if is_lay and odds_i > 1.001:
+                required = stake                          # liability
+            else:
+                required = stake
+            # Cap stake at 10% bankroll
+            if required > initial_bankroll * 0.10:
+                required = min(stake, initial_bankroll * 0.10)
+            if required > 0.01:
+                if is_lay and odds_i > 1.001:
+                    profits[i] = stake / (odds_i - 1.0) if df['won'].values[i] else -required
+                else:
+                    profits[i] = required * (odds_i - 1.0) if df['won'].values[i] else -required
 
         # Convert daily blocks to profit arrays for fast bootstrap
         try:
@@ -861,9 +913,14 @@ def run_monte_carlo_simulation(bets_record, initial_bankroll=1000.0, staking_rul
             for block in daily_blocks:
                 block_profits = np.zeros(len(block['odds']))
                 for i in range(len(block['odds'])):
-                    stake_f = min(stake_value, initial_bankroll * 0.10)
-                    if stake_f > 0.01:
-                        block_profits[i] = stake_f * (block['odds'][i] - 1.0) if block['won'][i] else -stake_f
+                    odds_i = block['odds'][i]
+                    is_lay = block['is_lay'][i]
+                    required_f = min(stake_value, initial_bankroll * 0.10)
+                    if required_f > 0.01:
+                        if is_lay and odds_i > 1.001:
+                            block_profits[i] = stake_value / (odds_i - 1.0) if block['won'][i] else -required_f
+                        else:
+                            block_profits[i] = required_f * (odds_i - 1.0) if block['won'][i] else -required_f
                 profit_blocks.append(block_profits)
         except Exception:
             profit_blocks = [np.array([p]) for p in profits]
