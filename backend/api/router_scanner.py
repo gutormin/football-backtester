@@ -1089,11 +1089,13 @@ def get_live_steam_moves(req: LiveSteamRequest):
                         
                         if trigger_drop >= req.minDropPct:
                             sport_key = match_info.get('sport', '')
+                            from ..live_odds_tracker import map_sport_to_league_code
+                            mapped_league = map_sport_to_league_code(sport_key)
                             from ..smart_money import calculate_confidence_score, classify_drop_profile, calculate_odds_metrics
-                            score, confidence_level, tier_name = calculate_confidence_score(trigger_drop, sport_key)
+                            score, confidence_level, tier_name = calculate_confidence_score(trigger_drop, mapped_league)
                             sharpness_score, profile_type = classify_drop_profile(
                                 drop_pct=trigger_drop,
-                                league_identifier=sport_key,
+                                league_identifier=mapped_league,
                                 commence_time_str=commence_time,
                                 bookmaker_name=bookie,
                                 match_entry=match_info,
@@ -1117,8 +1119,7 @@ def get_live_steam_moves(req: LiveSteamRequest):
                             if req.profileFilter == 'squares' and profile_type != 'Squares':
                                 continue
                                 
-                            from ..live_odds_tracker import map_sport_to_league_code
-                            league_code = map_sport_to_league_code(sport_key)
+                            league_code = mapped_league
                             
                             results.append({
                                 'match': title,

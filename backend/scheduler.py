@@ -658,10 +658,13 @@ async def run_automatic_arbitrage_scan():
     
     try:
         # Puxar oportunidades
-        opps = await loop.run_in_executor(None, fetch_arbitrage_opportunities)
+        result = await loop.run_in_executor(None, fetch_arbitrage_opportunities)
     except Exception as e:
         return {"status": "error", "message": f"Erro ao buscar arbitragem: {e}"}
-        
+
+    # fetch_arbitrage_opportunities returns dict with 'opportunities' key
+    opps = result.get('opportunities', []) if isinstance(result, dict) else result
+
     if not opps:
         return {"status": "success", "message": "Nenhuma arbitragem encontrada."}
         
@@ -786,7 +789,7 @@ async def run_automatic_dutching_scan():
     import os
     from dotenv import load_dotenv
     load_dotenv()
-    token = get_api_token() or os.getenv('THE_ODDS_API_KEY')
+    token = os.getenv('THE_ODDS_API_KEY')
     
     try:
         # Puxar oportunidades via The Odds API (live)

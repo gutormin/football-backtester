@@ -370,12 +370,13 @@ def fetch_and_update_live_odds() -> None:
                             if trigger_drop >= 5.0:
                                 try:
                                     from .smart_money import calculate_confidence_score, classify_drop_profile, calculate_odds_metrics
+                                    mapped_league = map_sport_to_league_code(sport_key)
                                     score, confidence_level, tier_name = calculate_confidence_score(
-                                        trigger_drop, sport_key
+                                        trigger_drop, mapped_league
                                     )
                                     sharpness_score, profile_type = classify_drop_profile(
                                         drop_pct=trigger_drop,
-                                        league_identifier=sport_key,
+                                        league_identifier=mapped_league,
                                         commence_time_str=commence_time,
                                         bookmaker_name=bookie_name,
                                         match_entry=match_entry,
@@ -393,8 +394,6 @@ def fetch_and_update_live_odds() -> None:
                                         date_str = dt.astimezone().strftime('%d/%m %H:%M')
                                     except Exception:
                                         date_str = commence_time
-
-                                    mapped_league = map_sport_to_league_code(sport_key)
 
                                     alert_entry = {
                                         'date':             date_str,
