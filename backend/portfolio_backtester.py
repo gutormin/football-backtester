@@ -80,7 +80,19 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
         logger.info(f"Usando {len(selected_strategies)} estratégias inline (DB vazio pós-deploy).")
 
     if not selected_strategies:
-        return {"error": "Nenhuma estratégia válida selecionada."}
+        return {
+            "error": "Nenhuma estratégia válida selecionada.",
+            "per_strategy_status": {
+                sid: {"name": "Desconhecida", "status": "not_found", "bets": 0, "error_message": "ID não encontrado no histórico."}
+                for sid in strategy_ids
+            }
+        }
+
+    # Track strategy_ids that were requested but NOT found in history
+    found_ids = {s['id'] for s in selected_strategies}
+    not_found_ids = [sid for sid in strategy_ids if sid not in found_ids]
+    if not_found_ids:
+        logger.warning(f"Portfolio: {len(not_found_ids)} IDs não encontrados no histórico: {not_found_ids}")
 
     # Deduplicate equivalent market pairs: lay_X and lay_X_ex are identical aliases
     LAY_ALIASES = {
@@ -119,14 +131,52 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
 
     logger.info(f"Rodando backtests individuais para {len(selected_strategies)} estratégias...")
 
-    # Collect aggregated stats from individual backtests (matches analyzed, seasons)
+    # Per-strategy status tracking — NEVER silently skip a strategy.
+    # The frontend needs to know exactly what happened with each one.
+    per_strategy_status = {}
+    for s in selected_strategies:
+        per_strategy_status[s['id']] = {
+            'name': s['name'],
+            'status': 'pending',
+            'bets': 0,
+            'error_message': None,
+            'matches_in_file': 0,
+            'seasons_analyzed': [],
+        }
+    for nfid in not_found_ids:
+        per_strategy_status[nfid] = {
+            'name': 'Desconhecida',
+            'status': 'not_found',
+            'bets': 0,
+            'error_message': 'ID não encontrado no histórico.',
+            'matches_in_file': 0,
+            'seasons_analyzed': [],
+        }
+
     total_matches_in_file = 0
     all_seasons = set()
     for s in selected_strategies:
+        sid = s['id']
         try:
             p = s['params']
             raw_mkt = p.get('market', '')
             mkt_str = raw_mkt[0] if isinstance(raw_mkt, list) and len(raw_mkt) > 0 else (raw_mkt if not isinstance(raw_mkt, list) else '')
+
+            if not mkt_str:
+                per_strategy_status[sid]['status'] = 'error'
+                per_strategy_status[sid]['error_message'] = 'Estratégia sem mercado definido (market vazio).'
+                logger.warning(f"Portfolio: estratégia '{s['name']}' ignorada — mercado vazio.")
+                continue
+
+            if not p.get('leagues', []):
+                per_strategy_status[sid]['status'] = 'error'
+                per_strategy_status[sid]['error_message'] = 'Estratégia sem liga definida (leagues vazio).'
+                logger.warning(f"Portfolio: estratégia '{s['name']}' ignorada — liga vazia.")
+                continue
+
+            data_source = p.get('data_source', 'football-data')
+            futpython_api_key = get_futpython_api_key() if data_source == 'futpython' else p.get('futpython_api_key', '')
+
             bt = ChronologicalBacktester()
             res = bt.run(
                 leagues=p.get('leagues', []),
@@ -140,32 +190,55 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
                 odds_source=p.get('oddsSource', p.get('odds_source', 'B365')),
                 min_odds=p.get('minOdds', p.get('min_odds', 1.0)),
                 max_odds=p.get('maxOdds', p.get('max_odds', 50.0)),
-                data_source=p.get('data_source', 'football-data'),
+                data_source=data_source,
                 use_ml=p.get('use_ml', False),
-                futpython_api_key=get_futpython_api_key(),
+                futpython_api_key=futpython_api_key,
                 min_odds_h=p.get('minOddsH', p.get('min_odds_h')), max_odds_h=p.get('maxOddsH', p.get('max_odds_h')),
                 min_odds_d=p.get('minOddsD', p.get('min_odds_d')), max_odds_d=p.get('maxOddsD', p.get('max_odds_d')),
                 min_odds_a=p.get('minOddsA', p.get('min_odds_a')), max_odds_a=p.get('maxOddsA', p.get('max_odds_a')),
                 min_odds_over25=p.get('minOddsOver25', p.get('min_odds_over25')), max_odds_over25=p.get('maxOddsOver25', p.get('max_odds_over25')),
                 min_odds_under25=p.get('minOddsUnder25', p.get('min_odds_under25')), max_odds_under25=p.get('maxOddsUnder25', p.get('max_odds_under25'))
             )
-            if "error" not in res and "bets" in res:
+
+            if "error" in res:
+                per_strategy_status[sid]['status'] = 'error'
+                per_strategy_status[sid]['error_message'] = res['error']
+                logger.warning(f"Portfolio: estratégia '{s['name']}' retornou erro: {res['error']}")
+                continue
+
+            if "bets" in res:
                 for b in res['bets']:
-                    b['strategy_id'] = s['id']
+                    b['strategy_id'] = sid
                     b['strategy_name'] = s['name']
                     all_bets.append(b)
+                per_strategy_status[sid]['bets'] = len(res['bets'])
+                per_strategy_status[sid]['status'] = 'success'
+            else:
+                # Backtester ran without error but produced no bets key — treat as 0 bets
+                per_strategy_status[sid]['status'] = 'success'
+                per_strategy_status[sid]['bets'] = 0
+
             # Collect matches/seasons from individual summary
-            s_summary = res.get('summary', {}) if "error" not in res else {}
+            s_summary = res.get('summary', {})
+            per_strategy_status[sid]['matches_in_file'] = s_summary.get('matches_total_in_file', 0)
+            per_strategy_status[sid]['seasons_analyzed'] = s_summary.get('seasons_analyzed', [])
             total_matches_in_file = max(total_matches_in_file, s_summary.get('matches_total_in_file', 0))
             for season in s_summary.get('seasons_analyzed', []):
                 all_seasons.add(str(season))
+
         except Exception as e:
             import traceback
-            logger.error(f"Error processing strategy {s.get('id','?')} '{s.get('name','?')}': {e}\n{traceback.format_exc()}")
-            continue
+            traceback.print_exc()
+            per_strategy_status[sid]['status'] = 'error'
+            per_strategy_status[sid]['error_message'] = str(e)
+            logger.error(f"Portfolio: exceção na estratégia '{s.get('name','?')}': {e}")
 
     if not all_bets:
-        return {"error": "Nenhuma aposta gerada pelas estratégias selecionadas."}
+        # Return detailed per-strategy status so the frontend knows WHY
+        return {
+            "error": "Nenhuma aposta gerada pelas estratégias selecionadas.",
+            "per_strategy_status": per_strategy_status,
+        }
 
     # Sort all bets chronologically.
     # Using (date, market, match_id) ensures that bets on the same day are
@@ -572,5 +645,6 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
         "max_portfolio_exposure_pct": round(MAX_PORTFOLIO_EXPOSURE * 100, 0),
         "dedup_warnings": dedup_warnings,
         "matches_total_in_file": total_matches_in_file,
-        "seasons_analyzed": sorted(all_seasons, key=lambda x: int(x) if x.isdigit() else 0)
+        "seasons_analyzed": sorted(all_seasons, key=lambda x: int(x) if x.isdigit() else 0),
+        "per_strategy_status": per_strategy_status,
     }
