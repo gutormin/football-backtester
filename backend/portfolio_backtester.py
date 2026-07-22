@@ -290,6 +290,7 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
                 profit = -stake
 
         b['stake'] = round(stake, 2)
+        b['lay_liability'] = round(lay_liability, 2) if lay_liability is not None else None
         b['profit'] = round(profit, 2)
         b['bankroll'] = round(bankroll + idle_cash + profit, 2)
         bankroll += profit
