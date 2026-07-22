@@ -16,7 +16,7 @@ load_dotenv()
 API_KEY = os.getenv('THE_ODDS_API_KEY')
 SPORT   = 'upcoming'
 REGIONS = 'eu,uk,us'
-MARKETS = 'h2h,spreads,totals,btts,draw_no_bet'
+MARKETS = 'h2h,spreads,totals'
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  BASELINE IMUTÁVEL
