@@ -74,10 +74,25 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
     history = load_history()
     selected_strategies = [s for s in history if s['id'] in strategy_ids]
 
-    # Fallback: use inline strategies when server DB is empty (post-deploy cold start)
-    if not selected_strategies and strategies_inline:
+    # CRITICAL: When strategies_inline is provided and the DB doesn't have ALL requested IDs,
+    # use strategies_inline as the authoritative source. This handles the case where the
+    # frontend's localStorage IDs differ from the Render PostgreSQL IDs (different UUIDs
+    # generated on different machines). Without this, a partial DB match (e.g., 1 out of 3
+    # IDs found) causes the other 2 strategies to be silently dropped.
+    missing_ids = [sid for sid in strategy_ids if sid not in {s['id'] for s in selected_strategies}]
+    if missing_ids and strategies_inline:
+        # Build a merged set: DB strategies that matched + inline strategies for the missing IDs
+        inline_map = {s['id']: s for s in strategies_inline}
+        for mid in missing_ids:
+            if mid in inline_map:
+                selected_strategies.append(inline_map[mid])
+        logger.info(
+            f"Portfolio: {len(missing_ids)} IDs não encontrados no DB, "
+            f"completados via strategies_inline ({len(selected_strategies)} total)."
+        )
+    elif not selected_strategies and strategies_inline:
         selected_strategies = strategies_inline
-        logger.info(f"Usando {len(selected_strategies)} estratégias inline (DB vazio pós-deploy).")
+        logger.info(f"Portfolio: usando {len(selected_strategies)} estratégias inline (DB vazio).")
 
     if not selected_strategies:
         return {
