@@ -940,6 +940,12 @@ async function runScanner(scanType) {
 
         window.lastScanParams = requestData;
 
+        // Reset optimization state on new scanner run — prevents old
+        // suggestions from filtering against stale appliedOptimizationSuggestions
+        if (window.appliedOptimizationSuggestions) { window.appliedOptimizationSuggestions.clear(); }
+        window.allOptimizationSuggestions = [];
+        window._optimizationCache = {};
+
         
 
         showToast("Escaneamento concluído!", "success");
@@ -2948,6 +2954,18 @@ function renderOptimizedResultsToLaboratory(sug) {
     const biasBanner = document.getElementById('selection-bias-banner');
     if (biasBanner) biasBanner.style.display = 'none';
 
+    // Show AI panel with "recalculating" state while full backtest runs
+    const aiPanel = document.getElementById('ai-analytics-panel');
+    if (aiPanel) aiPanel.style.display = 'block';
+    const aiChecklist = document.getElementById('ai-checklist-container');
+    if (aiChecklist) aiChecklist.innerHTML = '<div class="ai-report-text" style="color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Recalculando análise com parâmetros otimizados...</div>';
+    const mcProfit = document.getElementById('mc-profit-probability');
+    if (mcProfit) mcProfit.innerText = '...';
+    const mcRuin = document.getElementById('mc-ruin-probability');
+    if (mcRuin) mcRuin.innerText = '...';
+    const mcHalfRuin = document.getElementById('mc-half-ruin-probability');
+    if (mcHalfRuin) mcHalfRuin.innerText = '...';
+
     const btnRun = document.getElementById('btn-run-backtest');
     if (btnRun) { btnRun.innerHTML = '<i class="fa-solid fa-flask"></i> Executar Backtest'; btnRun.disabled = false; }
     const btnTopbar = document.getElementById('btn-topbar-run');
@@ -3320,7 +3338,18 @@ function clearDashboard() {
         // 5. Clear backtest state (excluding Scanner)
         if (typeof window.lastBacktestSummary !== 'undefined') { window.lastBacktestSummary = null; }
         if (typeof window.lastBacktestParams !== 'undefined') { window.lastBacktestParams = null; }
-        
+
+        // Clear optimization in-memory state so old filters don't leak into new backtests
+        if (window.appliedOptimizationSuggestions) { window.appliedOptimizationSuggestions.clear(); }
+        window.allOptimizationSuggestions = [];
+        window._optimizationCache = {};
+
+        // Reset optimization panels UI
+        const optList = document.getElementById('opt-suggestions-list');
+        if (optList) optList.innerHTML = '';
+        const optTable = document.getElementById('opt-comparison-table-container');
+        if (optTable) optTable.innerHTML = '';
+
         safeSetDisplay('btn-export-backtest', 'none');
         safeSetHTML('eqs-table-container', '');
 
