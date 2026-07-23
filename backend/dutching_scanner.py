@@ -258,7 +258,15 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         m['_league_code'] = league_code
                     matches_found.extend(data)
                 elif response.status_code == 401:
-                    api_errors.append(f'Chave de API inválida (HTTP 401). Verifique THE_ODDS_API_KEY.')
+                    try:
+                        body = response.json()
+                        error_code = body.get('error_code', '')
+                    except Exception:
+                        error_code = ''
+                    if error_code == 'OUT_OF_USAGE_CREDITS':
+                        api_errors.append('Créditos da The Odds API esgotados. O plano gratuito renova mensalmente.')
+                    else:
+                        api_errors.append('Chave de API inválida (HTTP 401). Verifique THE_ODDS_API_KEY.')
                     break
                 else:
                     api_errors.append(f'{sport_key}: HTTP {response.status_code}')

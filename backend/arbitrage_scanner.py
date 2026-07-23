@@ -222,6 +222,15 @@ def fetch_arbitrage_opportunities(allowed_bookies=None):
 
         if response.status_code == 422:
             continue  # no upcoming matches for this league
+        if response.status_code == 401:
+            try:
+                body = response.json()
+                error_code = body.get('error_code', '')
+            except Exception:
+                error_code = ''
+            if error_code == 'OUT_OF_USAGE_CREDITS':
+                return [{'error': 'no_credits', 'message': 'Créditos da The Odds API esgotados. O plano gratuito renova mensalmente. Acesse https://the-odds-api.com para ver seu plano.'}]
+            return [{'error': 'invalid_api_key', 'message': 'Chave de API inválida. Verifique THE_ODDS_API_KEY no ambiente do Render.'}]
         if response.status_code != 200:
             if response.status_code == 429:
                 logger.warning(f"Rate limit atingido em {sport_key}, parando scan")

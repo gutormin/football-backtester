@@ -221,8 +221,19 @@ def fetch_and_update_live_odds() -> None:
 
     try:
         response = _fetch_odds(url)
+        if response.status_code == 401:
+            try:
+                body = response.json()
+                error_code = body.get('error_code', '')
+            except Exception:
+                error_code = ''
+            if error_code == 'OUT_OF_USAGE_CREDITS':
+                logger.error("Smart Money: Créditos da The Odds API esgotados. O plano gratuito renova mensalmente.")
+            else:
+                logger.error(f"Smart Money: Chave de API inválida (HTTP 401). Verifique THE_ODDS_API_KEY.")
+            return
         if response.status_code != 200:
-            logger.error(f"API Error {response.status_code}: {response.text}")
+            logger.error(f"Smart Money API Error {response.status_code}: {response.text}")
             return
 
         matches = response.json()

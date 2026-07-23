@@ -665,6 +665,9 @@ async def run_automatic_arbitrage_scan():
     # fetch_arbitrage_opportunities returns dict with 'opportunities' key
     opps = result.get('opportunities', []) if isinstance(result, dict) else result
 
+    if isinstance(opps, list) and opps and 'error' in opps[0]:
+        return {"status": "error", "message": opps[0].get('message', 'Erro desconhecido na API.')}
+
     if not opps:
         return {"status": "success", "message": "Nenhuma arbitragem encontrada."}
         
@@ -797,9 +800,12 @@ async def run_automatic_dutching_scan():
     except Exception as e:
         return {"status": "error", "message": f"Erro ao buscar Dutching: {e}"}
         
+    if isinstance(opps, list) and opps and 'error' in opps[0]:
+        return {"status": "error", "message": opps[0].get('message', 'Erro desconhecido na API.')}
+
     if not opps:
         return {"status": "success", "message": "Nenhuma oportunidade de Dutching encontrada."}
-        
+
     sent_tips = get_telegram_dutching_tips()
     sent_lookup = set()
     for t in sent_tips:
