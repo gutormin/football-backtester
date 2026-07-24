@@ -21,6 +21,7 @@ from .form_tracker import update_form, calculate_xg_ratings, calculate_motivatio
 from .metrics import compile_backtest_summary, compile_parallel_scan_summary
 
 _FACTORIALS = [math.factorial(i) for i in range(16)]
+_DEFAULT_MAX_GOALS = 8
 
 def get_futpython_ah_odd(row, line, side="Home"):
     if pd.isna(line):
@@ -585,7 +586,7 @@ class ChronologicalBacktester:
             prob_over_05_ht = bundle['prob_over_05_ht']; prob_over_15_ht = bundle['prob_over_15_ht']
             rho = bundle['rho']
             avg_h_goals = bundle['avg_h_goals']; avg_a_goals = bundle['avg_a_goals']
-            max_goals = bundle.get('max_goals', 8)
+            max_goals = bundle.get('max_goals', _DEFAULT_MAX_GOALS)
 
             # Lazy loading of estimated odds from the solver
             est_odds = None
@@ -2400,7 +2401,7 @@ class ChronologicalBacktester:
             prob_h_ht = bundle['prob_h_ht']; prob_d_ht = bundle['prob_d_ht']; prob_a_ht = bundle['prob_a_ht']
             prob_over_05_ht = bundle['prob_over_05_ht']; prob_over_15_ht = bundle['prob_over_15_ht']
             rho = bundle['rho']
-            max_goals = bundle.get('max_goals', 8)
+            max_goals = bundle.get('max_goals', _DEFAULT_MAX_GOALS)
 
             est_odds = None
 
@@ -2411,12 +2412,15 @@ class ChronologicalBacktester:
             expected_away_corners = np.mean(leg_a_corners) if leg_a_corners else 4.5
             corners_probs = compute_corners_probs(expected_home_corners, expected_away_corners)
 
+            _mg = bundle.get('max_goals', _DEFAULT_MAX_GOALS)
+
             def eval_market(mkt):
                 nonlocal est_odds
+                max_goals = _mg  # local binding, nunca falha via closure
                 model_prob = 0.0
                 bookie_odds = np.nan
                 bet_won = False
-                
+
                 # Check for missing HT data for HT markets
                 if mkt.startswith('ht_') and (pd.isna(hthg) or pd.isna(htag)):
                     _exstats["markets_skipped_ht_no_data"] += 1
