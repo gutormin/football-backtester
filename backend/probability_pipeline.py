@@ -118,6 +118,7 @@ class MatchProbabilityBundle:
             'prob_matrix_ht': self.prob_matrix_ht,
             'prob_h_ht': self.prob_h_ht, 'prob_d_ht': self.prob_d_ht, 'prob_a_ht': self.prob_a_ht,
             'prob_over_05_ht': self.prob_over_05_ht, 'prob_over_15_ht': self.prob_over_15_ht,
+            'max_goals': self.max_goals,
             'rho': self.rho, 'avg_h_goals': self.avg_h_goals, 'avg_a_goals': self.avg_a_goals,
         }
 
