@@ -359,9 +359,13 @@ def run_portfolio(strategy_ids, initial_bankroll=1000.0, risk_method='fixed_1', 
             elif risk_method == 'kelly_quarter':
                 lay_liability = stake * (bet_odds - 1.0)  # Kelly already backer's stake
 
-        # Bankroll check: for lay, verify against liability
+        # Bankroll check: verify against TOTAL portfolio (not per-strategy slice).
+        # Per-strategy allocated_bankroll can go negative during drawdowns, but the
+        # portfolio as a whole still has capital. The user configured risk relative
+        # to the full bankroll, not a partitioned slice.
         required = lay_liability if lay_liability is not None else stake
-        if strat_bankroll < required or strat_bankroll < 1.0:
+        total_bankroll_current = bankroll + idle_cash
+        if total_bankroll_current < required or total_bankroll_current < 1.0:
             b['stake'] = 0.0
             b['profit'] = 0.0
             continue
