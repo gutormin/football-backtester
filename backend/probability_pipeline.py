@@ -79,6 +79,7 @@ class MatchProbabilityBundle:
     prob_over_55: float
     prob_btts_yes: float
     prob_matrix_ht: np.ndarray
+    max_goals: int
     prob_h_ht: float
     prob_d_ht: float
     prob_a_ht: float
@@ -653,6 +654,7 @@ class ProbabilityPipeline:
             prob_matrix_ht=prob_matrix_ht,
             prob_h_ht=prob_h_ht, prob_d_ht=prob_d_ht, prob_a_ht=prob_a_ht,
             prob_over_05_ht=prob_over_05_ht, prob_over_15_ht=prob_over_15_ht,
+            max_goals=self.max_goals,
             rho=rho, avg_h_goals=avg_h_goals, avg_a_goals=avg_a_goals,
         )
 

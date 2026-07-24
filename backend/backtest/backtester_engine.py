@@ -585,6 +585,7 @@ class ChronologicalBacktester:
             prob_over_05_ht = bundle['prob_over_05_ht']; prob_over_15_ht = bundle['prob_over_15_ht']
             rho = bundle['rho']
             avg_h_goals = bundle['avg_h_goals']; avg_a_goals = bundle['avg_a_goals']
+            max_goals = bundle.get('max_goals', 8)
 
             # Lazy loading of estimated odds from the solver
             est_odds = None
@@ -2399,7 +2400,8 @@ class ChronologicalBacktester:
             prob_h_ht = bundle['prob_h_ht']; prob_d_ht = bundle['prob_d_ht']; prob_a_ht = bundle['prob_a_ht']
             prob_over_05_ht = bundle['prob_over_05_ht']; prob_over_15_ht = bundle['prob_over_15_ht']
             rho = bundle['rho']
-            
+            max_goals = bundle.get('max_goals', 8)
+
             est_odds = None
 
             # Compute corners probabilities using league-average rates (Poisson model)
