@@ -6129,7 +6129,17 @@ async function savePortfolio() {
         return;
     }
     
-    const name = prompt("Digite um nome para este Portfólio Combinado:");
+    // Auto-generate portfolio name from strategy names
+    const history = lsLoadHistory();
+    const strategyNames = strategyIds
+        .map(id => history.find(h => h.id === id))
+        .filter(Boolean)
+        .map(s => s.name);
+    const defaultName = strategyNames.length > 0
+        ? strategyNames.join(' + ')
+        : 'Portfólio Combinado';
+
+    const name = prompt("Digite um nome para este Portfólio Combinado:", defaultName);
     if (!name || name.trim() === '') return;
     
     const profitText = document.getElementById('port-metric-profit')?.innerText || '0';
