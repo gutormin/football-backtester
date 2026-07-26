@@ -130,8 +130,8 @@ const MARKET_COLUMN_MAP = {
         'over55': 'Estimado (Poisson)', 'under55': 'Estimado (Poisson)',
         // BTTS
         'btts_yes': 'Real (B365)',  'btts_no': 'Real (B365)',
-        // DNB
-        'dnb_h': 'Real (B365)',  'dnb_a': 'Real (B365)',
+        // DNB — colunas existem mas estao vazias (0% populated) em TODAS as ligas
+        'dnb_h': 'Indisponivel',  'dnb_a': 'Indisponivel',
         // Asian Handicap
         'ah_home': 'Indisponivel',   'ah_away': 'Indisponivel',
         // HT 1X2
