@@ -1378,8 +1378,26 @@ def get_autopilot_predictions(source: str = 'api'):
                         except Exception:
                             bookie_odds = np.nan
                         market_label = "Lay Empate"
-                    elif s_m == 'dnb_h': market_prob = pred['prob_home'] / (pred['prob_home'] + pred['prob_away']) if (pred['prob_home'] + pred['prob_away']) > 0 else 0.5; bookie_odds = float(row.get('DNB_1', np.nan)) if not pd.isna(row.get('DNB_1')) else (odds_h * (odds_d - 1.0) / odds_d if (odds_h and odds_d and odds_d > 1.0) else np.nan); market_label = "DNB Mandante"
-                    elif s_m == 'dnb_a': market_prob = pred['prob_away'] / (pred['prob_home'] + pred['prob_away']) if (pred['prob_home'] + pred['prob_away']) > 0 else 0.5; bookie_odds = float(row.get('DNB_2', np.nan)) if not pd.isna(row.get('DNB_2')) else (odds_a * (odds_d - 1.0) / odds_d if (odds_a and odds_d and odds_d > 1.0) else np.nan); market_label = "DNB Visitante"
+                    elif s_m == 'dnb_h':
+                        market_prob = pred['prob_home'] / (pred['prob_home'] + pred['prob_away']) if (pred['prob_home'] + pred['prob_away']) > 0 else 0.5
+                        try:
+                            _dnb_h = float(str(row.get('DNB_1')).replace(',', '.')) if row.get('DNB_1') is not None and not pd.isna(row.get('DNB_1')) else np.nan
+                            odds_dnb_h_real = _dnb_h if (_dnb_h is not None and not pd.isna(_dnb_h) and _dnb_h > 1.0) else np.nan
+                        except Exception:
+                            odds_dnb_h_real = np.nan
+                        odds_dnb_h_synth = odds_h * (odds_d - 1.0) / odds_d if (odds_h and odds_d and odds_d > 1.0) else np.nan
+                        bookie_odds = odds_dnb_h_real if not pd.isna(odds_dnb_h_real) else odds_dnb_h_synth
+                        market_label = "DNB Mandante"
+                    elif s_m == 'dnb_a':
+                        market_prob = pred['prob_away'] / (pred['prob_home'] + pred['prob_away']) if (pred['prob_home'] + pred['prob_away']) > 0 else 0.5
+                        try:
+                            _dnb_a = float(str(row.get('DNB_2')).replace(',', '.')) if row.get('DNB_2') is not None and not pd.isna(row.get('DNB_2')) else np.nan
+                            odds_dnb_a_real = _dnb_a if (_dnb_a is not None and not pd.isna(_dnb_a) and _dnb_a > 1.0) else np.nan
+                        except Exception:
+                            odds_dnb_a_real = np.nan
+                        odds_dnb_a_synth = odds_a * (odds_d - 1.0) / odds_d if (odds_a and odds_d and odds_d > 1.0) else np.nan
+                        bookie_odds = odds_dnb_a_real if not pd.isna(odds_dnb_a_real) else odds_dnb_a_synth
+                        market_label = "DNB Visitante"
 
                     if pd.isna(bookie_odds) or bookie_odds <= 1.0:
                         continue

@@ -2502,13 +2502,33 @@ class ChronologicalBacktester:
                     ah_probs = calculate_ah_probabilities(prob_matrix, -ahh_line)
                     model_prob = ah_probs['win'] + 0.5 * ah_probs['half_win']
                     bookie_odds = odds_aha
-                    
+
                     score = (ftag - fthg) - ahh_line
                     if score > 0.24: bet_won = 1.0
                     elif 0.10 < score <= 0.25: bet_won = 0.5
                     elif -0.10 <= score <= 0.10: bet_won = 0.0
                     elif -0.25 <= score < -0.10: bet_won = -0.5
                     else: bet_won = -1.0
+                elif mkt == 'dnb_h':
+                    model_prob = prob_h / (prob_h + prob_a) if (prob_h + prob_a) > 0 else 0.5
+                    try:
+                        _dnb_h = float(str(row.get('DNB_1')).replace(',', '.')) if row.get('DNB_1') is not None and not pd.isna(row.get('DNB_1')) else np.nan
+                        odds_dnb_h_real = _dnb_h if _dnb_h > 1.0 else np.nan
+                    except Exception:
+                        odds_dnb_h_real = np.nan
+                    odds_dnb_h_synth = odds_h * (odds_d - 1.0) / odds_d if (odds_h and odds_d and odds_d > 1.0) else np.nan
+                    bookie_odds = odds_dnb_h_real if not pd.isna(odds_dnb_h_real) else odds_dnb_h_synth
+                    bet_won = is_home_win
+                elif mkt == 'dnb_a':
+                    model_prob = prob_a / (prob_h + prob_a) if (prob_h + prob_a) > 0 else 0.5
+                    try:
+                        _dnb_a = float(str(row.get('DNB_2')).replace(',', '.')) if row.get('DNB_2') is not None and not pd.isna(row.get('DNB_2')) else np.nan
+                        odds_dnb_a_real = _dnb_a if _dnb_a > 1.0 else np.nan
+                    except Exception:
+                        odds_dnb_a_real = np.nan
+                    odds_dnb_a_synth = odds_a * (odds_d - 1.0) / odds_d if (odds_a and odds_d and odds_d > 1.0) else np.nan
+                    bookie_odds = odds_dnb_a_real if not pd.isna(odds_dnb_a_real) else odds_dnb_a_synth
+                    bet_won = is_away_win
                 else:
                     if est_odds is None:
                         est_odds = estimate_bookmaker_odds(odds_over25, odds_under25, lambda_home, lambda_away, rho)
