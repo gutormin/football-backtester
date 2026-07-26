@@ -1520,23 +1520,29 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
  </div>
 
- <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
- <table class="table-styled" style="width: 100%;" id="dutching-radar-table">
+ 	 <!-- Campo de busca -->
+	 <div style="margin-bottom: 10px;">
+	 <input type="text" id="dutching-search-input" placeholder="Buscar por partida, time, mercado..." oninput="filterDutchingRadar()" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 12px; border-radius: 4px; outline: none; font-size: 13px;">
+	 </div>
+
+	 <div class="table-responsive" style="max-height: 550px; overflow-y: auto;">
+ <table class="table-styled dutching-radar-table" style="width: 100%;" id="dutching-radar-table">
  <thead>
  <tr>
- <th onclick="window.sortDutchingRadar('match')" style="cursor: pointer; user-select: none;" title="Clique para ordenar por Partida">Partida / Horário <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
+ <th class="sortable" data-sort-key="match" onclick="window.sortDutchingRadar('match')" title="Clique para ordenar por data e hora">Partida / Horário <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
+ <th>Casa</th>
+ <th class="sortable" data-sort-key="bookmaker" onclick="window.sortDutchingRadar('bookmaker')" title="Clique para ordenar por Casa de Aposta">Bookmaker <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
  <th>Mercado</th>
- <th>Resultados Cobrir</th>
- <th>Odds Individuais</th>
- <th onclick="window.sortDutchingRadar('odd')" style="cursor: pointer; user-select: none;" title="Clique para ordenar por Odd Combinada">Odd Combinada <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i> <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
- <th onclick="window.sortDutchingRadar('prob')" style="cursor: pointer; user-select: none;" title="Clique para ordenar por Probabilidade Real">Prob. Real (IA) <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i> <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
- <th onclick="window.sortDutchingRadar('edge')" style="cursor: pointer; user-select: none;" title="Clique para ordenar por Edge">Edge (+EV) <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i> <i class="fa-solid fa-circle-question" style="font-size: 10px; color: var(--text-muted);"></i></th>
+ <th>Seleções</th>
+ <th class="sortable" data-sort-key="odd" onclick="window.sortDutchingRadar('odd')" title="Clique para ordenar por Odd Combinada">Odd Comb. <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
+ <th class="sortable" data-sort-key="prob" onclick="window.sortDutchingRadar('prob')" title="Clique para ordenar por Probabilidade Real">Prob. IA <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
+ <th class="sortable" data-sort-key="edge" onclick="window.sortDutchingRadar('edge')" title="Clique para ordenar por Edge">Edge (+EV) <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
  <th>Ação</th>
  </tr>
  </thead>
  <tbody id="dutching-radar-list">
  <tr>
- <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma oportunidade detectada no momento. Clique em 'Atualizar Odds Radar' para escanear.</td>
+ <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma oportunidade detectada no momento. Clique em 'Atualizar Odds Radar' para escanear.</td>
  </tr>
  </tbody>
  </table>

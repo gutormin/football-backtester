@@ -137,6 +137,10 @@ def match_to_backtester_row(match, league_code):
         'B365_HT_Under05': _parse_float(match.get('odds_1st_half_under05')),
         'B365_HT_Over15': _parse_float(match.get('odds_1st_half_over15')),
         'B365_HT_Under15': _parse_float(match.get('odds_1st_half_under15')),
+        'B365_HT_Over25': _parse_float(match.get('odds_1st_half_over25')),
+        'B365_HT_Under25': _parse_float(match.get('odds_1st_half_under25')),
+        'B365_HT_Over35': _parse_float(match.get('odds_1st_half_over35')),
+        'B365_HT_Under35': _parse_float(match.get('odds_1st_half_under35')),
 
         # Over/Under FT extended
         'B365_Over05': _parse_float(match.get('odds_ft_over05')),
@@ -156,6 +160,30 @@ def match_to_backtester_row(match, league_code):
         # DNB
         'B365_DNB_H': _parse_float(match.get('odds_dnb_1')),
         'B365_DNB_A': _parse_float(match.get('odds_dnb_2')),
+
+        # 2H Result odds
+        'B365_2H_H': _parse_float(match.get('odds_2nd_half_result_1')),
+        'B365_2H_D': _parse_float(match.get('odds_2nd_half_result_x')),
+        'B365_2H_A': _parse_float(match.get('odds_2nd_half_result_2')),
+
+        # 2H Over/Under odds
+        'B365_2H_Over05': _parse_float(match.get('odds_2nd_half_over05')),
+        'B365_2H_Under05': _parse_float(match.get('odds_2nd_half_under05')),
+        'B365_2H_Over15': _parse_float(match.get('odds_2nd_half_over15')),
+        'B365_2H_Under15': _parse_float(match.get('odds_2nd_half_under15')),
+        'B365_2H_Over25': _parse_float(match.get('odds_2nd_half_over25')),
+        'B365_2H_Under25': _parse_float(match.get('odds_2nd_half_under25')),
+        'B365_2H_Over35': _parse_float(match.get('odds_2nd_half_over35')),
+        'B365_2H_Under35': _parse_float(match.get('odds_2nd_half_under35')),
+
+        # Win to Nil
+        'B365_WinToNil_H': _parse_float(match.get('odds_win_to_nil_1')),
+        'B365_WinToNil_A': _parse_float(match.get('odds_win_to_nil_2')),
+
+        # Corners 1X2
+        'B365_Corners_1': _parse_float(match.get('odds_corners_1')),
+        'B365_Corners_x': _parse_float(match.get('odds_corners_x')),
+        'B365_Corners_2': _parse_float(match.get('odds_corners_2')),
 
         # Stats
         'HS': _parse_int(match.get('team_a_shotsOnTarget')),
@@ -184,6 +212,8 @@ def match_to_backtester_row(match, league_code):
         'B365_Corners_Under95': _parse_float(match.get('odds_corners_under_95')),
         'B365_Corners_Over105': _parse_float(match.get('odds_corners_over_105')),
         'B365_Corners_Under105': _parse_float(match.get('odds_corners_under_105')),
+        'B365_Corners_Over115': _parse_float(match.get('odds_corners_over_115')),
+        'B365_Corners_Under115': _parse_float(match.get('odds_corners_under_115')),
 
         # Possession
         'HPos': _parse_int(match.get('team_a_possession')),

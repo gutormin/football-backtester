@@ -5,7 +5,15 @@
       "name": "football-backtester",
       "runtimeExecutable": "python",
       "runtimeArgs": ["run.py"],
-      "port": 8000
+      "port": 8000,
+      "autoPort": true
+    },
+    {
+      "name": "yt-vite",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "3000", "--strictPort"],
+      "port": 3000,
+      "cwd": "../youtube-pipeline/frontend"
     }
   ]
 }

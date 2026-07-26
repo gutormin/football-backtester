@@ -1555,6 +1555,34 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.015); }
 .leagues .metric-opt { color: #34d399; }
 .metric-diff { font-weight: 700; }
 .metric-diff.positive { color: var(--color-success); }
+
+/* ==========================================================================
+   Dutching Radar Table
+   ========================================================================== */
+.dutching-radar-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+.dutching-radar-table th.sortable:hover {
+  color: #c084fc;
+}
+.dutching-radar-table th.sortable.sorted-asc::after {
+  content: ' ▲';
+  color: #a78bfa;
+  font-size: 10px;
+}
+.dutching-radar-table th.sortable.sorted-desc::after {
+  content: ' ▼';
+  color: #a78bfa;
+  font-size: 10px;
+}
+.dutching-radar-table tbody tr {
+  transition: background 0.15s ease;
+}
+.dutching-radar-table tbody tr:hover {
+  background: rgba(139, 92, 246, 0.06);
+}
 .metric-diff.negative { color: var(--color-danger); }
 
 /* Blink */

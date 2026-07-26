@@ -424,6 +424,8 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                     opportunities.append({
                         'match': match_name,
                         'date': match_date,
+                        'match_date_sort': match_time.strftime("%Y-%m-%d"),
+                        'match_time_sort': match_time.strftime("%H:%M"),
                         'bookmaker': bookie,
                         'market': f"{label_prefix}{market_label}",
                         'selections': outcomes_to_cover,
@@ -486,8 +488,21 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
 
             match_name = f"{home_team} vs {away_team}"
             match_date = str(row.get('Date', 'Hoje'))
+            raw_date = str(row.get('Date', ''))
+            raw_time = str(row.get('Time', ''))
             if row.get('Time'):
-                match_date += f" {row.get('Time')}"
+                match_date += f" {raw_time}"
+
+            # Parse date for sorting (supports DD/MM/YYYY and YYYY-MM-DD)
+            match_date_sort = ''
+            match_time_sort = raw_time[:5] if raw_time and raw_time != 'nan' else '00:00'
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d/%m/%y'):
+                try:
+                    parsed = datetime.strptime(raw_date.strip()[:10], fmt)
+                    match_date_sort = parsed.strftime('%Y-%m-%d')
+                    break
+                except (ValueError, IndexError):
+                    continue
 
             # Extrai odds da Bet365 ou Médias da base
             odds_h = float(row.get('B365H', row.get('AvgH', np.nan)))
@@ -528,6 +543,8 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 opportunities.append({
                     'match': match_name,
                     'date': match_date,
+                    'match_date_sort': match_date_sort,
+                    'match_time_sort': match_time_sort,
                     'bookmaker': 'Bet365',
                     'market': f"{label_prefix}{market_label}",
                     'selections': outcomes_b365,
@@ -553,6 +570,8 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                     opportunities.append({
                         'match': match_name,
                         'date': match_date,
+                        'match_date_sort': match_date_sort,
+                        'match_time_sort': match_time_sort,
                         'bookmaker': 'Betfair Exchange',
                         'market': f"{label_prefix}{market_label}",
                         'selections': outcomes_b365,
@@ -570,13 +589,18 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
     return opportunities
 
 def get_mock_dutching_opportunities(strategy='auto_ia'):
-    now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    now = datetime.now()
+    now_str = now.strftime("%d/%m/%Y %H:%M")
+    mock_sort_date = now.strftime("%Y-%m-%d")
+    mock_sort_time = now.strftime("%H:%M")
 
     if strategy == 'home_fav':
         opps = [
             {
                 'match': 'Flamengo vs Fluminense',
                 'date': now_str,
+                'match_date_sort': mock_sort_date,
+                'match_time_sort': mock_sort_time,
                 'bookmaker': 'Betfair Exchange',
                 'market': 'Favorito Mandante',
                 'selections': ['1-0', '2-0', '2-1', '3-0', '3-1', '3-2'],
@@ -598,6 +622,8 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
             {
                 'match': 'Castellon vs Eibar',
                 'date': now_str,
+                'match_date_sort': mock_sort_date,
+                'match_time_sort': mock_sort_time,
                 'bookmaker': 'Bet365',
                 'market': 'Under / Jogo Truncado',
                 'selections': ['0-0', '1-0', '0-1', '2-0', '1-1'],
@@ -618,6 +644,8 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
             {
                 'match': 'Corinthians vs São Paulo',
                 'date': now_str,
+                'match_date_sort': mock_sort_date,
+                'match_time_sort': mock_sort_time,
                 'bookmaker': 'Bet365',
                 'market': 'Empate',
                 'selections': ['0-0', '1-1', '2-2'],
@@ -639,6 +667,8 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
             {
                 'match': 'Atlético Mineiro vs Palmeiras',
                 'date': now_str,
+                'match_date_sort': mock_sort_date,
+                'match_time_sort': mock_sort_time,
                 'bookmaker': 'Betfair Exchange',
                 'market': 'Favorito Visitante',
                 'selections': ['0-1', '0-2', '1-2', '0-3', '1-3'],
@@ -659,6 +689,8 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
             {
                 'match': 'RB Bragantino vs Fortaleza',
                 'date': now_str,
+                'match_date_sort': mock_sort_date,
+                'match_time_sort': mock_sort_time,
                 'bookmaker': 'Bet365',
                 'market': 'Over / Goleada',
                 'selections': ['2-1', '1-2', '3-1', '2-2', '3-2', '1-3'],
@@ -679,6 +711,8 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
             {
                 'match': 'Flamengo vs Fluminense',
                 'date': now_str,
+                'match_date_sort': mock_sort_date,
+                'match_time_sort': mock_sort_time,
                 'bookmaker': 'Betfair Exchange',
                 'market': 'IA Favorito Mandante',
                 'selections': ['1-0', '2-0', '2-1', '3-0', '3-1', '3-2'],
@@ -696,6 +730,8 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
             {
                 'match': 'Castellon vs Eibar',
                 'date': now_str,
+                'match_date_sort': mock_sort_date,
+                'match_time_sort': mock_sort_time,
                 'bookmaker': 'Bet365',
                 'market': 'IA Under / Jogo Truncado',
                 'selections': ['0-0', '1-0', '0-1', '2-0', '1-1'],

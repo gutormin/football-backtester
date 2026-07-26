@@ -244,22 +244,42 @@ async function runDutchingScan() {
 
 function filterDutchingRadar() {
     const filterVal = document.querySelector('input[name="dutching-bookie-filter"]:checked').value;
+    const searchInput = document.getElementById('dutching-search-input');
+    const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
     const tbody = document.getElementById('dutching-radar-list');
     if (!tbody) return;
-    
+
     tbody.innerHTML = '';
-    
+
     let filtered = dutchingRadarAllOpps.filter(opp => {
         if (filterVal === 'best') return true;
         return opp.bookmaker === filterVal;
     });
+
+    // Apply text search filter
+    if (searchQuery) {
+        filtered = filtered.filter(opp => {
+            return opp.match.toLowerCase().includes(searchQuery) ||
+                   (opp.date && opp.date.toLowerCase().includes(searchQuery)) ||
+                   (opp.market && opp.market.toLowerCase().includes(searchQuery)) ||
+                   (opp.bookmaker && opp.bookmaker.toLowerCase().includes(searchQuery));
+        });
+    }
     
     // Apply sorting
     filtered.sort((a, b) => {
         let valA, valB;
         if (dutchingSortKey === 'match') {
-            valA = a.match.toLowerCase();
-            valB = b.match.toLowerCase();
+            // Sort by date then time, then by match name as tiebreaker
+            valA = (a.match_date_sort || '') + 'T' + (a.match_time_sort || '00:00');
+            valB = (b.match_date_sort || '') + 'T' + (b.match_time_sort || '00:00');
+            if (valA === valB) {
+                valA = a.match.toLowerCase();
+                valB = b.match.toLowerCase();
+            }
+        } else if (dutchingSortKey === 'bookmaker') {
+            valA = (a.bookmaker || '').toLowerCase();
+            valB = (b.bookmaker || '').toLowerCase();
         } else if (dutchingSortKey === 'odd') {
             valA = a.dutching_odd;
             valB = b.dutching_odd;
@@ -281,27 +301,32 @@ function filterDutchingRadar() {
     window.dutchingRadarFilteredOpps = filtered;
     
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma oportunidade +EV correspondente encontrada.</td></tr>`;
+        const msg = searchQuery
+            ? `Nenhum resultado encontrado para "${searchQuery}".`
+            : 'Nenhuma oportunidade +EV correspondente encontrada.';
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">${msg}</td></tr>`;
         return;
     }
-    
+
     filtered.forEach((opp, index) => {
         const tr = document.createElement('tr');
         const selectionsWithOdds = opp.selections.map((sel, idx) => `${sel} (${opp.odds[idx].toFixed(2)})`).join(' | ');
-        
+        const homeTeam = opp.match.split(' vs ')[0] || '—';
+
         tr.innerHTML = `
             <td>
-                <div><strong>${opp.match}</strong></div>
-                <div style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-clock"></i> ${opp.date}</div>
+                <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${opp.match}</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;"><i class="fa-solid fa-clock"></i> ${opp.date}</div>
             </td>
-            <td><span class="badge badge-info" style="font-size: 10px;">${opp.bookmaker}</span></td>
-            <td><div style="font-size: 11px; color: var(--text-secondary);">${opp.market}</div></td>
+            <td><span style="font-size: 12px; font-weight: 500; color: var(--text-secondary);">${homeTeam}</span></td>
+            <td><span class="badge badge-info" style="font-size: 11px;">${opp.bookmaker}</span></td>
+            <td><div style="font-size: 12px; color: var(--text-secondary);">${opp.market}</div></td>
             <td><div style="font-size: 11px; font-family: monospace; color: #a78bfa;">${selectionsWithOdds}</div></td>
             <td><span style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${opp.dutching_odd.toFixed(2)}</span></td>
-            <td><span style="color: #a78bfa; font-weight: 500;">${opp.model_prob}</span></td>
+            <td><span style="color: #a78bfa; font-weight: 500; font-size: 13px;">${opp.model_prob}</span></td>
             <td><span style="color: #34d399; font-weight: 700; font-size: 13px;">${opp.edge}</span></td>
             <td>
-                <button type="button" class="btn-clear" onclick="loadDutchingOpportunityByIndex(${index})" style="padding: 4px 8px; font-size: 10px; color: #a78bfa; border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05); cursor: pointer;">
+                <button type="button" class="btn-clear" onclick="loadDutchingOpportunityByIndex(${index})" style="padding: 6px 10px; font-size: 11px; color: #a78bfa; border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05); cursor: pointer;">
                     <i class="fa-solid fa-download"></i> Carregar
                 </button>
             </td>
@@ -360,6 +385,19 @@ function sortDutchingRadar(key) {
         dutchingSortKey = key;
         dutchingSortAsc = (key === 'match') ? true : false;
     }
+
+    // Update header sort indicators
+    const table = document.getElementById('dutching-radar-table');
+    if (table) {
+        table.querySelectorAll('th.sortable').forEach(th => {
+            th.classList.remove('sorted-asc', 'sorted-desc');
+        });
+        const activeTh = table.querySelector(`th[data-sort-key="${key}"]`);
+        if (activeTh) {
+            activeTh.classList.add(dutchingSortAsc ? 'sorted-asc' : 'sorted-desc');
+        }
+    }
+
     filterDutchingRadar();
 }
 

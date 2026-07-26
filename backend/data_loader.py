@@ -156,7 +156,107 @@ def translate_custom_csv(df):
         # Filter incomplete matches for history, but keep them if we need them for upcoming
         # However, data_loader.py is usually for history, so we only need rows with FTR
         # We won't drop them here, we let the logic below handle NaNs
-        
+
+    # Normalize DataFootball API CSV columns (B365_ prefix → standard names)
+    # The API downloader writes: B365_BTTS_Yes, B365_DC_X2, B365_Over15, etc.
+    # But the backtester reads: BTTS_Yes, DC_X2, Over_FT_1_5, etc.
+    df = _normalize_datafootball_columns(df)
+
+    return df
+
+
+def _normalize_datafootball_columns(df):
+    """Normalize DataFootball API columns (B365_ prefix) to standard backtester names."""
+    # Only apply if DataFootball-specific columns exist
+    has_df_columns = any(c.startswith('B365_') for c in df.columns)
+
+    if not has_df_columns:
+        return df
+
+    rename_map = {}
+
+    # HT Result: B365H_H → Odd_1_HT, etc.
+    for api_col, std_col in [('B365H_H', 'Odd_1_HT'), ('B365H_D', 'Odd_X_HT'), ('B365H_A', 'Odd_2_HT')]:
+        if api_col in df.columns and std_col not in df.columns:
+            rename_map[api_col] = std_col
+
+    # HT Over/Under
+    for line in ['05', '15', '25', '35']:
+        api_over = f'B365_HT_Over{line}'
+        api_under = f'B365_HT_Under{line}'
+        std_over = f'Over_HT_{line[0]}_{line[1]}'
+        std_under = f'Under_HT_{line[0]}_{line[1]}'
+        if api_over in df.columns and std_over not in df.columns:
+            rename_map[api_over] = std_over
+        if api_under in df.columns and std_under not in df.columns:
+            rename_map[api_under] = std_under
+
+    # BTTS
+    for api_col, std_col in [('B365_BTTS_Yes', 'BTTS_Yes'), ('B365_BTTS_No', 'BTTS_No')]:
+        if api_col in df.columns and std_col not in df.columns:
+            rename_map[api_col] = std_col
+
+    # Full Time Over/Under (extended)
+    for line in ['05', '15', '35', '45']:
+        api_over = f'B365_Over{line}'
+        api_under = f'B365_Under{line}'
+        std_over = f'Over_FT_{line[0]}_{line[1]}' if line != '05' else 'Over_FT_0_5'
+        std_under = f'Under_FT_{line[0]}_{line[1]}' if line != '05' else 'Under_FT_0_5'
+        if api_over in df.columns and std_over not in df.columns:
+            rename_map[api_over] = std_over
+        if api_under in df.columns and std_under not in df.columns:
+            rename_map[api_under] = std_under
+
+    # Double Chance
+    for api_col, std_col in [('B365_DC_1X', 'DC_1X'), ('B365_DC_12', 'DC_12'), ('B365_DC_X2', 'DC_X2')]:
+        if api_col in df.columns and std_col not in df.columns:
+            rename_map[api_col] = std_col
+
+    # Draw No Bet
+    for api_col, std_col in [('B365_DNB_H', 'DNB_1'), ('B365_DNB_A', 'DNB_2')]:
+        if api_col in df.columns and std_col not in df.columns:
+            rename_map[api_col] = std_col
+
+    # Corners Over/Under
+    for line in ['75', '85', '95', '105', '115']:
+        api_over = f'B365_Corners_Over{line}'
+        api_under = f'B365_Corners_Under{line}'
+        std_over = f'odds_corners_over_{line}'
+        std_under = f'odds_corners_under_{line}'
+        if api_over in df.columns and std_over not in df.columns:
+            rename_map[api_over] = std_over
+        if api_under in df.columns and std_under not in df.columns:
+            rename_map[api_under] = std_under
+
+    # Corners 1X2
+    for api_col, std_col in [('B365_Corners_1', 'odds_corners_1'), ('B365_Corners_x', 'odds_corners_x'), ('B365_Corners_2', 'odds_corners_2')]:
+        if api_col in df.columns and std_col not in df.columns:
+            rename_map[api_col] = std_col
+
+    # 2H Result
+    for api_col, std_col in [('B365_2H_H', 'Odd_1_2H'), ('B365_2H_D', 'Odd_X_2H'), ('B365_2H_A', 'Odd_2_2H')]:
+        if api_col in df.columns and std_col not in df.columns:
+            rename_map[api_col] = std_col
+
+    # 2H Over/Under
+    for line in ['05', '15', '25', '35']:
+        api_over = f'B365_2H_Over{line}'
+        api_under = f'B365_2H_Under{line}'
+        std_over = f'Over_2H_{line[0]}_{line[1]}'
+        std_under = f'Under_2H_{line[0]}_{line[1]}'
+        if api_over in df.columns and std_over not in df.columns:
+            rename_map[api_over] = std_over
+        if api_under in df.columns and std_under not in df.columns:
+            rename_map[api_under] = std_under
+
+    # Win to Nil
+    for api_col, std_col in [('B365_WinToNil_H', 'odds_win_to_nil_1'), ('B365_WinToNil_A', 'odds_win_to_nil_2')]:
+        if api_col in df.columns and std_col not in df.columns:
+            rename_map[api_col] = std_col
+
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
     return df
 
 # In-memory cache for loaded league dataframes
@@ -748,6 +848,11 @@ def load_league_data(league_code, start_date='2021-01-01', data_source="football
 
                 # Clean dataframe
                 combined_df = combined_df.dropna(subset=['Date', 'HomeTeam', 'AwayTeam'])
+
+                # Remove garbage rows where Date column contains non-date values (e.g. league name)
+                date_ser = combined_df['Date'].astype(str)
+                date_fmt_mask = date_ser.str.match(r'^\d{4}-\d{2}-\d{2}') | date_ser.str.match(r'^\d{2}/\d{2}/\d{4}')
+                combined_df = combined_df[date_fmt_mask].copy()
 
                 # Parse Dates robustly
                 combined_df['Date'] = pd.to_datetime(combined_df['Date'], format='mixed', dayfirst=True)
