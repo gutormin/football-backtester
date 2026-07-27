@@ -5,6 +5,8 @@ var dutchingChartInstance = null;
 var dutchingRadarAllOpps = [];
 var dutchingSortKey = 'edge';
 var dutchingSortAsc = false;
+// Sync with window so demo and live scan share the same reference
+window.dutchingRadarAllOpps = dutchingRadarAllOpps;
 
 function updateDutchingChart(labels, data) {
     const ctx = document.getElementById('dutching-pie-chart');
@@ -226,6 +228,7 @@ async function runDutchingScan() {
 
         const opps = await res.json();
         dutchingRadarAllOpps = opps;
+        window.dutchingRadarAllOpps = opps;
 
         // Detect API error responses (backend returns error objects instead of opportunities)
         if (opps.length === 1 && opps[0].error) {
@@ -246,7 +249,8 @@ async function runDutchingScan() {
 }
 
 function filterDutchingRadar() {
-    const filterVal = document.querySelector('input[name="dutching-bookie-filter"]:checked').value;
+    const checkedRadio = document.querySelector('input[name="dutching-bookie-filter"]:checked');
+    const filterVal = checkedRadio ? checkedRadio.value : 'best';
     const searchInput = document.getElementById('dutching-search-input');
     const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
     const tbody = document.getElementById('dutching-radar-list');
@@ -254,7 +258,9 @@ function filterDutchingRadar() {
 
     tbody.innerHTML = '';
 
-    let filtered = dutchingRadarAllOpps.filter(opp => {
+    // Always read from window to pick up demo data and live scan data
+    const allOpps = window.dutchingRadarAllOpps || dutchingRadarAllOpps;
+    let filtered = allOpps.filter(opp => {
         if (filterVal === 'best') return true;
         return opp.bookmaker === filterVal;
     });
@@ -888,8 +894,10 @@ function loadDemoOpportunity() {
         odds_source_type: 'estimated',
     };
 
-    // Populate radar table with demo row
-    window.dutchingRadarAllOpps = [demoOpp];
+    // Populate radar table with demo row (sync both local var and window)
+    dutchingRadarAllOpps.length = 0;
+    dutchingRadarAllOpps.push(demoOpp);
+    window.dutchingRadarAllOpps = dutchingRadarAllOpps;
     window.dutchingRadarFilteredOpps = [demoOpp];
     filterDutchingRadar();
 
