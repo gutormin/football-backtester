@@ -883,48 +883,46 @@ def estimate_bookmaker_odds(avg_over_25_odds, avg_under_25_odds, model_lambda_ho
     is_betfair = (bookmaker or '').lower().startswith('betfair')
     is_pinnacle = (bookmaker or '').lower().startswith('pinnacle')
 
+    # Base overround from O/U 2.5 market (real market juice, ~1.05-1.10)
+    base_overround = total_implied
+
     def apply_juice(prob, market_type="default"):
         if prob <= 0.001: return 99.0
 
         if is_betfair:
-            # Betfair Exchange: commission 2-5%, no traditional overround
-            # CS markets still carry wider spreads due to lower liquidity
-            base_juice = 1.03
+            # Betfair Exchange: commission only (2-5%), no traditional juice
+            # CS markets carry slightly wider spreads due to lower liquidity
             if market_type == "cs":
-                if prob > 0.06:      juice_val = 1.06
-                elif prob > 0.03:    juice_val = 1.08
-                elif prob > 0.015:   juice_val = 1.10
-                else:                juice_val = 1.13
+                juice_val = 1.0 + (base_overround - 1.0) * 0.35
             elif market_type == "ht_1x2":
                 juice_val = 1.04
             else:
-                juice_val = base_juice
+                juice_val = 1.03
         elif is_pinnacle:
-            # Pinnacle: low-margin sharp bookmaker (~6-12% overround)
-            base_juice = 1.06
+            # Pinnacle: low-margin (~2-4% overround). CS markets at ~4-8%
             if market_type == "cs":
-                if prob > 0.06:      juice_val = 1.10
-                elif prob > 0.03:    juice_val = 1.13
-                elif prob > 0.015:   juice_val = 1.16
-                else:                juice_val = 1.20
+                juice_val = base_overround * 1.04
             elif market_type == "ht_1x2":
-                juice_val = 1.08
+                juice_val = base_overround * 1.03
             else:
-                juice_val = base_juice
+                juice_val = base_overround
         else:
-            # Bet365 / default: standard bookmaker overround
-            juice_val = total_implied
+            # Bet365 / traditional bookmaker: ~5-8% overround on 1X2/O/U
+            # CS markets scale with rarity — common scores ~10-18%, rare ~20-30%
             if market_type == "ht_1x2":
-                juice_val = max(1.12, total_implied + 0.06)
+                juice_val = base_overround * 1.06
             elif market_type == "cs":
+                # CS juice proportional to rarity, calibrated to real market data
                 if prob > 0.06:
-                    juice_val = max(1.22, total_implied + 0.15)
+                    juice_val = base_overround * 1.10        # common: ~1.15-1.18
                 elif prob > 0.03:
-                    juice_val = max(1.28, total_implied + 0.20)
+                    juice_val = base_overround * 1.15        # medium: ~1.21-1.24
                 elif prob > 0.015:
-                    juice_val = max(1.33, total_implied + 0.26)
+                    juice_val = base_overround * 1.20        # semi-rare: ~1.26-1.30
                 else:
-                    juice_val = max(1.40, total_implied + 0.33)
+                    juice_val = base_overround * 1.25        # rare: ~1.31-1.35
+            else:
+                juice_val = base_overround
 
         val = 1.0 / (prob * juice_val)
         return float(round(max(1.01, min(99.0, val)), 3))

@@ -11,6 +11,13 @@ from __future__ import annotations
 import os
 import pickle
 import hashlib
+import math
+
+try:
+    from scipy.optimize import minimize_scalar
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
 
 from .constants import (
     RHO_FALLBACK, RHO_MLE_BOUNDS, RHO_MLE_WINDOW, RHO_MLE_MIN_MATCHES,
@@ -201,26 +208,24 @@ def estimate_dynamic_rho(
         total = 0.0
         for i in range(len(hg)):
             tau = _tau(hg[i], ag[i], lh[i], la[i], rho)
-            if tau <= 0:
-                return 1e12  # Penalidade para rho inválido
+            # Smooth floor instead of hard penalty (avoids gradient issues with scipy)
+            tau = max(0.0001, tau)
             total += math.log(tau)
         return -total
 
-    try:
-        from scipy.optimize import minimize_scalar
+    if not HAS_SCIPY:
+        return FALLBACK_RHO
 
+    try:
         result = minimize_scalar(
             _neg_log_likelihood,
             bounds=RHO_MLE_BOUNDS,
             method="bounded",
         )
-
         if result.success:
             return float(result.x)
         return FALLBACK_RHO
-
-    except (ImportError, Exception):
-        # Fallback caso scipy não esteja disponível ou otimização falhe
+    except Exception:
         return FALLBACK_RHO
 
 import pandas as pd

@@ -587,13 +587,15 @@ class ProbabilityPipeline:
         lambda_away_ht = max(self.lambda_cap_ht_low * HT_AWAY_FLOOR_FACTOR, min(self.lambda_cap_ht_high, lambda_away_ht))
 
         # 6. Rho (Dixon-Coles correlation)
-        if league_code in league_rho_cache:
-            rho = league_rho_cache[league_code]
-        else:
-            rho_data = league_goals_for_rho[league_code]
+        # Always re-estimate when data is sufficiently populated (>50 matches)
+        rho_data = league_goals_for_rho.get(league_code, {'h': [], 'a': [], 'lh': [], 'la': []})
+        if len(rho_data['h']) >= 50:
             rho = estimate_dynamic_rho(rho_data['h'], rho_data['a'],
                                        rho_data['lh'], rho_data['la'])
-            league_rho_cache[league_code] = rho
+        elif league_code in league_rho_cache:
+            rho = league_rho_cache[league_code]
+        else:
+            rho = RHO_FALLBACK
 
         # 7. Build score matrix (Poisson or Negative Binomial)
         prob_matrix = self._build_score_matrix(lambda_home, lambda_away, rho)
@@ -801,7 +803,33 @@ def predict_match_nb(home_team: str, away_team: str, historical_df,
     league_code = 'all'
     decay = get_league_weighted_decay(league_code)
     league_rho_cache = {}
+
+    # Populate rho data for dynamic Dixon-Coles estimation
     league_goals_for_rho = defaultdict(lambda: {'h': [], 'a': [], 'lh': [], 'la': []})
+    target_dt = pd.to_datetime(match_date)
+    df_sorted = historical_df.copy()
+    df_sorted['Date'] = pd.to_datetime(df_sorted['Date'], format='mixed', dayfirst=True)
+    prior = df_sorted[df_sorted['Date'] < target_dt].sort_values('Date')
+
+    # Use per-match simple lambdas for MLE gradient
+    # λ_home = match_home_goals / ratio_correction, λ_away similar
+    # This gives real variation between matches (0-0 has low lambda, 4-3 has high)
+    # while using the match's own goals as a noisy-but-unbiased lambda proxy
+    if len(prior) >= 50:
+        home_avg = prior['FTHG'].mean() or 1.35
+        away_avg = prior['FTAG'].mean() or 1.05
+        for _, row in prior.iterrows():
+            fthg = row.get('FTHG')
+            ftag = row.get('FTAG')
+            if pd.isna(fthg) or pd.isna(ftag): continue
+            # Smoothed lambda: 70% league avg + 30% match-specific
+            # This preserves variation while avoiding extreme overfitting
+            lam_h = 0.7 * home_avg + 0.3 * float(fthg)
+            lam_a = 0.7 * away_avg + 0.3 * float(ftag)
+            league_goals_for_rho['all']['h'].append(int(fthg))
+            league_goals_for_rho['all']['a'].append(int(ftag))
+            league_goals_for_rho['all']['lh'].append(lam_h)
+            league_goals_for_rho['all']['la'].append(lam_a)
 
     bundle = pipeline.compute_all(
         state['team_h_scored'], state['team_h_conceded'],
