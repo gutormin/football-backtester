@@ -843,6 +843,66 @@ window.sortDutchingRadar = sortDutchingRadar;
 window.toggleDutchingGuide = toggleDutchingGuide;
 window.runDutchingBacktest = runDutchingBacktest;
 window.loadDutchingBtLeagues = loadDutchingBtLeagues;
+window.loadDemoOpportunity = loadDemoOpportunity;
+
+// ── Demo opportunity (shows all new features without API key) ─────
+
+function loadDemoOpportunity() {
+    const demoOpp = {
+        match: 'Flamengo vs Palmeiras',
+        date: '27/07/2026 16:00',
+        bookmaker: 'Bet365',
+        market: 'IA Favorito Mandante',
+        selections: ['1-0', '2-0', '2-1', '3-0', '3-1'],
+        selections_probs: [0.18, 0.14, 0.12, 0.09, 0.08],
+        odds: [7.00, 8.50, 9.00, 13.0, 15.0],
+        dutching_odd: 2.45,
+        model_prob: '61.00%',
+        edge: '+15.3%',
+        raw_edge: 0.153,
+        game_profile: 'home_fav',
+        profile_confidence: 0.42,
+        edge_ci_95: [0.045, 0.28],
+        edge_prob_positive: 0.93,
+        quality_score: 68.5,
+        quality_verdict: 'BET',
+        quality_verdict_label: 'OK: Apostar',
+        quality_verdict_color: '#f59e0b',
+        quality_verdict_icon: '\u{1F7E1}',
+        quality_breakdown: {
+            edge_sharpe: 21.2,
+            bootstrap_robustness: 17.5,
+            profile_confidence: 6.3,
+            odd_quality: 10.0,
+            market_divergence: 8.5,
+            selection_diversity: 5.0,
+        },
+        alternative_scores: [
+            { name: '3-2', prob: 0.045, odd: 22.0, recommendation: 'add', edge_change: 0.003, reason: 'Adicionar melhora edge em +0.3%' },
+            { name: '4-0', prob: 0.025, odd: 35.0, recommendation: 'neutral', edge_change: -0.002, reason: 'Neutro (-0.2% edge), +2.5% cobertura' },
+            { name: '4-1', prob: 0.018, odd: 45.0, recommendation: 'skip', edge_change: -0.015, reason: 'Dilui edge em -1.5% - não recomendado' },
+            { name: '1-1', prob: 0.07, odd: 7.50, recommendation: 'skip', edge_change: -0.022, reason: 'Dilui edge em -2.2% - não recomendado' },
+            { name: '0-0', prob: 0.05, odd: 10.0, recommendation: 'skip', edge_change: -0.018, reason: 'Dilui edge em -1.8% - não recomendado' },
+            { name: '0-1', prob: 0.04, odd: 14.0, recommendation: 'skip', edge_change: -0.025, reason: 'Dilui edge em -2.5% - não recomendado' },
+        ],
+        odds_source_type: 'estimated',
+    };
+
+    // Populate radar table with demo row
+    window.dutchingRadarAllOpps = [demoOpp];
+    window.dutchingRadarFilteredOpps = [demoOpp];
+    filterDutchingRadar();
+
+    // Load into calculator
+    loadDutchingOpportunityByIndex(0);
+
+    // Set default bankroll
+    const bankrollInput = document.getElementById('dutching-bankroll-input');
+    if (bankrollInput && !bankrollInput.value) bankrollInput.value = '2000';
+    calculateDutching();
+
+    showToast('Demonstração carregada! Explore o Quality Score, Kelly e badges nos alternativos.', 'success');
+}
 // Bot configs and API key functions are defined and exposed in app.js
 
 
