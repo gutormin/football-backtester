@@ -19,6 +19,7 @@ from ..models import PoissonModel, estimate_bookmaker_odds
 from ..elo_model import build_elo_tracker_from_history
 from ..ai_predictor import apply_fdr_correction, compute_edge_quality_score
 from ..portfolio_backtester import run_portfolio
+from ..backtest.dutching_backtester import DutchingBacktester
 from ..constants import RHO_FALLBACK
 
 router = APIRouter()
@@ -172,6 +173,51 @@ class PortfolioRequest(BaseModel):
 
     @validator('initial_bankroll')
     def validate_portfolio_bankroll(cls, v):
+        if v <= 0:
+            raise ValueError("A banca inicial deve ser maior que zero")
+        return v
+
+
+class DutchingBacktestRequest(BaseModel):
+    leagues: List[str]
+    startDate: str
+    endDate: str
+    strategies: List[str] = ['auto_ia']  # auto_ia, under, over, draw, home_fav, away_fav, dynamic
+    initialBankroll: float = 10000.0
+    stakeValue: float = 100.0          # fixed stake or Kelly fraction
+    stakingRule: str = 'fixed'         # 'fixed' or 'kelly_quarter'
+    minEdge: float = 0.0               # minimum predicted edge to bet
+    maxOverround: float = 0.92         # maximum overround for Dutching
+    maxLegs: int = 8                   # maximum score selections per Dutch
+    minSelections: int = 3             # minimum selections to place a bet
+    dataSource: str = 'auto'
+    futpythonApiKey: str = ''
+    modelType: str = 'negative_binomial'  # 'poisson' or 'negative_binomial'
+
+    @validator('startDate', 'endDate')
+    def validate_date_format(cls, v):
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("As datas devem estar no formato YYYY-MM-DD")
+        return v
+
+    @validator('endDate')
+    def validate_dates_relation(cls, v, values):
+        start_date_str = values.get('startDate')
+        if start_date_str:
+            try:
+                start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
+                end_dt = datetime.strptime(v, "%Y-%m-%d")
+                if start_dt > end_dt:
+                    raise ValueError("A data de início deve ser anterior à data de fim")
+            except ValueError as e:
+                if "formato" not in str(e):
+                    raise e
+        return v
+
+    @validator('initialBankroll')
+    def validate_bankroll_positive(cls, v):
         if v <= 0:
             raise ValueError("A banca inicial deve ser maior que zero")
         return v
@@ -816,6 +862,39 @@ def api_run_portfolio(req: PortfolioRequest):
         if "error" in res:
             raise HTTPException(status_code=400, detail=res["error"])
         return res
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/backtest_dutching")
+def api_run_dutching_backtest(req: DutchingBacktestRequest):
+    """Run a chronological backtest of Dutching (Correct Score) strategies.
+
+    Validates whether the theoretical edge reported by the live Dutching
+    scanner materializes into real profit when tested against historical data.
+    """
+    try:
+        backtester = DutchingBacktester(model_type=req.modelType)
+        results = backtester.run(
+            leagues=req.leagues,
+            start_date=req.startDate,
+            end_date=req.endDate,
+            strategies=req.strategies,
+            initial_bankroll=req.initialBankroll,
+            stake_value=req.stakeValue,
+            staking_rule=req.stakingRule,
+            min_edge=req.minEdge,
+            max_overround=req.maxOverround,
+            max_legs=req.maxLegs,
+            min_selections=req.minSelections,
+            data_source=req.dataSource,
+            futpython_api_key=req.futpythonApiKey,
+        )
+        if "error" in results:
+            raise HTTPException(status_code=400, detail=results["error"])
+        return results
     except Exception as e:
         import traceback
         traceback.print_exc()

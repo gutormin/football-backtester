@@ -1,9 +1,12 @@
 import os
+import math
 import logging
 import requests
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
+from collections import defaultdict
+from scipy.special import expit
 
 logger = logging.getLogger(__name__)
 from backend.models import estimate_bookmaker_odds
@@ -47,10 +50,343 @@ SCORE_GROUPS = {
     'home_fav': ['1-0', '2-0', '2-1', '3-0', '3-1', '3-2', '4-0', '4-1'],
     'away_fav': ['0-1', '0-2', '1-2', '0-3', '1-3', '2-3', '0-4', '1-4'],
     'draw':     ['0-0', '1-1', '2-2', '3-3'],
-    'under':    ['0-0', '1-0', '0-1', '2-0', '0-2', '1-1'],       # total ≤ 2
-    'over':     ['2-1', '1-2', '3-0', '0-3', '3-1', '1-3', '2-2',  # total ≥ 3
+    'under':    ['0-0', '1-0', '0-1', '2-0', '0-2', '1-1'],
+    'over':     ['2-1', '1-2', '3-0', '0-3', '3-1', '1-3', '2-2',
                  '3-2', '2-3', '4-0', '0-4', '4-1', '1-4', '3-3'],
 }
+
+# ── League-average goals for z-score calibration ──────────────────
+LEAGUE_AVG_GOALS = {
+    # High-scoring leagues (3.0+)
+    'N1': 3.15, 'D1': 3.10, 'D2': 2.85,
+    # Medium-high
+    'E0': 2.85, 'E1': 2.60, 'E2': 2.55, 'E3': 2.55,
+    'I1': 2.75, 'I2': 2.45,
+    'SP1': 2.60, 'SP2': 2.35,
+    'F1': 2.70, 'F2': 2.45,
+    'TUR': 2.65, 'BEL': 2.75, 'SWISS': 2.85, 'AUT': 2.80,
+    'MLS': 2.80, 'J1': 2.55, 'J2': 2.50,
+    # Medium
+    'BRAZIL_SERIE_A': 2.45, 'BRAZIL_SERIE_B': 2.30, 'BRAZIL_SERIE_C': 2.20,
+    'ARG': 2.35, 'ARGENTINA_PRIMERA_DIVISION': 2.35,
+    # Lower
+    'RUSSIA': 2.35, 'UKRAINE': 2.40, 'CHINA': 2.55, 'KOR': 2.30,
+    'GRE': 2.40, 'POR': 2.55,
+}
+LEAGUE_AVG_GOALS_DEFAULT = 2.55
+LEAGUE_STD_GOALS = 1.25
+
+STRATEGY_LABELS = {
+    'dynamic': 'Dinamico (Top Probabilidades)',
+    'home_fav': 'Favorito Mandante',
+    'away_fav': 'Favorito Visitante',
+    'draw': 'Empate',
+    'under': 'Under / Jogo Truncado',
+    'over': 'Over / Goleada',
+}
+
+PROFILE_LABELS = {
+    'under': 'Under / Jogo Truncado',
+    'over': 'Over / Goleada',
+    'draw': 'Empate',
+    'home_fav': 'Favorito Mandante',
+    'away_fav': 'Favorito Visitante',
+    'dynamic': 'Dinamico (Top Probabilidades)',
+}
+
+# ═══════════════════════════════════════════════════════════════════════
+# Game Profile Classification (Melhoria #2)
+# ═══════════════════════════════════════════════════════════════════════
+
+def _get_league_avg_goals(league_code=None):
+    if league_code and league_code in LEAGUE_AVG_GOALS:
+        return LEAGUE_AVG_GOALS[league_code]
+    return LEAGUE_AVG_GOALS_DEFAULT
+
+
+def _solve_lambda_from_under25_fast(prob_under):
+    """Quick approximate lambda from under 2.5 probability via bisection."""
+    if prob_under <= 0.01: return 6.0
+    if prob_under >= 0.99: return 0.1
+    lo, hi = 0.05, 10.0
+    for _ in range(10):
+        mid = (lo + hi) / 2.0
+        p = math.exp(-mid) * (1.0 + mid + (mid ** 2) / 2.0)
+        if p > prob_under: lo = mid
+        else: hi = mid
+    return (lo + hi) / 2.0 * 1.12  # NB2 correction
+
+
+def classify_game_profile(pred, is_home_fav, market_ou_odds=None, league_code=None):
+    """Classify game profile using fuzzy membership scores (sigmoid transitions).
+
+    Returns a dict with scores per profile, best_profile, confidence, and metadata.
+    Each score is in [0, 1] representing membership strength.
+
+    Uses: lambda z-score (league-calibrated), model-vs-market divergence,
+    draw probability, and home/away dominance ratio.
+    """
+    lambda_home = pred.get('lambda_home', 1.2)
+    lambda_away = pred.get('lambda_away', 1.0)
+    lambda_total = lambda_home + lambda_away
+    prob_under25 = pred.get('prob_under_25', 0.5)
+    prob_draw = pred.get('prob_d', 0.26)
+    prob_h = pred.get('prob_h', 0.37)
+    prob_a = pred.get('prob_a', 0.37)
+
+    # League-calibrated z-score
+    league_avg = _get_league_avg_goals(league_code)
+    lambda_z = (lambda_total - league_avg) / LEAGUE_STD_GOALS
+
+    # Model-vs-market divergence
+    market_divergence = 0.0
+    if market_ou_odds:
+        over_odd, under_odd = market_ou_odds
+        if over_odd > 1.01 and under_odd > 1.01:
+            imp_over = 1.0 / over_odd
+            imp_under = 1.0 / under_odd
+            fair_under = imp_under / (imp_over + imp_under)
+            if 0.01 < fair_under < 0.99:
+                mkt_lambda = _solve_lambda_from_under25_fast(fair_under)
+                if mkt_lambda > 0:
+                    market_divergence = lambda_total - mkt_lambda
+
+    # Dominance and balance
+    lambda_ratio = lambda_home / max(lambda_away, 0.1)
+    dominance = (lambda_home - lambda_away) / max(lambda_total, 1.0)
+
+    # ── Fuzzy profile scores ──────────────────────────────────────
+    under_score = expit(-(lambda_z + 0.3) * 3.0)
+    if market_divergence < -0.1:
+        under_score = min(1.0, under_score * 1.3)
+
+    over_score = expit((lambda_z - 0.3) * 3.0)
+    if market_divergence > 0.1:
+        over_score = min(1.0, over_score * 1.3)
+
+    draw_strength = max(0.0, min(1.0, (prob_draw - 0.24) / 0.10))
+    balance_factor = 1.0 - min(1.0, abs(dominance))
+    draw_score = max(0.0, min(1.0, draw_strength * 0.7 + balance_factor * 0.3))
+
+    home_fav_score = expit((lambda_ratio - 1.5) * 2.5) * min(1.0, prob_h / 0.40)
+    away_ratio = lambda_away / max(lambda_home, 0.1)
+    away_fav_score = expit((away_ratio - 1.5) * 2.5) * min(1.0, prob_a / 0.40)
+
+    max_specific = max(under_score, over_score, draw_score, home_fav_score, away_fav_score)
+    dynamic_score = 1.0 - max_specific
+
+    scores = {
+        'under': round(under_score, 4),
+        'over': round(over_score, 4),
+        'draw': round(draw_score, 4),
+        'home_fav': round(home_fav_score, 4),
+        'away_fav': round(away_fav_score, 4),
+        'dynamic': round(dynamic_score, 4),
+    }
+
+    best = max(scores, key=scores.get)
+    best_score = scores[best]
+    sorted_scores = sorted(scores.values(), reverse=True)
+    confidence = sorted_scores[0] - sorted_scores[1] if len(sorted_scores) > 1 else 0.0
+
+    return {
+        'scores': scores,
+        'best_profile': best,
+        'confidence': round(confidence, 4),
+        'profile_label': PROFILE_LABELS.get(best, best),
+        'lambda_z': round(lambda_z, 3),
+        'market_divergence': round(market_divergence, 3),
+        'lambda_total': round(lambda_total, 2),
+        'dominance': round(dominance, 3),
+    }
+
+
+def resolve_strategy(strategy_name, pred, is_home_fav):
+    """Resolve strategy for Dutching: if 'auto_ia', pick based on game profile.
+
+    Uses classify_game_profile() internally for fuzzy classification.
+    Backward-compatible with callers that expect a single string.
+    """
+    if strategy_name != 'auto_ia':
+        return strategy_name
+    profile = classify_game_profile(pred, is_home_fav)
+    return profile['best_profile']
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Directional Dominance Scoring (Melhoria #3)
+# ═══════════════════════════════════════════════════════════════════════
+
+def score_dominance_weight(score_str, lambda_home, lambda_away):
+    """Directional dominance weight for a score given expected goal ratio.
+
+    Returns [0.10, 2.0] representing how consistent this score is with
+    the λ_home/λ_away ratio.
+    - Strong match (score aligns with dominance) → ~1.8
+    - Neutral → ~1.0
+    - Mismatch (score contradicts dominance) → ~0.15
+    """
+    try:
+        hg, ag = map(int, score_str.split('-'))
+    except Exception:
+        return 1.0
+    total = lambda_home + lambda_away
+    if total < 0.1 or (hg + ag) == 0:
+        return 1.0
+    score_home_ratio = hg / (hg + ag)
+    expected_ratio = lambda_home / total
+    ratio_diff = abs(score_home_ratio - expected_ratio)
+    if ratio_diff < 0.10:
+        weight = 1.8
+    elif ratio_diff < 0.20:
+        weight = 1.4
+    elif ratio_diff < 0.30:
+        weight = 1.0
+    elif ratio_diff < 0.45:
+        weight = 0.5
+    else:
+        weight = 0.15
+    # Suppress scores with 0 goals on the dominant side
+    if expected_ratio > 0.62 and hg == 0 and ag > 0:
+        weight *= 0.5
+    if expected_ratio < 0.38 and ag == 0 and hg > 0:
+        weight *= 0.5
+    return max(0.10, min(2.0, weight))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Team-Specific NB Dispersion (Melhoria #8)
+# ═══════════════════════════════════════════════════════════════════════
+
+def compute_team_dispersions(historical_df, target_date=None):
+    """Estimate per-team Negative Binomial overdispersion from history.
+
+    NB2: Var = μ + α·μ² → α = max(0.005, (Var - μ) / μ²) when Var > μ.
+
+    Returns dict: team_name → {alpha_home, alpha_away, n_home_games, n_away_games}
+    """
+    df = historical_df.copy()
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'], format='mixed', dayfirst=True)
+        if target_date is not None:
+            df = df[df['Date'] < pd.to_datetime(target_date)]
+
+    team_home_goals = defaultdict(list)
+    team_away_goals = defaultdict(list)
+    for _, row in df.iterrows():
+        ht = row.get('HomeTeam', '')
+        at = row.get('AwayTeam', '')
+        fthg = row.get('FTHG')
+        ftag = row.get('FTAG')
+        if pd.isna(fthg) or pd.isna(ftag): continue
+        team_home_goals[ht].append(float(fthg))
+        team_away_goals[at].append(float(ftag))
+
+    MIN_GAMES = 15
+    dispersions = {}
+    for team in set(list(team_home_goals) + list(team_away_goals)):
+        alpha_h = _estimate_team_alpha(team_home_goals.get(team, []), MIN_GAMES)
+        alpha_a = _estimate_team_alpha(team_away_goals.get(team, []), MIN_GAMES)
+        dispersions[team] = {
+            'alpha_home': alpha_h, 'alpha_away': alpha_a,
+            'n_home_games': len(team_home_goals.get(team, [])),
+            'n_away_games': len(team_away_goals.get(team, [])),
+        }
+    return dispersions
+
+
+def _estimate_team_alpha(goals, min_games=15):
+    """Estimate NB2 α from goal list. Returns None if insufficient data."""
+    if len(goals) < min_games: return None
+    arr = np.array(goals, dtype=float)
+    mu = arr.mean()
+    var = arr.var(ddof=1)
+    if var > mu and mu > 0:
+        return max(0.005, min(0.35, (var - mu) / (mu ** 2)))
+    return 0.01  # under-dispersed → near-Poisson
+
+
+def get_team_alphas(home_team, away_team, dispersions):
+    """Extract home/away alpha overrides from dispersion dict."""
+    if not dispersions: return None, None, False
+    hd = dispersions.get(home_team, {})
+    ad = dispersions.get(away_team, {})
+    alpha_h = hd.get('alpha_home') if hd else None
+    alpha_a = ad.get('alpha_away') if ad else None
+    return alpha_h, alpha_a, (alpha_h is not None and alpha_a is not None)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Bootstrap Confidence for Dutching Edge (Melhoria #7)
+# ═══════════════════════════════════════════════════════════════════════
+
+def bootstrap_dutching_edge(pred, est_odds, strategy='auto_ia',
+                            max_legs=8, max_overround=0.92, min_selections=3,
+                            n_bootstrap=300, is_home_fav=True, seed=None):
+    """Parametric bootstrap: sample λ from Gamma posterior, recompute edge.
+
+    Returns edge_median, 95% CI, 80% CI, P(edge > 0), mean, std.
+    """
+    rng = np.random.RandomState(seed)
+    lambda_home = max(0.1, pred.get('lambda_home', 1.2))
+    lambda_away = max(0.1, pred.get('lambda_away', 1.0))
+    n_h = max(5, min(30, int(lambda_home * 15)))
+    n_a = max(5, min(30, int(lambda_away * 15)))
+
+    edge_samples = []
+    for _ in range(n_bootstrap):
+        lam_h = max(0.05, rng.gamma(shape=n_h * lambda_home, scale=1.0 / n_h))
+        lam_a = max(0.05, rng.gamma(shape=n_a * lambda_away, scale=1.0 / n_a))
+        boot_pred = _build_bootstrap_matrix(lam_h, lam_a)
+        outcomes, _, _, _, _, _, _, edge = build_dynamic_dutch(
+            boot_pred, est_odds, strategy=strategy,
+            max_legs=max_legs, max_overround=max_overround,
+            min_selections=min_selections)
+        if outcomes is not None:
+            edge_samples.append(edge)
+
+    if len(edge_samples) < 10:
+        return {'edge_median': None, 'edge_ci_95': None, 'edge_ci_80': None,
+                'prob_positive': None, 'edge_mean': None, 'edge_std': None,
+                'insufficient_samples': True}
+
+    arr = np.array(edge_samples)
+    return {
+        'edge_median': round(float(np.median(arr)), 4),
+        'edge_ci_95': (round(float(np.percentile(arr, 2.5)), 4),
+                       round(float(np.percentile(arr, 97.5)), 4)),
+        'edge_ci_80': (round(float(np.percentile(arr, 10)), 4),
+                       round(float(np.percentile(arr, 90)), 4)),
+        'prob_positive': round(float(np.mean(arr > 0)), 4),
+        'edge_mean': round(float(np.mean(arr)), 4),
+        'edge_std': round(float(np.std(arr)), 4),
+        'insufficient_samples': False,
+    }
+
+
+def _build_bootstrap_matrix(lambda_home, lambda_away, max_goals=8):
+    """Quick bivariate Poisson matrix for bootstrap sampling."""
+    prob_matrix = np.zeros((max_goals + 1, max_goals + 1))
+    for i in range(max_goals + 1):
+        pi = math.exp(-lambda_home) * (lambda_home ** i) / math.factorial(i)
+        for j in range(max_goals + 1):
+            pj = math.exp(-lambda_away) * (lambda_away ** j) / math.factorial(j)
+            prob_matrix[i, j] = pi * pj
+    total = prob_matrix.sum()
+    if total > 0: prob_matrix /= total
+    return {
+        'prob_matrix': prob_matrix,
+        'lambda_home': lambda_home, 'lambda_away': lambda_away,
+        'prob_h': float(np.sum(np.tril(prob_matrix, -1))),
+        'prob_d': float(np.sum(np.diag(prob_matrix))),
+        'prob_a': float(np.sum(np.triu(prob_matrix, 1))),
+        'prob_over_25': float(sum(prob_matrix[i, j] for i in range(max_goals + 1)
+                                 for j in range(max_goals + 1) if i + j > 2)),
+        'prob_under_25': float(sum(prob_matrix[i, j] for i in range(max_goals + 1)
+                                   for j in range(max_goals + 1) if i + j <= 2)),
+    }
+
+# ═══════════════════════════════════════════════════════════════════════
 
 def _score_to_key(score_str: str) -> str:
     return f"bookie_cs_{score_str.replace('-', '')}"
@@ -64,22 +400,24 @@ def _get_score_prob(pred, score_str: str) -> float:
 
 def build_dynamic_dutch(pred, est_odds, strategy='dynamic',
                         max_legs=8, max_overround=0.92, min_selections=3):
-    """Constrói um dutch agregando os placares mais provaveis da estrategia.
+    """Build a Dutching combination of correct scores.
 
-    Com odds ESTIMADAS (derivadas do mercado O/U 2.5), nao faz sentido filtrar por EV
-    individual — a divergencia modelo-vs-mercado esta no lambda total, nao por placar.
-    O edge de cada placar e aproximadamente 1/juice - 1 (negativo) para todos.
+    With ESTIMATED odds (derived from O/U 2.5 market), individual EV per score
+    is ~constant — the real edge comes from model-vs-market divergence in
+    total lambda. Selection uses:
 
-    A estrategia correta com odds estimadas:
-    1. Inclui todos os placares do grupo (respeitando max_overround)
-    2. Calcula o edge AGREGADO do dutch completo
-    3. Se edge agregado > 0, o dutch captura a divergencia modelo vs mercado
+    1. Strategy group → candidate scores (or all 20 for 'dynamic')
+    2. Directional dominance weighting: scores consistent with λ_home/λ_away
+       get boosted, mismatched scores get suppressed
+    3. Composite = prob × dominance_weight → sort descending
+    4. Select up to max_legs within max_overround
+    5. Trim worst legs while edge < 0
 
-    O edge agregado reflete essencialmente o edge que o modelo teria no mercado O/U 2.5,
-    redistribuido entre os placares do dutch.
-
-    Com odds REAIS de CS (API), filtrariamos por EV individual (min_ev=5%).
+    With REAL CS odds (from API), would filter by individual EV instead.
     """
+    lambda_home = pred.get('lambda_home', 1.2)
+    lambda_away = pred.get('lambda_away', 1.0)
+
     if strategy in SCORE_GROUPS:
         candidate_scores = list(SCORE_GROUPS[strategy])
     else:
@@ -94,6 +432,10 @@ def build_dynamic_dutch(pred, est_odds, strategy='dynamic',
         if pd.isna(odd) or np.isnan(odd) or odd <= 1.3 or prob <= 0.005:
             continue
 
+        # Directional dominance weight (new — respects λ ratio)
+        dom_weight = score_dominance_weight(score, lambda_home, lambda_away)
+        composite = prob * dom_weight
+
         all_candidates.append({
             'score': score,
             'prob': prob,
@@ -101,24 +443,23 @@ def build_dynamic_dutch(pred, est_odds, strategy='dynamic',
             'key': key,
             'ev': prob * odd - 1.0,
             'prob_odd_ratio': prob / (1.0 / odd),
+            'dominance_weight': dom_weight,
+            'composite': composite,
         })
 
     if len(all_candidates) < min_selections:
         return None, None, None, None, None, 0, 0, -1
 
-    # Detecta se temos odds reais de CS (EV varia entre scores)
-    # Com odds estimadas, todos os EV sao ~1/juice - 1 (quase identicos)
+    # Detect real CS odds (EV varies) vs estimated (EV ~constant)
     ev_values = [c['ev'] for c in all_candidates]
     has_real_odds = (max(ev_values) - min(ev_values)) > 0.03 and max(ev_values) > -0.01
 
     if has_real_odds:
-        # Odds reais: seleciona por EV positivo, depois por EV decrescente
         all_candidates.sort(key=lambda x: (x['ev'] > 0, x['ev']), reverse=True)
     else:
-        # Odds estimadas: seleciona por probabilidade (EV individual nao informativo)
-        all_candidates.sort(key=lambda x: x['prob'], reverse=True)
+        # Sort by composite (prob × dominance) instead of raw prob
+        all_candidates.sort(key=lambda x: x['composite'], reverse=True)
 
-    # Seleciona todos os candidatos ate o limite de max_legs e max_overround
     selected = []
     cum_overround = 0.0
     cum_prob = 0.0
@@ -136,8 +477,7 @@ def build_dynamic_dutch(pred, est_odds, strategy='dynamic',
     dutching_odd = 1.0 / cum_overround
     edge = cum_prob * dutching_odd - 1.0
 
-    # Remove a pior perna (menor prob/odd) enquanto edge < 0
-    # Isso concentra o dutch nos placares onde modelo e mais otimista que o mercado
+    # Trim worst leg while edge < 0
     while edge < 0 and len(selected) > min_selections:
         worst = min(selected, key=lambda c: c['prob_odd_ratio'])
         selected.remove(worst)
@@ -155,16 +495,7 @@ def build_dynamic_dutch(pred, est_odds, strategy='dynamic',
     probs_list = [round(c['prob'], 4) for c in selected]
     odds_list = [round(c['odd'], 2) for c in selected]
     keys_list = [c['key'] for c in selected]
-
-    strategy_labels = {
-        'dynamic': 'Dinamico (Top Probabilidades)',
-        'home_fav': 'Favorito Mandante',
-        'away_fav': 'Favorito Visitante',
-        'draw': 'Empate',
-        'under': 'Under / Jogo Truncado',
-        'over': 'Over / Goleada',
-    }
-    label = strategy_labels.get(strategy, strategy)
+    label = STRATEGY_LABELS.get(strategy, strategy)
 
     return outcomes, probs_list, odds_list, keys_list, label, cum_prob, dutching_odd, edge
 
@@ -195,31 +526,36 @@ def get_selections_and_alternatives(pred, outcomes_to_cover, est_odds):
     alternative_scores.sort(key=lambda x: x['prob'], reverse=True)
     return selections_probs, alternative_scores
 
+def resolve_strategy(strategy_name, pred, is_home_fav):
+    """Resolve strategy for Dutching: if 'auto_ia', pick based on game profile.
+
+    Extracted as module-level function so both the live scanner and the
+    Dutching backtester can share the same classification logic.
+    """
+    if strategy_name != 'auto_ia':
+        return strategy_name
+    g_exp = pred.get('lambda_home', 1.0) + pred.get('lambda_away', 1.0)
+    prob_under25 = pred.get('prob_under_25', 0.5)
+    prob_draw = pred.get('prob_d', 0.26)
+    prob_h = pred.get('prob_h', 0.37)
+    prob_a = pred.get('prob_a', 0.37)
+
+    if g_exp < 2.30 or prob_under25 > 0.55:
+        return 'under'
+    elif prob_draw > 0.32:
+        return 'draw'
+    elif is_home_fav and prob_h > 0.45:
+        return 'home_fav'
+    elif not is_home_fav and prob_a > 0.45:
+        return 'away_fav'
+    else:
+        return 'dynamic'
+
+
 def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto_ia', data_source='auto', futpython_api_key=''):
     if not api_key:
         api_key = os.getenv('THE_ODDS_API_KEY') or get_odds_api_token()
     opportunities = []
-
-    # Helper para resolver a estratégia: se 'auto_ia', escolhe baseado no perfil do jogo
-    def resolve_strategy(strategy_name, pred, is_home_fav):
-        if strategy_name != 'auto_ia':
-            return strategy_name
-        g_exp = pred.get('lambda_home', 1.0) + pred.get('lambda_away', 1.0)
-        prob_under25 = pred.get('prob_under_25', 0.5)
-        prob_draw = pred.get('prob_d', 0.26)
-        prob_h = pred.get('prob_h', 0.37)
-        prob_a = pred.get('prob_a', 0.37)
-
-        if g_exp < 2.30 or prob_under25 > 0.55:
-            return 'under'
-        elif prob_draw > 0.32:
-            return 'draw'
-        elif is_home_fav and prob_h > 0.45:
-            return 'home_fav'
-        elif not is_home_fav and prob_a > 0.45:
-            return 'away_fav'
-        else:
-            return 'dynamic'
 
     def _load_league_data(league_code):
         """Lazy-load historical data for a single league."""

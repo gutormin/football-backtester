@@ -408,6 +408,263 @@ function toggleDutchingGuide() {
     }
 }
 
+// ── Dutching Backtest ──────────────────────────────────────────────────
+
+var dutchingBtChartInstance = null;
+
+async function loadDutchingBtLeagues() {
+    const select = document.getElementById('dutching-bt-leagues');
+    if (!select) return;
+    try {
+        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/leagues?source=footballdata`);
+        if (!res.ok) return;
+        const leagues = await res.json();
+        select.innerHTML = '';
+        leagues.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = l.code;
+            opt.textContent = l.name || l.code;
+            // Pre-select common leagues
+            if (['BRAZIL_SERIE_A', 'BRAZIL_SERIE_B', 'E0', 'SP1', 'ARG'].includes(l.code)) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+    } catch (e) {
+        console.warn('Failed to load Dutching BT leagues:', e);
+    }
+}
+
+async function runDutchingBacktest() {
+    const btn = document.getElementById('btn-run-dutching-bt');
+    const statusEl = document.getElementById('dutching-bt-status');
+    const resultsEl = document.getElementById('dutching-bt-results');
+
+    if (!btn || !statusEl) return;
+
+    const leagueSelect = document.getElementById('dutching-bt-leagues');
+    const selectedLeagues = Array.from(leagueSelect.selectedOptions).map(o => o.value);
+    if (selectedLeagues.length === 0) {
+        statusEl.innerHTML = '<span style="color: #f87171;">Selecione pelo menos 1 liga.</span>';
+        return;
+    }
+
+    const strategySelect = document.getElementById('dutching-bt-strategies');
+    const selectedStrategies = Array.from(strategySelect.selectedOptions).map(o => o.value);
+    if (selectedStrategies.length === 0) {
+        statusEl.innerHTML = '<span style="color: #f87171;">Selecione pelo menos 1 estratégia.</span>';
+        return;
+    }
+
+    const startDate = document.getElementById('dutching-bt-start').value;
+    const endDate = document.getElementById('dutching-bt-end').value;
+    const stakeValue = parseFloat(document.getElementById('dutching-bt-stake').value) || 100;
+    const minEdgePct = parseFloat(document.getElementById('dutching-bt-edge').value) || 0;
+    const stakingRule = document.getElementById('dutching-bt-staking').value;
+    const initialBankroll = parseFloat(document.getElementById('dutching-bt-bankroll').value) || 10000;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-arrows-rotate spinning"></i> Rodando...';
+    statusEl.innerHTML = '<span style="color: #a78bfa;">Processando backtest cronológico... Isso pode levar até 2 minutos.</span>';
+    resultsEl.style.display = 'none';
+
+    try {
+        const payload = {
+            leagues: selectedLeagues,
+            startDate: startDate,
+            endDate: endDate,
+            strategies: selectedStrategies,
+            initialBankroll: initialBankroll,
+            stakeValue: stakeValue,
+            stakingRule: stakingRule,
+            minEdge: minEdgePct / 100.0,
+            maxOverround: 0.92,
+            maxLegs: 8,
+            minSelections: 3,
+        };
+
+        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/backtest_dutching`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: 'Erro desconhecido' }));
+            throw new Error(err.detail || 'Backtest failed');
+        }
+
+        const data = await res.json();
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        renderDutchingBacktestResults(data);
+        statusEl.innerHTML = '<span style="color: #34d399;"><i class="fa-solid fa-circle-check"></i> Backtest concluído!</span>';
+        showToast('Backtest Dutching concluído!', 'success');
+    } catch (err) {
+        console.error('Dutching backtest error:', err);
+        statusEl.innerHTML = `<span style="color: #f87171;"><i class="fa-solid fa-circle-exclamation"></i> ${err.message}</span>`;
+        showToast('Erro no backtest Dutching: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Rodar Backtest Dutching';
+    }
+}
+
+function renderDutchingBacktestResults(data) {
+    const resultsEl = document.getElementById('dutching-bt-results');
+    if (!resultsEl) return;
+    resultsEl.style.display = 'block';
+
+    // Summary cards
+    const summary = data.summary || {};
+    const summaryEl = document.getElementById('dutching-bt-summary');
+    summaryEl.innerHTML = `
+        <div style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); padding: 12px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Total de Dutchings</div>
+            <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">${summary.total_bets || 0}</div>
+        </div>
+        <div style="background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.2); padding: 12px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Win Rate</div>
+            <div style="font-size: 20px; font-weight: 700; color: #34d399;">${summary.win_rate || 0}%</div>
+        </div>
+        <div style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); padding: 12px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Lucro Total</div>
+            <div style="font-size: 20px; font-weight: 700; color: ${(summary.net_profit || 0) >= 0 ? '#34d399' : '#f87171'};">
+                $${(summary.net_profit || 0).toFixed(2)}
+            </div>
+        </div>
+        <div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); padding: 12px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">ROI</div>
+            <div style="font-size: 20px; font-weight: 700; color: ${(summary.roi || 0) >= 0 ? '#34d399' : '#f87171'};">
+                ${(summary.roi || 0) >= 0 ? '+' : ''}${(summary.roi || 0).toFixed(1)}%
+            </div>
+        </div>
+    `;
+
+    // Strategy breakdown table
+    const tbody = document.getElementById('dutching-bt-strategy-tbody');
+    tbody.innerHTML = '';
+    const breakdown = data.strategy_breakdown || {};
+    for (const [key, s] of Object.entries(breakdown)) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong style="color: #a78bfa;">${s.label || key}</strong></td>
+            <td>${s.total_bets}</td>
+            <td style="color: ${s.win_rate >= 25 ? '#34d399' : '#f87171'};">${s.win_rate}%</td>
+            <td style="color: ${s.net_profit >= 0 ? '#34d399' : '#f87171'}; font-weight: 600;">$${s.net_profit.toFixed(2)}</td>
+            <td style="color: ${s.roi >= 0 ? '#34d399' : '#f87171'};">${s.roi >= 0 ? '+' : ''}${s.roi}%</td>
+            <td style="color: var(--text-muted);">${s.avg_edge_realized >= 0 ? '+' : ''}${s.avg_edge_realized}%</td>
+            <td style="color: #f87171;">${s.max_drawdown}%</td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    // Equity curve chart
+    renderDutchingBtEquityChart(breakdown);
+
+    // Coverage analysis (from first strategy with data)
+    const coverageEl = document.getElementById('dutching-bt-coverage');
+    let hasCoverage = false;
+    for (const [key, s] of Object.entries(breakdown)) {
+        const cov = s.coverage_analysis;
+        if (cov && (cov.most_hit_scores?.length > 0 || cov.most_missed_scores?.length > 0)) {
+            const hitsEl = document.getElementById('dutching-bt-top-hits');
+            const missesEl = document.getElementById('dutching-bt-top-misses');
+
+            hitsEl.innerHTML = cov.most_hit_scores.slice(0, 8).map(
+                sc => `<span style="display: inline-block; margin: 2px; padding: 3px 8px; background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); border-radius: 4px;">${sc.score} <strong style="color: #34d399;">${sc.hits}x</strong></span>`
+            ).join('') || '<span style="color: var(--text-muted);">Nenhum acerto registrado</span>';
+
+            missesEl.innerHTML = cov.most_missed_scores.slice(0, 8).map(
+                sc => `<span style="display: inline-block; margin: 2px; padding: 3px 8px; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); border-radius: 4px;">${sc.score} <strong style="color: #f87171;">errou ${sc.misses}x</strong></span>`
+            ).join('') || '<span style="color: var(--text-muted);">Nenhum erro registrado</span>';
+
+            hasCoverage = true;
+            break;
+        }
+    }
+    if (coverageEl) coverageEl.style.display = hasCoverage ? 'block' : 'none';
+}
+
+function renderDutchingBtEquityChart(breakdown) {
+    const ctx = document.getElementById('dutching-bt-equity-chart');
+    if (!ctx) return;
+
+    if (dutchingBtChartInstance) {
+        dutchingBtChartInstance.destroy();
+    }
+
+    const colors = ['#a78bfa', '#34d399', '#f59e0b', '#3b82f6', '#ec4899', '#10b981', '#06b6d4'];
+    const datasets = [];
+    let ci = 0;
+
+    for (const [key, s] of Object.entries(breakdown)) {
+        const curve = s.equity_curve || [];
+        if (curve.length < 2) continue;
+
+        const color = colors[ci % colors.length];
+        datasets.push({
+            label: s.label || key,
+            data: curve.map((p, i) => ({ x: i, y: p.bankroll })),
+            borderColor: color,
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.2,
+        });
+        ci++;
+    }
+
+    if (datasets.length === 0) return;
+
+    dutchingBtChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: { display: true, text: 'Aposta #', color: '#9ca3af', font: { size: 10 } },
+                    ticks: { color: '#9ca3af', font: { size: 9 } },
+                    grid: { color: 'rgba(255,255,255,0.03)' },
+                },
+                y: {
+                    title: { display: true, text: 'Bankroll ($)', color: '#9ca3af', font: { size: 10 } },
+                    ticks: { color: '#9ca3af', font: { size: 9 } },
+                    grid: { color: 'rgba(255,255,255,0.03)' },
+                },
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 12, padding: 8 },
+                },
+            },
+        },
+    });
+}
+
+// Load leagues on Dutching tab switch (attach to existing switchTab or init)
+(function() {
+    const origSwitchTab = window.switchTab;
+    if (origSwitchTab) {
+        window.switchTab = function(tabId) {
+            origSwitchTab(tabId);
+            if (tabId === 'tab-dutching') {
+                loadDutchingBtLeagues();
+            }
+        };
+    }
+    // Also try loading on page init
+    window.addEventListener('load', function() {
+        setTimeout(loadDutchingBtLeagues, 2000);
+    });
+})();
+
 // Expose to window
 window.addDutchingRow = addDutchingRow;
 window.removeDutchingRow = removeDutchingRow;
@@ -417,6 +674,8 @@ window.filterDutchingRadar = filterDutchingRadar;
 window.loadDutchingOpportunityByIndex = loadDutchingOpportunityByIndex;
 window.sortDutchingRadar = sortDutchingRadar;
 window.toggleDutchingGuide = toggleDutchingGuide;
+window.runDutchingBacktest = runDutchingBacktest;
+window.loadDutchingBtLeagues = loadDutchingBtLeagues;
 // Bot configs and API key functions are defined and exposed in app.js
 
 
