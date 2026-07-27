@@ -1537,12 +1537,13 @@ window.addEventListener('unhandledrejection', function(e) {
  <th class="sortable" data-sort-key="odd" onclick="window.sortDutchingRadar('odd')" title="Clique para ordenar por Odd Combinada">Odd Comb. <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
  <th class="sortable" data-sort-key="prob" onclick="window.sortDutchingRadar('prob')" title="Clique para ordenar por Probabilidade Real">Prob. IA <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
  <th class="sortable" data-sort-key="edge" onclick="window.sortDutchingRadar('edge')" title="Clique para ordenar por Edge">Edge (+EV) <i class="fa-solid fa-sort" style="font-size: 10px; margin-left: 4px; color: var(--text-muted);"></i></th>
+ <th title="Quality Score: 0-100 agregando edge, robustez, perfil, odds, mercado e diversidade">Qualidade</th>
  <th>Ação</th>
  </tr>
  </thead>
  <tbody id="dutching-radar-list">
  <tr>
- <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma oportunidade detectada no momento. Clique em 'Atualizar Odds Radar' para escanear.</td>
+ <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhuma oportunidade detectada no momento. Clique em 'Atualizar Odds Radar' para escanear.</td>
  </tr>
  </tbody>
  </table>
@@ -1616,6 +1617,10 @@ window.addEventListener('unhandledrejection', function(e) {
  <div style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px;" id="dutching-result-type-label">Lucro Líquido</div>
  <div style="font-size: 16px; font-weight: 700; color: #34d399;" id="dutching-profit-value">$0.00</div>
  </div>
+ </div>
+
+ <!-- Quality Score Card (filled by JS when opportunity is loaded) -->
+ <div id="dutching-quality-card" style="display: none; background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.2); padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 11px;">
  </div>
 
  <div class="table-responsive" style="margin-bottom: 15px;">

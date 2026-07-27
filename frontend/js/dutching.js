@@ -304,7 +304,7 @@ function filterDutchingRadar() {
         const msg = searchQuery
             ? `Nenhum resultado encontrado para "${searchQuery}".`
             : 'Nenhuma oportunidade +EV correspondente encontrada.';
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">${msg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">${msg}</td></tr>`;
         return;
     }
 
@@ -325,6 +325,9 @@ function filterDutchingRadar() {
             <td><span style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${opp.dutching_odd.toFixed(2)}</span></td>
             <td><span style="color: #a78bfa; font-weight: 500; font-size: 13px;">${opp.model_prob}</span></td>
             <td><span style="color: #34d399; font-weight: 700; font-size: 13px;">${opp.edge}</span></td>
+            <td style="text-align: center;">
+                ${opp.quality_verdict ? `<span style="font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 700; background: ${opp.quality_verdict_color || '#f87171'}20; color: ${opp.quality_verdict_color || '#f87171'}; border: 1px solid ${opp.quality_verdict_color || '#f87171'}40;" title="${opp.quality_verdict_label || ''} | Score: ${opp.quality_score}/100">${opp.quality_verdict_icon || ''} ${opp.quality_score || '—'}</span>` : '<span style="color: var(--text-muted); font-size: 10px;">—</span>'}
+            </td>
             <td>
                 <button type="button" class="btn-clear" onclick="loadDutchingOpportunityByIndex(${index})" style="padding: 6px 10px; font-size: 11px; color: #a78bfa; border-color: rgba(167,139,250,0.3); background: rgba(167,139,250,0.05); cursor: pointer;">
                     <i class="fa-solid fa-download"></i> Carregar
@@ -338,18 +341,19 @@ function filterDutchingRadar() {
 function loadDutchingOpportunityByIndex(index) {
     const opp = window.dutchingRadarFilteredOpps && window.dutchingRadarFilteredOpps[index];
     if (!opp) return;
-    
+
     const container = document.getElementById('dutching-rows-container');
     if (!container) return;
-    
+
     container.innerHTML = '';
-    
+
     opp.selections.forEach((sel, i) => {
         const suffix = opp.bookmaker === 'Betfair Exchange' ? ' (Betfair)' : '';
         const prob = (opp.selections_probs && opp.selections_probs[i]) ? opp.selections_probs[i] : 0.0;
         addDutchingRow(sel + suffix, opp.odds[i], prob);
     });
 
+    // ── Alternatives with decision badges ──
     const altContainer = document.getElementById('dutching-alternatives-container');
     const altList = document.getElementById('dutching-alternatives-list');
     if (altContainer && altList) {
@@ -357,25 +361,93 @@ function loadDutchingOpportunityByIndex(index) {
         if (opp.alternative_scores && opp.alternative_scores.length > 0) {
             altContainer.style.display = 'block';
             opp.alternative_scores.forEach(alt => {
+                const rec = alt.recommendation || 'neutral';
+                const badgeColors = {
+                    'add':     { bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.3)', text: '#34d399', icon: 'fa-circle-plus', label: 'ADD' },
+                    'neutral': { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)', text: '#f59e0b', icon: 'fa-circle', label: 'NEUTRO' },
+                    'skip':    { bg: 'rgba(248,113,113,0.06)', border: 'rgba(248,113,113,0.15)', text: 'rgba(248,113,113,0.45)', icon: 'fa-circle-minus', label: 'PULAR' },
+                };
+                const bc = badgeColors[rec] || badgeColors['neutral'];
+                const edgeChangeStr = alt.edge_change != null ? `${alt.edge_change >= 0 ? '+' : ''}${(alt.edge_change * 100).toFixed(1)}%` : '';
+                const opacity = rec === 'skip' ? '0.55' : '1';
+
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'btn-clear';
-                btn.style = 'padding: 6px 12px; font-size: 11px; border-color: rgba(167, 139, 250, 0.3); background: rgba(167, 139, 250, 0.05); color: #c084fc; cursor: pointer; display: flex; align-items: center; gap: 6px; border-radius: 4px; font-weight: 600;';
-                btn.innerHTML = `<i class="fa-solid fa-plus-circle"></i> + Cobrir ${alt.name} <span style="font-size: 10px; color: var(--text-muted); font-weight: normal;">(Odd: ${alt.odd.toFixed(2)} | IA: ${(alt.prob * 100).toFixed(1)}%)</span>`;
+                btn.style = `padding: 6px 12px; font-size: 11px; border: 1px solid ${bc.border}; background: ${bc.bg}; color: ${bc.text}; cursor: pointer; display: flex; align-items: center; gap: 6px; border-radius: 4px; font-weight: 600; opacity: ${opacity}; transition: opacity 0.2s;`;
+                btn.title = alt.reason || `Edge change: ${edgeChangeStr}`;
+                btn.innerHTML = `<i class="fa-solid ${bc.icon}"></i> + Cobrir ${alt.name} <span style="font-size: 10px; font-weight: normal;">(Odd: ${alt.odd.toFixed(2)} | IA: ${(alt.prob * 100).toFixed(1)}%)</span><span style="font-size: 9px; padding: 1px 5px; border-radius: 3px; background: ${bc.border}; color: ${bc.text}; margin-left: 2px;">${bc.label} ${edgeChangeStr}</span>`;
                 btn.onclick = () => {
                     const suffix = opp.bookmaker === 'Betfair Exchange' ? ' (Betfair)' : '';
                     addDutchingRow(alt.name + suffix, alt.odd, alt.prob);
                     btn.remove();
                     if (altList.children.length === 0) altContainer.style.display = 'none';
                 };
+                btn.onmouseenter = () => { btn.style.opacity = '1'; };
+                btn.onmouseleave = () => { btn.style.opacity = opacity; };
                 altList.appendChild(btn);
             });
         } else {
             altContainer.style.display = 'none';
         }
     }
-    
+
+    // ── Quality Score card ──
+    renderDutchingQualityCard(opp);
+
     showToast(`Oportunidade para ${opp.match} carregada na calculadora!`, "success");
+}
+
+function renderDutchingQualityCard(opp) {
+    const card = document.getElementById('dutching-quality-card');
+    if (!card) return;
+
+    const qs = opp.quality_score;
+    const qv = opp.quality_verdict;
+    const qvl = opp.quality_verdict_label;
+    const qvc = opp.quality_verdict_color;
+    const qvi = opp.quality_verdict_icon;
+    const qb = opp.quality_breakdown;
+
+    if (qs == null) {
+        card.style.display = 'none';
+        return;
+    }
+
+    card.style.display = 'block';
+
+    // Score bar color
+    let barColor = '#f87171';
+    if (qs >= 70) barColor = '#34d399';
+    else if (qs >= 55) barColor = '#f59e0b';
+    else if (qs >= 40) barColor = '#f97316';
+
+    card.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <span style="font-size: 24px;">${qvi || ''}</span>
+            <div>
+                <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);">Quality Score: <span style="color: ${barColor};">${qs}/100</span></div>
+                <div style="font-size: 12px; font-weight: 600; color: ${qvc || '#f87171'};">${qvl || 'SKIP'}</div>
+            </div>
+        </div>
+        <div style="background: rgba(255,255,255,0.04); border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 12px;">
+            <div style="background: ${barColor}; height: 100%; width: ${qs}%; border-radius: 4px; transition: width 0.5s ease;"></div>
+        </div>
+        ${qb ? `
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; font-size: 10px; color: var(--text-muted);">
+            <div><span style="color: var(--text-secondary);">Edge:</span> ${qb.edge_magnitude}/35</div>
+            <div><span style="color: var(--text-secondary);">Robustez:</span> ${qb.bootstrap_robustness}/25</div>
+            <div><span style="color: var(--text-secondary);">Perfil:</span> ${qb.profile_confidence}/15</div>
+            <div><span style="color: var(--text-secondary);">Odds:</span> ${qb.odd_quality}/10</div>
+            <div><span style="color: var(--text-secondary);">Mercado:</span> ${qb.market_divergence}/10</div>
+            <div><span style="color: var(--text-secondary);">Diversidade:</span> ${qb.selection_diversity}/5</div>
+        </div>
+        ` : ''}
+        <div style="margin-top: 8px; font-size: 10px; color: var(--text-muted);">
+            <span style="color: #a78bfa;">Perfil IA:</span> ${opp.game_profile || '—'}
+            ${opp.edge_prob_positive != null ? ` · <span style="color: #a78bfa;">P(edge&gt;0):</span> ${(opp.edge_prob_positive * 100).toFixed(0)}%` : ''}
+        </div>
+    `;
 }
 
 function sortDutchingRadar(key) {

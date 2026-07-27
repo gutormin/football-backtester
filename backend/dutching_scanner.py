@@ -387,6 +387,215 @@ def _build_bootstrap_matrix(lambda_home, lambda_away, max_goals=8):
     }
 
 # ═══════════════════════════════════════════════════════════════════════
+# Decision Layer: "Add this score?" and "Bet or skip?" (Melhoria #9)
+# ═══════════════════════════════════════════════════════════════════════
+
+QUALITY_VERDICTS = {
+    'STRONG_BET':  {'min': 70, 'label': 'FORTE: Apostar',       'color': '#34d399', 'icon': '🟢'},
+    'BET':         {'min': 55, 'label': 'OK: Apostar',          'color': '#f59e0b', 'icon': '🟡'},
+    'CAUTION':     {'min': 40, 'label': 'Cautela: Avaliar',     'color': '#f97316', 'icon': '🟠'},
+    'SKIP':        {'min': 0,  'label': 'Pular: Não Apostar',   'color': '#f87171', 'icon': '🔴'},
+}
+
+
+def evaluate_extra_score(current_outcomes, current_odds, current_cum_prob,
+                         cand_score, cand_prob, cand_odd):
+    """Evaluate whether adding an extra score improves the Dutching edge.
+
+    Calculates the marginal effect of adding cand_score to the current
+    selection. The decision rule:
+    - ADD: edge improves (edge_change > 0)
+    - NEUTRAL: edge doesn't change significantly (-0.5% to 0)
+    - SKIP: edge degrades (edge_change <= -0.5%)
+
+    Args:
+        current_outcomes: list of score strings already selected
+        current_odds: list of odds for already-selected scores
+        current_cum_prob: sum of probabilities for current selection
+        cand_score: candidate score string (e.g. '1-0')
+        cand_prob: model probability for candidate score
+        cand_odd: bookmaker odd for candidate score
+
+    Returns dict with edge_change, recommendation, new values
+    """
+    n_current = len(current_outcomes)
+    if n_current == 0:
+        return {'recommendation': 'add', 'edge_change': cand_prob * cand_odd - 1.0,
+                'new_dutching_odd': cand_odd, 'new_cum_prob': cand_prob,
+                'reason': 'First selection — always add'}
+
+    if cand_odd <= 1.3:
+        return {'recommendation': 'skip', 'edge_change': -0.10,
+                'new_dutching_odd': None, 'new_cum_prob': None,
+                'reason': 'Odd muito baixa (< 1.30), dilui o edge'}
+
+    # Current Dutching
+    cur_overround = sum(1.0 / o for o in current_odds)
+    cur_dutching_odd = 1.0 / cur_overround if cur_overround > 0 else 1.0
+    cur_edge = current_cum_prob * cur_dutching_odd - 1.0
+
+    # With candidate added
+    new_overround = cur_overround + 1.0 / cand_odd
+    new_dutching_odd = 1.0 / new_overround if new_overround > 0 else 1.0
+    new_cum_prob = current_cum_prob + cand_prob
+    new_edge = new_cum_prob * new_dutching_odd - 1.0
+
+    edge_change = new_edge - cur_edge
+
+    if edge_change > 0:
+        rec = 'add'
+        reason = f'Adicionar melhora edge em +{edge_change*100:.1f}%'
+    elif edge_change > -0.008:
+        rec = 'neutral'
+        reason = f'Neutro ({edge_change*100:+.1f}% edge), +{cand_prob*100:.1f}% cobertura'
+    else:
+        rec = 'skip'
+        reason = f'Dilui edge em {edge_change*100:.1f}% — não recomendado'
+
+    return {
+        'recommendation': rec,
+        'edge_change': round(edge_change, 4),
+        'cur_edge': round(cur_edge, 4),
+        'new_edge': round(new_edge, 4),
+        'new_dutching_odd': round(new_dutching_odd, 2),
+        'new_cum_prob': round(new_cum_prob, 4),
+        'reason': reason,
+    }
+
+
+def dutching_quality_score(edge, edge_ci_95=None, profile_confidence=0.0,
+                           dutching_odd=2.0, n_selections=5,
+                           market_divergence=0.0, edge_prob_positive=None):
+    """Aggregate quality score (0-100) for a Dutching bet decision.
+
+    Combines 6 signals into a single score:
+    - Edge magnitude (35%): raw predicted edge
+    - Bootstrap robustness (25%): P(edge > 0) from bootstrap CI
+    - Profile confidence (15%): how clear the game profile is
+    - Dutching odd (10%): odds sweet spot = 2.0-5.0
+    - Market divergence (10%): model-vs-market disagreement
+    - Selection diversity (5%): 5-6 legs is ideal
+
+    Returns dict with score, verdict, and component breakdown.
+    """
+    # ── 1. Edge magnitude (35%) ─────────────────────────────────
+    # Edge > 15% = perfect, edge ~0 = zero
+    edge_clipped = max(0.0, min(0.20, edge))
+    edge_score = (edge_clipped / 0.20) * 35.0  # linear 0-35
+
+    # ── 2. Bootstrap robustness (25%) ───────────────────────────
+    bootstrap_score = 0.0
+    if edge_prob_positive is not None:
+        # P(edge > 0): 50% → 0pts, 100% → 25pts
+        bootstrap_score = max(0.0, (edge_prob_positive - 0.50) / 0.50) * 25.0
+    elif edge_ci_95 is not None:
+        low, high = edge_ci_95
+        if low is not None and high is not None:
+            # CI entirely above 0 → high score; straddles 0 → low
+            ci_range = high - low if high > low else 0.01
+            if low > 0:
+                bootstrap_score = 25.0  # all positive
+            elif high > 0:
+                # Fraction of CI above zero
+                bootstrap_score = (high / ci_range) * 25.0
+            else:
+                bootstrap_score = 0.0
+
+    # ── 3. Profile confidence (15%) ────────────────────────────
+    profile_score = profile_confidence * 15.0  # 0-15
+
+    # ── 4. Dutching odd quality (10%) ──────────────────────────
+    if 1.5 <= dutching_odd <= 5.0:
+        odd_score = 10.0  # sweet spot
+    elif 1.2 <= dutching_odd < 1.5:
+        odd_score = 5.0  # too low, little return
+    elif dutching_odd > 5.0:
+        odd_score = 7.0  # high return but low probability
+    else:
+        odd_score = 0.0
+
+    # ── 5. Market divergence (10%) ─────────────────────────────
+    div_abs = abs(market_divergence)
+    if div_abs > 0.8:
+        div_score = 10.0  # strong disagreement = opportunity
+    elif div_abs > 0.4:
+        div_score = 7.0
+    elif div_abs > 0.15:
+        div_score = 4.0
+    else:
+        div_score = 1.0  # model agrees with market — no edge
+
+    # ── 6. Selection diversity (5%) ────────────────────────────
+    if 5 <= n_selections <= 6:
+        sel_score = 5.0  # ideal
+    elif n_selections == 4 or n_selections == 7:
+        sel_score = 3.0
+    elif n_selections == 3:
+        sel_score = 2.0  # minimum, risky
+    elif n_selections >= 8:
+        sel_score = 1.0  # too many, diluted
+    else:
+        sel_score = 0.0
+
+    total = edge_score + bootstrap_score + profile_score + odd_score + div_score + sel_score
+    total = round(min(100.0, total), 1)
+
+    # ── Verdict ─────────────────────────────────────────────────
+    verdict = 'SKIP'
+    verdict_label = QUALITY_VERDICTS['SKIP']['label']
+    verdict_color = QUALITY_VERDICTS['SKIP']['color']
+    verdict_icon = QUALITY_VERDICTS['SKIP']['icon']
+    for vkey in ['STRONG_BET', 'BET', 'CAUTION', 'SKIP']:
+        if total >= QUALITY_VERDICTS[vkey]['min']:
+            verdict = vkey
+            verdict_label = QUALITY_VERDICTS[vkey]['label']
+            verdict_color = QUALITY_VERDICTS[vkey]['color']
+            verdict_icon = QUALITY_VERDICTS[vkey]['icon']
+            break
+
+    return {
+        'score': total,
+        'verdict': verdict,
+        'verdict_label': verdict_label,
+        'verdict_color': verdict_color,
+        'verdict_icon': verdict_icon,
+        'breakdown': {
+            'edge_magnitude': round(edge_score, 1),
+            'bootstrap_robustness': round(bootstrap_score, 1),
+            'profile_confidence': round(profile_score, 1),
+            'odd_quality': round(odd_score, 1),
+            'market_divergence': round(div_score, 1),
+            'selection_diversity': round(sel_score, 1),
+        },
+    }
+
+
+def evaluate_alternatives(current_outcomes, current_odds, current_cum_prob,
+                          alternative_scores, pred, est_odds):
+    """Evaluate all alternative scores for a Dutching selection.
+
+    Returns alternatives with recommendations attached.
+    """
+    for alt in alternative_scores:
+        cand_prob = alt['prob']
+        cand_odd = alt['odd']
+        eval_result = evaluate_extra_score(
+            current_outcomes, current_odds, current_cum_prob,
+            alt['name'], cand_prob, cand_odd
+        )
+        alt['recommendation'] = eval_result['recommendation']
+        alt['edge_change'] = eval_result['edge_change']
+        alt['reason'] = eval_result['reason']
+        alt['new_dutching_odd'] = eval_result['new_dutching_odd']
+        alt['new_edge'] = eval_result['new_edge']
+
+    # Sort: ADD first, then NEUTRAL, then SKIP
+    rec_order = {'add': 0, 'neutral': 1, 'skip': 2}
+    alternative_scores.sort(key=lambda x: (rec_order.get(x.get('recommendation', 'skip'), 2), -(x.get('edge_change', -1))))
+
+    return alternative_scores
+
+# ═══════════════════════════════════════════════════════════════════════
 
 def _score_to_key(score_str: str) -> str:
     return f"bookie_cs_{score_str.replace('-', '')}"
@@ -757,6 +966,31 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 if edge > 0:
                     label_prefix = "IA " if strategy == 'auto_ia' else ""
                     _, alt_scores = get_selections_and_alternatives(pred, outcomes_to_cover, est_odds)
+
+                    # Decision layer: evaluate alternatives & quality
+                    alt_scores = evaluate_alternatives(
+                        outcomes_to_cover,
+                        [round(o, 2) for o in odds_to_cover],
+                        prob_combined,
+                        alt_scores, pred, est_odds
+                    )
+                    game_profile = classify_game_profile(pred, is_home_fav,
+                        market_ou_odds=(o25_odd, u25_odd) if o25_odd and u25_odd else None)
+                    edge_ci = bootstrap_dutching_edge(
+                        pred, est_odds, strategy=current_strat,
+                        max_legs=8, max_overround=0.92, min_selections=3,
+                        n_bootstrap=150, is_home_fav=is_home_fav
+                    )
+                    quality = dutching_quality_score(
+                        edge=edge,
+                        edge_ci_95=edge_ci.get('edge_ci_95'),
+                        profile_confidence=game_profile['confidence'],
+                        dutching_odd=dutching_odd,
+                        n_selections=len(outcomes_to_cover),
+                        market_divergence=game_profile.get('market_divergence', 0),
+                        edge_prob_positive=edge_ci.get('prob_positive'),
+                    )
+
                     opportunities.append({
                         'match': match_name,
                         'date': match_date,
@@ -771,7 +1005,17 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         'dutching_odd': round(dutching_odd, 2),
                         'model_prob': f"{round(prob_combined * 100, 2)}%",
                         'edge': f"+{round(edge * 100, 2)}%",
-                        'raw_edge': edge
+                        'raw_edge': edge,
+                        'game_profile': game_profile['best_profile'],
+                        'profile_confidence': game_profile['confidence'],
+                        'edge_ci_95': edge_ci.get('edge_ci_95'),
+                        'edge_prob_positive': edge_ci.get('prob_positive'),
+                        'quality_score': quality['score'],
+                        'quality_verdict': quality['verdict'],
+                        'quality_verdict_label': quality['verdict_label'],
+                        'quality_verdict_color': quality['verdict_color'],
+                        'quality_verdict_icon': quality['verdict_icon'],
+                        'quality_breakdown': quality['breakdown'],
                     })
 
     # 2. FONTE: API DATAFOOTBALL OU FOOTBALL-DATA CSV (DADOS LOCAIS)
@@ -876,6 +1120,24 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
             if edge > 0:
                 label_prefix = "IA " if strategy == 'auto_ia' else ""
                 _, alt_scores = get_selections_and_alternatives(pred, outcomes_b365, est_odds_b365)
+                alt_scores = evaluate_alternatives(
+                    outcomes_b365, [round(o, 2) for o in odds_b365],
+                    prob_combined, alt_scores, pred, est_odds_b365
+                )
+                game_profile = classify_game_profile(pred, is_home_fav,
+                    market_ou_odds=(odds_over25, odds_under25))
+                edge_ci = bootstrap_dutching_edge(
+                    pred, est_odds_b365, strategy=current_strat,
+                    n_bootstrap=150, is_home_fav=is_home_fav
+                )
+                quality = dutching_quality_score(
+                    edge=edge, edge_ci_95=edge_ci.get('edge_ci_95'),
+                    profile_confidence=game_profile['confidence'],
+                    dutching_odd=dutching_odd,
+                    n_selections=len(outcomes_b365),
+                    market_divergence=game_profile.get('market_divergence', 0),
+                    edge_prob_positive=edge_ci.get('prob_positive'),
+                )
                 opportunities.append({
                     'match': match_name,
                     'date': match_date,
@@ -890,7 +1152,17 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                     'dutching_odd': round(dutching_odd, 2),
                     'model_prob': f"{round(prob_combined * 100, 2)}%",
                     'edge': f"+{round(edge * 100, 2)}%",
-                    'raw_edge': edge
+                    'raw_edge': edge,
+                    'game_profile': game_profile['best_profile'],
+                    'profile_confidence': game_profile['confidence'],
+                    'edge_ci_95': edge_ci.get('edge_ci_95'),
+                    'edge_prob_positive': edge_ci.get('prob_positive'),
+                    'quality_score': quality['score'],
+                    'quality_verdict': quality['verdict'],
+                    'quality_verdict_label': quality['verdict_label'],
+                    'quality_verdict_color': quality['verdict_color'],
+                    'quality_verdict_icon': quality['verdict_icon'],
+                    'quality_breakdown': quality['breakdown'],
                 })
 
             # 2.2 ESTRATÉGIA SIMULADA PARA BETFAIR EXCHANGE (+8% de valor de odd)
@@ -903,6 +1175,16 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 if edge_bf > 0.01:
                     label_prefix = "IA " if strategy == 'auto_ia' else ""
                     _, alt_scores = get_selections_and_alternatives(pred, outcomes_b365, est_odds_b365)
+                    alt_scores = evaluate_alternatives(
+                        outcomes_b365, [round(o, 2) for o in odds_betfair],
+                        prob_combined, alt_scores, pred, est_odds_b365
+                    )
+                    quality = dutching_quality_score(
+                        edge=edge_bf, edge_ci_95=None,
+                        profile_confidence=0.0,
+                        dutching_odd=dutching_odd_bf,
+                        n_selections=len(outcomes_b365),
+                    )
                     opportunities.append({
                         'match': match_name,
                         'date': match_date,
@@ -917,7 +1199,17 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         'dutching_odd': round(dutching_odd_bf, 2),
                         'model_prob': f"{round(prob_combined * 100, 2)}%",
                         'edge': f"+{round(edge_bf * 100, 2)}%",
-                        'raw_edge': edge_bf
+                        'raw_edge': edge_bf,
+                        'game_profile': None,
+                        'profile_confidence': 0,
+                        'edge_ci_95': None,
+                        'edge_prob_positive': None,
+                        'quality_score': quality['score'],
+                        'quality_verdict': quality['verdict'],
+                        'quality_verdict_label': quality['verdict_label'],
+                        'quality_verdict_color': quality['verdict_color'],
+                        'quality_verdict_icon': quality['verdict_icon'],
+                        'quality_breakdown': quality['breakdown'],
                     })
 
     # Ordena oportunidades pelo Edge
