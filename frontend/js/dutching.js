@@ -622,11 +622,6 @@ async function runDutchingBacktest() {
         return;
     }
 
-    // Aviso se muitas ligas
-    if (selectedLeagues.length > 10) {
-        statusEl.innerHTML = `<span style="color: #f59e0b;">⚠️ ${selectedLeagues.length} ligas selecionadas pode ser lento. Recomendamos até 10 ligas por vez.</span>`;
-    }
-
     const strategySelect = document.getElementById('dutching-bt-strategies');
     const selectedStrategies = Array.from(strategySelect.selectedOptions).map(o => o.value);
     if (selectedStrategies.length === 0) {
@@ -641,10 +636,9 @@ async function runDutchingBacktest() {
     const today = new Date().toISOString().split('T')[0];
     if (endDate >= today) {
         statusEl.innerHTML = '<span style="color: #f87171;">⚠️ O período deve ser histórico (datas passadas). O backtest só funciona com dados já disponíveis.</span>';
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-play"></i> Rodar Backtest';
         return;
     }
+
     const stakeValue = parseFloat(document.getElementById('dutching-bt-stake').value) || 50;
     const minEdgePct = parseFloat(document.getElementById('dutching-bt-edge').value) || 0;
     const stakingMode = document.getElementById('dutching-bt-staking').value;
@@ -652,10 +646,9 @@ async function runDutchingBacktest() {
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-arrows-rotate spinning"></i> Rodando...';
-    statusEl.innerHTML = '<span style="color: #a78bfa;">Processando backtest cronológico... Pode levar 1-3 minutos.</span>';
     if (resultsEl) resultsEl.style.display = 'none';
 
-    // Build list of runs: if "both", run fixed + kelly
+    // Build list of staking runs
     const runs = [];
     if (stakingMode === 'both') {
         runs.push({ rule: 'fixed', label: 'Stake Fixa' });
@@ -668,52 +661,252 @@ async function runDutchingBacktest() {
         const allResults = {};
 
         for (const run of runs) {
-            statusEl.innerHTML = `<span style="color: #a78bfa;">Rodando ${run.label}... aguarde.</span>`;
-            const payload = {
-                leagues: selectedLeagues,
-                startDate,
-                endDate,
-                strategies: selectedStrategies,
-                initialBankroll,
-                stakeValue,
-                stakingRule: run.rule,
-                minEdge: minEdgePct / 100.0,
-                maxOverround: 0.92,
-                maxLegs: 8,
-                minSelections: 3,
-            };
+            // ── Process ONE league at a time to avoid Render 30s timeout ──
+            let mergedBets = [];
+            let mergedEquity = {};
+            let errors = [];
 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min
-            const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/backtest_dutching`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-                signal: controller.signal,
-            });
-            clearTimeout(timeoutId);
+            for (let i = 0; i < selectedLeagues.length; i++) {
+                const league = selectedLeagues[i];
+                statusEl.innerHTML = `<span style="color: #a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> ${run.label} — liga ${i + 1}/${selectedLeagues.length}: <strong>${league}</strong></span>`;
 
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({ detail: 'Erro desconhecido' }));
-                throw new Error(errData.detail || errData.message || `Erro HTTP ${res.status}`);
+                const payload = {
+                    leagues: [league],   // UMA liga por vez
+                    startDate,
+                    endDate,
+                    strategies: selectedStrategies,
+                    initialBankroll,
+                    stakeValue,
+                    stakingRule: run.rule,
+                    minEdge: minEdgePct / 100.0,
+                    maxOverround: 0.92,
+                    maxLegs: 8,
+                    minSelections: 3,
+                };
+
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min per league
+                    const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/backtest_dutching`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                        signal: controller.signal,
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (!res.ok) {
+                        // Render 502 returns HTML, not JSON
+                        const contentType = res.headers.get('content-type') || '';
+                        if (contentType.includes('application/json')) {
+                            const errData = await res.json().catch(() => ({}));
+                            errors.push(`${league}: ${errData.detail || 'Erro HTTP ' + res.status}`);
+                        } else {
+                            errors.push(`${league}: Timeout do servidor (${res.status}). Tente com menos ligas ou período menor.`);
+                        }
+                        continue;
+                    }
+
+                    const data = await res.json();
+                    if (data.error) {
+                        errors.push(`${league}: ${data.error}`);
+                        continue;
+                    }
+
+                    // Merge bets
+                    if (data.bets) mergedBets = mergedBets.concat(data.bets);
+
+                    // Merge equity curves
+                    for (const [key, curve] of Object.entries(data.equity_curves || {})) {
+                        if (!mergedEquity[key]) mergedEquity[key] = [];
+                        mergedEquity[key] = mergedEquity[key].concat(curve);
+                    }
+
+                } catch (fetchErr) {
+                    if (fetchErr.name === 'AbortError') {
+                        errors.push(`${league}: Timeout — a liga demorou demais.`);
+                    } else {
+                        errors.push(`${league}: ${fetchErr.message}`);
+                    }
+                }
             }
 
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
-            allResults[run.rule] = { data, label: run.label };
+            // ── Sort bets by date and recalculate bankroll ──
+            mergedBets.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+            let bankroll = initialBankroll;
+            let totalStaked = 0;
+            let wins = 0;
+            mergedBets.forEach(b => {
+                bankroll += (b.profit || 0);
+                b.bankroll = bankroll;
+                totalStaked += (b.total_stake || 0);
+                if (b.won || b.covered) wins++;
+            });
+
+            const netProfit = bankroll - initialBankroll;
+            const roi = totalStaked > 0 ? (netProfit / totalStaked * 100) : 0;
+            const winRate = mergedBets.length > 0 ? (wins / mergedBets.length * 100) : 0;
+
+            // Build merged result
+            const mergedResult = {
+                summary: {
+                    total_bets: mergedBets.length,
+                    total_wins: wins,
+                    win_rate: Math.round(winRate * 10) / 10,
+                    net_profit: Math.round(netProfit * 100) / 100,
+                    roi: Math.round(roi * 10) / 10,
+                    total_staked: Math.round(totalStaked * 100) / 100,
+                    initial_bankroll: initialBankroll,
+                    final_bankroll: Math.round(bankroll * 100) / 100,
+                },
+                bets: mergedBets,
+                equity_curves: mergedEquity,
+                strategy_breakdown: _buildStrategyBreakdown(mergedBets, initialBankroll, selectedStrategies),
+            };
+
+            allResults[run.rule] = { data: mergedResult, label: run.label };
+
+            if (errors.length > 0) {
+                console.warn('Dutching BT errors:', errors);
+            }
+        }
+
+        // Check if we got any bets at all
+        const primaryKey = allResults['fixed'] ? 'fixed' : Object.keys(allResults)[0];
+        const primary = allResults[primaryKey]?.data;
+        if (!primary || primary.summary.total_bets === 0) {
+            statusEl.innerHTML = '<span style="color: #f59e0b;">⚠️ Nenhuma aposta encontrada no período. Tente ampliar o período ou reduzir o edge mínimo.</span>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-play"></i> Rodar Backtest';
+            return;
         }
 
         renderDutchingBacktestResults(allResults, stakingMode);
-        statusEl.innerHTML = '<span style="color: #34d399;"><i class="fa-solid fa-circle-check"></i> Backtest concluído!</span>';
+        statusEl.innerHTML = `<span style="color: #34d399;"><i class="fa-solid fa-circle-check"></i> Backtest concluído! ${primary.summary.total_bets} apostas analisadas.</span>`;
         showToast('Backtest Dutching concluído!', 'success');
     } catch (err) {
         console.error('Dutching backtest error:', err);
         statusEl.innerHTML = `<span style="color: #f87171;"><i class="fa-solid fa-circle-exclamation"></i> ${err.message}</span>`;
-        showToast('Erro no backtest Dutching: ' + err.message, 'error');
+        showToast('Erro no backtest: ' + err.message, 'error');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-play"></i> Rodar Backtest';
     }
+}
+
+// Helper: rebuild strategy breakdown from merged bets
+function _buildStrategyBreakdown(bets, initialBankroll, strategies) {
+    const breakdown = {};
+    const LABELS = {
+        'auto_ia': 'IA Auto (Perfil)',
+        'dynamic': 'Dinâmico (Top Probs)',
+        'home_fav': 'Favorito Mandante',
+        'away_fav': 'Favorito Visitante',
+        'draw': 'Empate',
+        'under': 'Under / Jogo Truncado',
+        'over': 'Over / Goleada',
+    };
+
+    for (const strat of strategies) {
+        const sBets = bets.filter(b => (b.resolved_strategy || b.strategy) === strat || strat === 'auto_ia');
+        if (sBets.length === 0) continue;
+
+        let bankroll = initialBankroll;
+        let peak = initialBankroll;
+        let maxDD = 0;
+        let totalStaked = 0;
+        let wins = 0;
+        let profits = [];
+        let edgePredicted = [];
+        const monthlyMap = {};
+        const leagueMap = {};
+
+        sBets.forEach(b => {
+            const profit = b.profit || 0;
+            bankroll += profit;
+            totalStaked += (b.total_stake || 0);
+            if (b.won || b.covered) wins++;
+            if (bankroll > peak) peak = bankroll;
+            const dd = peak > 0 ? ((peak - bankroll) / peak * 100) : 0;
+            if (dd > maxDD) maxDD = dd;
+            profits.push(profit);
+            if (b.edge_predicted) edgePredicted.push(b.edge_predicted * 100);
+
+            // Monthly
+            const month = (b.date || '').substring(0, 7);
+            if (month) {
+                if (!monthlyMap[month]) monthlyMap[month] = { bets: 0, wins: 0, profit: 0, staked: 0 };
+                monthlyMap[month].bets++;
+                if (b.won || b.covered) monthlyMap[month].wins++;
+                monthlyMap[month].profit += profit;
+                monthlyMap[month].staked += (b.total_stake || 0);
+            }
+
+            // League
+            const lg = b.league || 'Unknown';
+            if (!leagueMap[lg]) leagueMap[lg] = { bets: 0, wins: 0, profit: 0, staked: 0 };
+            leagueMap[lg].bets++;
+            if (b.won || b.covered) leagueMap[lg].wins++;
+            leagueMap[lg].profit += profit;
+            leagueMap[lg].staked += (b.total_stake || 0);
+        });
+
+        const netProfit = bankroll - initialBankroll;
+        const roi = totalStaked > 0 ? (netProfit / totalStaked * 100) : 0;
+        const winRate = sBets.length > 0 ? (wins / sBets.length * 100) : 0;
+        const avgProfit = profits.length > 0 ? profits.reduce((a, b) => a + b, 0) / profits.length : 0;
+        const stdProfit = profits.length > 1 ? Math.sqrt(profits.map(p => Math.pow(p - avgProfit, 2)).reduce((a, b) => a + b, 0) / (profits.length - 1)) : 1;
+        const sharpe = stdProfit > 0 ? (avgProfit / stdProfit) : 0;
+
+        const monthly = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b)).map(([month, m]) => ({
+            month,
+            bets: m.bets,
+            win_rate: m.bets > 0 ? Math.round(m.wins / m.bets * 1000) / 10 : 0,
+            profit: Math.round(m.profit * 100) / 100,
+            roi: m.staked > 0 ? Math.round(m.profit / m.staked * 1000) / 10 : 0,
+        }));
+
+        const leagueBreakdown = Object.entries(leagueMap).sort(([, a], [, b]) => b.profit - a.profit).map(([league, l]) => ({
+            league,
+            bets: l.bets,
+            win_rate: l.bets > 0 ? Math.round(l.wins / l.bets * 1000) / 10 : 0,
+            profit: Math.round(l.profit * 100) / 100,
+            roi: l.staked > 0 ? Math.round(l.profit / l.staked * 1000) / 10 : 0,
+        }));
+
+        // Coverage analysis
+        const hitCounts = {};
+        const missCounts = {};
+        sBets.forEach(b => {
+            (b.selections || []).forEach(sc => {
+                if (sc === b.actual_score) {
+                    hitCounts[sc] = (hitCounts[sc] || 0) + 1;
+                } else {
+                    missCounts[sc] = (missCounts[sc] || 0) + 1;
+                }
+            });
+        });
+
+        breakdown[strat] = {
+            label: LABELS[strat] || strat,
+            total_bets: sBets.length,
+            total_wins: wins,
+            win_rate: Math.round(winRate * 10) / 10,
+            net_profit: Math.round(netProfit * 100) / 100,
+            roi: Math.round(roi * 10) / 10,
+            max_drawdown: Math.round(maxDD * 10) / 10,
+            sharpe_ratio: Math.round(sharpe * 100) / 100,
+            avg_edge_predicted: edgePredicted.length > 0 ? Math.round(edgePredicted.reduce((a, b) => a + b, 0) / edgePredicted.length * 10) / 10 : 0,
+            monthly_breakdown: monthly,
+            league_breakdown: leagueBreakdown,
+            coverage_analysis: {
+                most_hit_scores: Object.entries(hitCounts).sort(([, a], [, b]) => b - a).map(([score, hits]) => ({ score, hits })),
+                most_missed_scores: Object.entries(missCounts).sort(([, a], [, b]) => b - a).map(([score, misses]) => ({ score, misses })),
+            },
+        };
+    }
+
+    return breakdown;
 }
 
 function renderDutchingBacktestResults(allResults, stakingMode) {
