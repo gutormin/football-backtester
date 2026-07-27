@@ -723,10 +723,10 @@ function renderDutchingBacktestResults(allResults, stakingMode) {
         const ks = allResults['kelly_quarter'].data.summary || {};
         const kc = (ks.net_profit || 0) >= 0 ? '#34d399' : '#f87171';
         kellyProfitHtml = `
-        <div style="background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.2); padding: 10px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Lucro 1/4 Kelly</div>
-            <div style="font-size: 18px; font-weight: 700; color: ${kc};">$${(ks.net_profit || 0).toFixed(2)}</div>
-            <div style="font-size: 9px; color: ${kc};">ROI ${(ks.roi || 0) >= 0 ? '+' : ''}${(ks.roi || 0).toFixed(1)}%</div>
+        <div style="background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Lucro 1/4 Kelly</div>
+            <div style="font-size: 28px; font-weight: 700; color: ${kc};">$${(ks.net_profit || 0).toFixed(2)}</div>
+            <div style="font-size: 11px; color: ${kc};">ROI ${(ks.roi || 0) >= 0 ? '+' : ''}${(ks.roi || 0).toFixed(1)}%</div>
         </div>`;
     }
 
@@ -736,32 +736,34 @@ function renderDutchingBacktestResults(allResults, stakingMode) {
     if (bvals.length > 0) avgEdgePred = bvals[0].avg_edge_predicted || 0;
 
     summaryEl.innerHTML = `
-        <div style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); padding: 10px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Total de Bets</div>
-            <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);">${summary.total_bets || 0}</div>
+        <div style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Total de Bets</div>
+            <div style="font-size: 28px; font-weight: 700; color: var(--text-primary);">${summary.total_bets || 0}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">${summary.total_wins || 0} acertos</div>
         </div>
-        <div style="background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.2); padding: 10px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Win Rate</div>
-            <div style="font-size: 22px; font-weight: 700; color: #34d399;">${summary.win_rate || 0}%</div>
-            <div style="font-size: 9px; color: var(--text-muted);">${summary.total_wins || 0} acertos</div>
+        <div style="background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Win Rate</div>
+            <div style="font-size: 28px; font-weight: 700; color: #34d399;">${summary.win_rate || 0}%</div>
+            <div style="font-size: 11px; color: var(--text-muted);">dos dutchings acertaram</div>
         </div>
-        <div style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); padding: 10px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Lucro (Fixo)</div>
-            <div style="font-size: 22px; font-weight: 700; color: ${profitColor};">$${(summary.net_profit || 0).toFixed(2)}</div>
-            <div style="font-size: 9px; color: ${profitColor};">ROI ${(summary.roi || 0) >= 0 ? '+' : ''}${(summary.roi || 0).toFixed(1)}%</div>
+        <div style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Lucro Stake Fixa</div>
+            <div style="font-size: 28px; font-weight: 700; color: ${profitColor};">$${(summary.net_profit || 0).toFixed(2)}</div>
+            <div style="font-size: 11px; color: ${profitColor};">ROI ${(summary.roi || 0) >= 0 ? '+' : ''}${(summary.roi || 0).toFixed(1)}%</div>
         </div>
-        ${kellyProfitHtml || `<div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); padding: 10px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">ROI</div>
-            <div style="font-size: 22px; font-weight: 700; color: ${roiColor};">${(summary.roi || 0) >= 0 ? '+' : ''}${(summary.roi || 0).toFixed(1)}%</div>
+        ${kellyProfitHtml || `<div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">ROI</div>
+            <div style="font-size: 28px; font-weight: 700; color: ${roiColor};">${(summary.roi || 0) >= 0 ? '+' : ''}${(summary.roi || 0).toFixed(1)}%</div>
         </div>`}
-        <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); padding: 10px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Edge Previsto</div>
-            <div style="font-size: 22px; font-weight: 700; color: #f59e0b;">+${avgEdgePred.toFixed(1)}%</div>
-            <div style="font-size: 9px; color: var(--text-muted);">Edge médio IA</div>
+        <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Edge Previsto IA</div>
+            <div style="font-size: 28px; font-weight: 700; color: #f59e0b;">+${avgEdgePred.toFixed(1)}%</div>
+            <div style="font-size: 11px; color: var(--text-muted);">média por aposta</div>
         </div>
-        <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); padding: 10px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Total Apostado</div>
-            <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">$${(summary.total_staked || 0).toFixed(0)}</div>
+        <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Total Apostado</div>
+            <div style="font-size: 28px; font-weight: 700; color: var(--text-primary);">$${(summary.total_staked || 0).toFixed(0)}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">volume total</div>
         </div>
     `;
 
