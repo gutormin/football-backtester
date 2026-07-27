@@ -74,6 +74,12 @@ export function switchTab(tabId) {
         correspondingBtn.style.borderBottomColor = 'var(--primary)';
     }
 
+    // Esconder sidebar na aba Dutching para dar mais espaço
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+        sidebar.style.display = tabId === 'tab-dutching' ? 'none' : '';
+    }
+
     // Marcar item da side nav como ativo
     const sideNavItem = document.querySelector(`.sidenav-item[onclick*="${tabId}"]`);
     if (sideNavItem) {

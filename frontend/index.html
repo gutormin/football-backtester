@@ -1683,7 +1683,13 @@ window.addEventListener('unhandledrejection', function(e) {
  <!-- Linha 1: Ligas + Período + Estratégia -->
  <div style="display: grid; grid-template-columns: 2fr 1fr 1.5fr; gap: 16px; margin-bottom: 14px;">
  <div>
- <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">🏆 Ligas</label>
+ <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">🏆 Ligas</label>
+ <div style="display: flex; gap: 6px;">
+ <button type="button" onclick="window.selectAllDutchingBtLeagues()" style="font-size: 10px; padding: 2px 8px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; border-radius: 4px; cursor: pointer;">Todas</button>
+ <button type="button" onclick="window.clearDutchingBtLeagues()" style="font-size: 10px; padding: 2px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 4px; cursor: pointer;">Limpar</button>
+ </div>
+ </div>
  <select id="dutching-bt-leagues" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; height: 120px;">
  </select>
  <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Ctrl+clique para selecionar múltiplas ligas</div>
@@ -3573,7 +3579,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=151"></script>
+ <script type="module" src="app.js?v=152"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,

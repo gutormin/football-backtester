@@ -996,10 +996,24 @@ window.filterDutchingRadar = filterDutchingRadar;
 window.loadDutchingOpportunityByIndex = loadDutchingOpportunityByIndex;
 window.sortDutchingRadar = sortDutchingRadar;
 window.toggleDutchingGuide = toggleDutchingGuide;
+function selectAllDutchingBtLeagues() {
+    const sel = document.getElementById('dutching-bt-leagues');
+    if (!sel) return;
+    Array.from(sel.options).forEach(o => o.selected = true);
+}
+
+function clearDutchingBtLeagues() {
+    const sel = document.getElementById('dutching-bt-leagues');
+    if (!sel) return;
+    Array.from(sel.options).forEach(o => o.selected = false);
+}
+
 window.runDutchingBacktest = runDutchingBacktest;
 window.loadDutchingBtLeagues = loadDutchingBtLeagues;
 window.loadDemoOpportunity = loadDemoOpportunity;
 window.filterDutchingBtTable = filterDutchingBtTable;
+window.selectAllDutchingBtLeagues = selectAllDutchingBtLeagues;
+window.clearDutchingBtLeagues = clearDutchingBtLeagues;
 
 // ── Demo opportunity (shows all new features without API key) ─────
 
