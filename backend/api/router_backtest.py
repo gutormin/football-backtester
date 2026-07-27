@@ -8,6 +8,8 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 from typing import List, Optional, Union, Dict, Any
 from fastapi import APIRouter, HTTPException
+import asyncio
+from functools import partial
 from pydantic import BaseModel, validator
 
 from ..data_loader import (
@@ -868,33 +870,37 @@ def api_run_portfolio(req: PortfolioRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/backtest_dutching")
-def api_run_dutching_backtest(req: DutchingBacktestRequest):
-    """Run a chronological backtest of Dutching (Correct Score) strategies.
 
-    Validates whether the theoretical edge reported by the live Dutching
-    scanner materializes into real profit when tested against historical data.
-    """
+@router.post("/backtest_dutching")
+async def api_run_dutching_backtest(req: DutchingBacktestRequest):
+    """Run a chronological backtest of Dutching (Correct Score) strategies."""
     try:
-        backtester = DutchingBacktester(model_type=req.modelType)
-        results = backtester.run(
-            leagues=req.leagues,
-            start_date=req.startDate,
-            end_date=req.endDate,
-            strategies=req.strategies,
-            initial_bankroll=req.initialBankroll,
-            stake_value=req.stakeValue,
-            staking_rule=req.stakingRule,
-            min_edge=req.minEdge,
-            max_overround=req.maxOverround,
-            max_legs=req.maxLegs,
-            min_selections=req.minSelections,
-            data_source=req.dataSource,
-            futpython_api_key=req.futpythonApiKey,
-        )
+        def _run():
+            backtester = DutchingBacktester(model_type=req.modelType)
+            return backtester.run(
+                leagues=req.leagues,
+                start_date=req.startDate,
+                end_date=req.endDate,
+                strategies=req.strategies,
+                initial_bankroll=req.initialBankroll,
+                stake_value=req.stakeValue,
+                staking_rule=req.stakingRule,
+                min_edge=req.minEdge,
+                max_overround=req.maxOverround,
+                max_legs=req.maxLegs,
+                min_selections=req.minSelections,
+                data_source=req.dataSource,
+                futpython_api_key=req.futpythonApiKey,
+            )
+
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, _run)
+
         if "error" in results:
             raise HTTPException(status_code=400, detail=results["error"])
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()

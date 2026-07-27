@@ -622,6 +622,11 @@ async function runDutchingBacktest() {
         return;
     }
 
+    // Aviso se muitas ligas
+    if (selectedLeagues.length > 10) {
+        statusEl.innerHTML = `<span style="color: #f59e0b;">⚠️ ${selectedLeagues.length} ligas selecionadas pode ser lento. Recomendamos até 10 ligas por vez.</span>`;
+    }
+
     const strategySelect = document.getElementById('dutching-bt-strategies');
     const selectedStrategies = Array.from(strategySelect.selectedOptions).map(o => o.value);
     if (selectedStrategies.length === 0) {
@@ -678,11 +683,15 @@ async function runDutchingBacktest() {
                 minSelections: 3,
             };
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min
             const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/backtest_dutching`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({ detail: 'Erro desconhecido' }));
