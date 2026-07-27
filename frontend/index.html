@@ -1680,22 +1680,25 @@ window.addEventListener('unhandledrejection', function(e) {
  <h3 style="font-size: 15px; color: var(--text-primary); margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-flask" style="color: #a78bfa;"></i> Backtest de Estratégias Dutching</h3>
  <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Simule o que teria acontecido se você tivesse apostado nos jogos sugeridos pelo sistema num período histórico. Compara Stake Fixa vs Kelly automaticamente.</p>
 
- <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 15px;">
- <div class="form-group" style="margin-bottom: 0;">
- <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Ligas</label>
- <select id="dutching-bt-leagues" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px; height: 110px;">
+ <!-- Linha 1: Ligas + Período + Estratégia -->
+ <div style="display: grid; grid-template-columns: 2fr 1fr 1.5fr; gap: 16px; margin-bottom: 14px;">
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">🏆 Ligas</label>
+ <select id="dutching-bt-leagues" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; height: 120px;">
  </select>
- <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Ctrl+clique para múltiplas</div>
+ <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Ctrl+clique para selecionar múltiplas ligas</div>
  </div>
- <div class="form-group" style="margin-bottom: 0;">
- <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Período</label>
- <input type="date" id="dutching-bt-start" value="2024-01-01" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px; margin-bottom: 5px;">
- <input type="date" id="dutching-bt-end" value="2024-06-30" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;">
- <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Períodos curtos são mais rápidos</div>
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">📅 Período</label>
+ <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 4px;">De</div>
+ <input type="date" id="dutching-bt-start" value="2024-01-01" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; margin-bottom: 8px; box-sizing: border-box;">
+ <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 4px;">Até</div>
+ <input type="date" id="dutching-bt-end" value="2024-06-30" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; box-sizing: border-box;">
+ <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">⚡ Períodos curtos são mais rápidos</div>
  </div>
- <div class="form-group" style="margin-bottom: 0;">
- <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Estratégia IA</label>
- <select id="dutching-bt-strategies" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px; height: 110px;">
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">🤖 Estratégia IA</label>
+ <select id="dutching-bt-strategies" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; height: 120px;">
  <option value="auto_ia" selected>🤖 IA Auto (Recomendada)</option>
  <option value="under">📉 Under / Jogo Truncado</option>
  <option value="over">📈 Over / Goleada</option>
@@ -1705,34 +1708,31 @@ window.addEventListener('unhandledrejection', function(e) {
  <option value="dynamic">⚡ Dinâmico (Todos Placares)</option>
  </select>
  </div>
- <div class="form-group" style="margin-bottom: 0;">
- <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Parâmetros</label>
- <div style="display: flex; flex-direction: column; gap: 6px;">
- <div style="display: flex; gap: 6px;">
- <div style="flex: 1;">
- <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">Banca Inicial ($)</div>
- <input type="number" id="dutching-bt-bankroll" value="1000" min="100" step="100" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;">
  </div>
- <div style="flex: 1;">
- <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">Stake Fixa ($)</div>
- <input type="number" id="dutching-bt-stake" value="50" min="1" step="10" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;" title="Usado na comparação Stake Fixa vs Kelly">
+
+ <!-- Linha 2: Parâmetros numéricos -->
+ <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; background: rgba(139,92,246,0.04); border: 1px solid rgba(139,92,246,0.12); border-radius: 8px; padding: 14px;">
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">💰 Banca Inicial ($)</label>
+ <input type="number" id="dutching-bt-bankroll" value="1000" min="100" step="100" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
  </div>
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">🎯 Stake Fixa ($)</label>
+ <input type="number" id="dutching-bt-stake" value="50" min="1" step="10" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 14px; box-sizing: border-box;" title="Valor por aposta no modo Stake Fixa">
  </div>
- <div style="display: flex; gap: 6px;">
- <div style="flex: 1;">
- <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">Edge Mínimo (%)</div>
- <input type="number" id="dutching-bt-edge" value="5" min="0" max="30" step="1" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;" title="Só aposta se edge for maior que este valor">
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">📊 Edge Mínimo (%)</label>
+ <input type="number" id="dutching-bt-edge" value="5" min="0" max="30" step="1" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 14px; box-sizing: border-box;" title="Só aposta onde o sistema vê pelo menos X% de vantagem">
+ <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Só aposta acima deste edge</div>
  </div>
- <div style="flex: 1;">
- <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">Comparar</div>
- <select id="dutching-bt-staking" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;">
- <option value="both" selected>Fixo + Kelly</option>
- <option value="fixed">Só Fixo</option>
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">⚖️ Comparar Staking</label>
+ <select id="dutching-bt-staking" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; box-sizing: border-box;">
+ <option value="both" selected>Fixo + Kelly (comparar)</option>
+ <option value="fixed">Só Stake Fixa</option>
  <option value="kelly_quarter">Só 1/4 Kelly</option>
  </select>
- </div>
- </div>
- </div>
+ <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Mostra os dois no gráfico</div>
  </div>
  </div>
 
@@ -3573,7 +3573,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=149"></script>
+ <script type="module" src="app.js?v=150"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
