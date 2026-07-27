@@ -319,7 +319,7 @@ function filterDutchingRadar() {
                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;"><i class="fa-solid fa-clock"></i> ${opp.date}</div>
             </td>
             <td><span style="font-size: 12px; font-weight: 500; color: var(--text-secondary);">${homeTeam}</span></td>
-            <td><span class="badge badge-info" style="font-size: 11px;">${opp.bookmaker}</span></td>
+            <td><span class="badge badge-info" style="font-size: 11px;">${opp.bookmaker}</span>${opp.odds_source_type === 'real' ? ' <span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; background: rgba(52,211,153,0.15); color: #34d399; font-weight: 700;" title="Odds reais de Correct Score da API">CS REAL</span>' : ' <span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; background: rgba(245,158,11,0.12); color: #f59e0b;" title="Odds estimadas a partir de O/U 2.5">EST</span>'}</td>
             <td><div style="font-size: 12px; color: var(--text-secondary);">${opp.market}</div></td>
             <td><div style="font-size: 11px; font-family: monospace; color: #a78bfa;">${selectionsWithOdds}</div></td>
             <td><span style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${opp.dutching_odd.toFixed(2)}</span></td>
@@ -435,14 +435,17 @@ function renderDutchingQualityCard(opp) {
         </div>
         ${qb ? `
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; font-size: 10px; color: var(--text-muted);">
-            <div><span style="color: var(--text-secondary);">Edge:</span> ${qb.edge_magnitude}/35</div>
-            <div><span style="color: var(--text-secondary);">Robustez:</span> ${qb.bootstrap_robustness}/25</div>
-            <div><span style="color: var(--text-secondary);">Perfil:</span> ${qb.profile_confidence}/15</div>
-            <div><span style="color: var(--text-secondary);">Odds:</span> ${qb.odd_quality}/10</div>
-            <div><span style="color: var(--text-secondary);">Mercado:</span> ${qb.market_divergence}/10</div>
-            <div><span style="color: var(--text-secondary);">Diversidade:</span> ${qb.selection_diversity}/5</div>
+            <div><span style="color: var(--text-secondary);">Edge Sharpe:</span> ${qb.edge_sharpe}</div>
+            <div><span style="color: var(--text-secondary);">Robustez:</span> ${qb.bootstrap_robustness}</div>
+            <div><span style="color: var(--text-secondary);">Perfil:</span> ${qb.profile_confidence}</div>
+            <div><span style="color: var(--text-secondary);">Odds:</span> ${qb.odd_quality}</div>
+            <div><span style="color: var(--text-secondary);">Mercado:</span> ${qb.market_divergence}</div>
+            <div><span style="color: var(--text-secondary);">Diversidade:</span> ${qb.selection_diversity}</div>
         </div>
         ` : ''}
+        <div style="margin-top: 6px; font-size: 9px; color: var(--text-muted);">
+            <span style="color: #a78bfa;">Fonte odds:</span> ${opp.odds_source_type === 'real' ? '🟢 CS Real (API)' : '🟡 Estimada (O/U 2.5)'}
+        </div>
         <div style="margin-top: 8px; font-size: 10px; color: var(--text-muted);">
             <span style="color: #a78bfa;">Perfil IA:</span> ${opp.game_profile || '—'}
             ${opp.edge_prob_positive != null ? ` · <span style="color: #a78bfa;">P(edge&gt;0):</span> ${(opp.edge_prob_positive * 100).toFixed(0)}%` : ''}

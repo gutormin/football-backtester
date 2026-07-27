@@ -827,7 +827,7 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
     # 1. FONTE: THE ODDS API (Tempo Real Betfair/Bet365)
     if source == 'odds_api':
         REGIONS = 'eu,uk,us'
-        MARKETS = 'h2h,totals'
+        MARKETS = 'h2h,totals,correct_score'
         headers = {'User-Agent': 'Mozilla/5.0'}
 
         @retry_with_backoff(max_retries=2, base_delay=0.5)
@@ -902,13 +902,14 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 continue
                 
             # Collect odds from all bookmakers that have h2h + totals
-            odds_data = {}  # bookie_title -> {h2h, totals_point, totals_over, totals_under, h2h_lay}
+            odds_data = {}  # bookie_title -> {h2h, totals_point, totals_over, totals_under, h2h_lay, cs_odds}
 
             for bookie in match.get('bookmakers', []):
                 title = bookie.get('title')
                 h2h = {}
                 h2h_lay = {}
                 totals_by_point = {}  # point -> {name: price}
+                cs_odds_raw = {}      # "1-0" -> price, "2-1" -> price, etc.
 
                 for market in bookie.get('markets', []):
                     key = market.get('key')
@@ -925,6 +926,11 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                                 if point not in totals_by_point:
                                     totals_by_point[point] = {}
                                 totals_by_point[point][outcome.get('name')] = outcome.get('price')
+                    elif key == 'correct_score':
+                        for outcome in market.get('outcomes', []):
+                            score_name = outcome.get('name')  # e.g. "1-0", "2-1"
+                            if score_name:
+                                cs_odds_raw[score_name] = outcome.get('price')
 
                 # Escolhe o ponto mais proximo de 2.5 com Over/Under completos
                 best_totals = {}
@@ -943,11 +949,21 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
 
                 if has_h2h and has_totals:
                     use_lay = len(h2h_lay) == 3
+                    # Map real CS odds to bookie_cs_<score> keys
+                    cs_mapped = {}
+                    if cs_odds_raw:
+                        for score_name, price in cs_odds_raw.items():
+                            key_cs = f"bookie_cs_{score_name.replace('-', '')}"
+                            if price and price > 1.0:
+                                cs_mapped[key_cs] = float(price)
+
                     odds_data[title] = {
                         'h2h': h2h_lay if use_lay else h2h,
                         'totals': best_totals,
                         'totals_point': best_totals_point,
                         'is_exchange': use_lay,
+                        'cs_odds': cs_mapped,
+                        'has_real_cs': len(cs_mapped) >= 6,
                     }
 
             # Filtrar apenas 1xBet e Pinnacle
@@ -984,47 +1000,55 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 u25_odd = data['totals'].get('Under')
                 o25_point = data.get('totals_point', 2.5)
                 is_exchange = data.get('is_exchange', False)
+                real_cs = data.get('cs_odds', {})
+                has_real_cs = data.get('has_real_cs', False)
 
                 if not o25_odd or not u25_odd:
                     continue
 
-                try:
-                    est_odds = estimate_bookmaker_odds(
-                        o25_odd, u25_odd, pred['lambda_home'], pred['lambda_away'],
-                        pred.get('rho'), bookmaker=bookie,
-                        btts_yes_odd=None, btts_no_odd=None)
-                except Exception:
-                    continue
+                # ── Odds source: real CS > estimated ──────────────────
+                odds_source_type = 'estimated'
+                if has_real_cs:
+                    # Use real CS odds directly from API
+                    cs_odds = real_cs
+                    odds_source_type = 'real'
+                else:
+                    # Fallback: estimate CS odds from O/U 2.5 market
+                    try:
+                        cs_odds = estimate_bookmaker_odds(
+                            o25_odd, u25_odd, pred['lambda_home'], pred['lambda_away'],
+                            pred.get('rho'), bookmaker=bookie,
+                            btts_yes_odd=None, btts_no_odd=None)
+                    except Exception:
+                        continue
 
-                # Se o ponto do totals nao for 2.5 (ex: Pinnacle 2.75), ajusta odds via shift linear
-                if abs(o25_point - 2.5) > 0.01 and 'bookie_over_25' not in est_odds:
-                    shift = o25_point - 2.5
-                    est_odds['total_point'] = o25_point
+                    if abs(o25_point - 2.5) > 0.01 and 'bookie_over_25' not in cs_odds:
+                        cs_odds['total_point'] = o25_point
 
-                # Dutching dinâmico baseado em EV individual
+                # ── Build Dutching ────────────────────────────────────
                 is_home_fav = pred['prob_h'] > pred['prob_a']
                 current_strat = resolve_strategy(strategy, pred, is_home_fav)
                 outcomes_to_cover, sel_probs, odds_to_cover, odds_keys, market_label, prob_combined, dutching_odd, edge = \
-                    build_dynamic_dutch(pred, est_odds, strategy=current_strat)
+                    build_dynamic_dutch(pred, cs_odds, strategy=current_strat)
 
                 if outcomes_to_cover is None:
                     continue
 
                 if edge > 0:
                     label_prefix = "IA " if strategy == 'auto_ia' else ""
-                    _, alt_scores = get_selections_and_alternatives(pred, outcomes_to_cover, est_odds)
+                    _, alt_scores = get_selections_and_alternatives(pred, outcomes_to_cover, cs_odds)
 
                     # Decision layer: evaluate alternatives & quality
                     alt_scores = evaluate_alternatives(
                         outcomes_to_cover,
                         [round(o, 2) for o in odds_to_cover],
                         prob_combined,
-                        alt_scores, pred, est_odds
+                        alt_scores, pred, cs_odds
                     )
                     game_profile = classify_game_profile(pred, is_home_fav,
                         market_ou_odds=(o25_odd, u25_odd) if o25_odd and u25_odd else None)
                     edge_ci = bootstrap_dutching_edge(
-                        pred, est_odds, strategy=current_strat,
+                        pred, cs_odds, strategy=current_strat,
                         max_legs=8, max_overround=0.92, min_selections=3,
                         n_bootstrap=150, is_home_fav=is_home_fav
                     )
@@ -1037,7 +1061,7 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         market_divergence=game_profile.get('market_divergence', 0),
                         edge_prob_positive=edge_ci.get('prob_positive'),
                         edge_std=edge_ci.get('edge_std'),
-                        has_real_odds=False,
+                        has_real_odds=has_real_cs,
                         hours_to_kickoff=_hours_until_match(dt),
                     )
 
@@ -1066,6 +1090,7 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         'quality_verdict_color': quality['verdict_color'],
                         'quality_verdict_icon': quality['verdict_icon'],
                         'quality_breakdown': quality['breakdown'],
+                        'odds_source_type': odds_source_type,
                     })
 
     # 2. FONTE: API DATAFOOTBALL OU FOOTBALL-DATA CSV (DADOS LOCAIS)
@@ -1215,6 +1240,7 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                     'quality_verdict_color': quality['verdict_color'],
                     'quality_verdict_icon': quality['verdict_icon'],
                     'quality_breakdown': quality['breakdown'],
+                    'odds_source_type': 'estimated',
                 })
 
             # 2.2 ESTRATÉGIA SIMULADA PARA BETFAIR EXCHANGE (+8% de valor de odd)
@@ -1263,6 +1289,7 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         'quality_verdict_color': quality['verdict_color'],
                         'quality_verdict_icon': quality['verdict_icon'],
                         'quality_breakdown': quality['breakdown'],
+                        'odds_source_type': 'estimated',
                     })
 
     # Ordena oportunidades pelo Edge
