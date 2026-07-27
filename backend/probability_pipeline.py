@@ -12,11 +12,15 @@ Single source of truth for:
 Used by: ChronologicalBacktester.run(), run_parallel_scan(), dutching_scanner.py
 """
 
+import os
 import math
+import logging
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Tuple, List
+
+logger = logging.getLogger(__name__)
 
 from .elo_model import estimate_dynamic_rho
 from .models import calculate_ah_probabilities, get_fair_ah_odds
@@ -847,4 +851,46 @@ def predict_match_nb(home_team: str, away_team: str, historical_df,
         home_team, away_team, league_code, decay,
         league_rho_cache, league_goals_for_rho, elo_tracker,
     )
-    return bundle.to_dict()
+
+    result = bundle.to_dict()
+
+    # Apply ML ensemble correction if available
+    _ml = _get_dutching_ml_ensemble()
+    if _ml is not None and _ml.fitted:
+        try:
+            # Build features dict for ML
+            pred_for_ml = result.copy()
+            pred_for_ml['h_att'] = bundle.h_att
+            pred_for_ml['h_def'] = bundle.h_def
+            pred_for_ml['a_att'] = bundle.a_att
+            pred_for_ml['a_def'] = bundle.a_def
+            adj_matrix = _ml.adjust_score_matrix(bundle.prob_matrix, pred_for_ml)
+            result['prob_matrix'] = adj_matrix
+            # Recompute derived probabilities from adjusted matrix
+            from .models import calculate_ah_probabilities
+            mkt = ProbabilityPipeline._derive_market_probs(adj_matrix, bundle.max_goals)
+            result.update(mkt)
+        except Exception:
+            pass
+
+    return result
+
+
+# ── Global ML ensemble cache ──────────────────────────────────────────
+_dutching_ml_cache = None
+_dutching_ml_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'dutching_ml_ensemble.pkl')
+
+
+def _get_dutching_ml_ensemble():
+    """Lazy-load the Dutching ML ensemble from disk."""
+    global _dutching_ml_cache
+    if _dutching_ml_cache is None:
+        try:
+            if os.path.exists(_dutching_ml_path):
+                from .dutching_ml import DutchingMLEnsemble
+                _dutching_ml_cache = DutchingMLEnsemble.load(_dutching_ml_path)
+                logger.info(f"[ML] Dutching ensemble loaded from {_dutching_ml_path}. "
+                           f"Fitted: {_dutching_ml_cache.fitted}")
+        except Exception:
+            _dutching_ml_cache = False  # prevent retry
+    return _dutching_ml_cache if _dutching_ml_cache and _dutching_ml_cache is not False else None
