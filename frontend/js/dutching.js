@@ -631,6 +631,15 @@ async function runDutchingBacktest() {
 
     const startDate = document.getElementById('dutching-bt-start').value;
     const endDate = document.getElementById('dutching-bt-end').value;
+
+    // Validar datas
+    const today = new Date().toISOString().split('T')[0];
+    if (endDate >= today) {
+        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ O período deve ser histórico (datas passadas). O backtest só funciona com dados já disponíveis.</span>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Rodar Backtest';
+        return;
+    }
     const stakeValue = parseFloat(document.getElementById('dutching-bt-stake').value) || 50;
     const minEdgePct = parseFloat(document.getElementById('dutching-bt-edge').value) || 0;
     const stakingMode = document.getElementById('dutching-bt-staking').value;
@@ -676,8 +685,8 @@ async function runDutchingBacktest() {
             });
 
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ detail: 'Erro desconhecido' }));
-                throw new Error(err.detail || 'Backtest failed');
+                const errData = await res.json().catch(() => ({ detail: 'Erro desconhecido' }));
+                throw new Error(errData.detail || errData.message || `Erro HTTP ${res.status}`);
             }
 
             const data = await res.json();
