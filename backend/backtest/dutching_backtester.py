@@ -32,7 +32,7 @@ from ..probability_pipeline import (
 )
 from ..dutching_scanner import (
     build_dynamic_dutch, resolve_strategy, classify_game_profile,
-    bootstrap_dutching_edge,
+    bootstrap_dutching_edge, dutching_quality_score,
 )
 from ..elo_model import EloTracker, build_elo_tracker_from_history
 from ..constants import (
@@ -403,6 +403,17 @@ class DutchingBacktester:
                                 n_bootstrap=150, is_home_fav=is_home_fav,
                             )
 
+                            # Quality score
+                            quality = dutching_quality_score(
+                                edge=edge,
+                                edge_ci_95=edge_confidence.get('edge_ci_95'),
+                                profile_confidence=game_profile['confidence'],
+                                dutching_odd=dutching_odd,
+                                n_selections=len(outcomes),
+                                market_divergence=game_profile.get('market_divergence', 0),
+                                edge_prob_positive=edge_confidence.get('prob_positive'),
+                            )
+
                             # Calculate stake
                             if staking_rule == 'kelly_quarter':
                                 # Kelly Criterion: f* = edge / (odds - 1), quarter Kelly
@@ -478,6 +489,11 @@ class DutchingBacktester:
                                 'edge_ci_95_high': edge_confidence.get('edge_ci_95', (None, None))[1],
                                 'edge_prob_positive': edge_confidence.get('prob_positive'),
                                 'edge_std': edge_confidence.get('edge_std'),
+                                'quality_score': quality['score'],
+                                'quality_verdict': quality['verdict'],
+                                'quality_verdict_label': quality['verdict_label'],
+                                'quality_verdict_color': quality['verdict_color'],
+                                'quality_breakdown': quality['breakdown'],
                                 'selections': outcomes,
                                 'selection_odds': [round(o, 2) for o in sel_odds],
                                 'selection_probs': [round(p, 4) for p in sel_probs],
