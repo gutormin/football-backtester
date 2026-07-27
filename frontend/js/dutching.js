@@ -996,9 +996,13 @@ window.filterDutchingRadar = filterDutchingRadar;
 window.loadDutchingOpportunityByIndex = loadDutchingOpportunityByIndex;
 window.sortDutchingRadar = sortDutchingRadar;
 window.toggleDutchingGuide = toggleDutchingGuide;
-function selectAllDutchingBtLeagues() {
+async function selectAllDutchingBtLeagues() {
     const sel = document.getElementById('dutching-bt-leagues');
     if (!sel) return;
+    // Se ainda não carregou as ligas, carrega primeiro
+    if (sel.options.length === 0) {
+        await loadDutchingBtLeagues();
+    }
     Array.from(sel.options).forEach(o => o.selected = true);
 }
 
