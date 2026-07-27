@@ -586,23 +586,19 @@ function renderKellyRecommendation(dutchingOdd, modelProbPct, edge, selections) 
 var dutchingBtChartInstance = null;
 
 async function loadDutchingBtLeagues() {
-    const select = document.getElementById('dutching-bt-leagues');
-    if (!select) return;
+    const container = document.getElementById('dutching-bt-leagues-container');
+    if (!container) return;
     try {
         const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/leagues?source=footballdata`);
         if (!res.ok) return;
         const leagues = await res.json();
-        select.innerHTML = '';
-        leagues.forEach(l => {
-            const opt = document.createElement('option');
-            opt.value = l.code;
-            opt.textContent = l.name || l.code;
-            // Pre-select common leagues
-            if (['BRAZIL_SERIE_A', 'BRAZIL_SERIE_B', 'E0', 'SP1', 'ARG'].includes(l.code)) {
-                opt.selected = true;
-            }
-            select.appendChild(opt);
-        });
+        const defaultSelected = ['BRAZIL_SERIE_A', 'BRAZIL_SERIE_B', 'E0', 'SP1', 'ARG'];
+        container.innerHTML = leagues.map(l => `
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${l.name || l.code}">
+                <input type="checkbox" value="${l.code}" ${defaultSelected.includes(l.code) ? 'checked' : ''} style="accent-color:#8b5cf6;width:14px;height:14px;flex-shrink:0;">
+                ${l.name || l.code}
+            </label>
+        `).join('');
     } catch (e) {
         console.warn('Failed to load Dutching BT leagues:', e);
     }
@@ -618,8 +614,9 @@ async function runDutchingBacktest() {
 
     if (!btn || !statusEl) return;
 
-    const leagueSelect = document.getElementById('dutching-bt-leagues');
-    const selectedLeagues = Array.from(leagueSelect.selectedOptions).map(o => o.value);
+    const selectedLeagues = Array.from(
+        document.querySelectorAll('#dutching-bt-leagues-container input[type="checkbox"]:checked')
+    ).map(cb => cb.value);
     if (selectedLeagues.length === 0) {
         statusEl.innerHTML = '<span style="color: #f87171;">Selecione pelo menos 1 liga.</span>';
         return;
@@ -997,19 +994,14 @@ window.loadDutchingOpportunityByIndex = loadDutchingOpportunityByIndex;
 window.sortDutchingRadar = sortDutchingRadar;
 window.toggleDutchingGuide = toggleDutchingGuide;
 async function selectAllDutchingBtLeagues() {
-    const sel = document.getElementById('dutching-bt-leagues');
-    if (!sel) return;
-    // Se ainda não carregou as ligas, carrega primeiro
-    if (sel.options.length === 0) {
-        await loadDutchingBtLeagues();
-    }
-    Array.from(sel.options).forEach(o => o.selected = true);
+    const container = document.getElementById('dutching-bt-leagues-container');
+    if (!container) return;
+    if (container.children.length === 0) await loadDutchingBtLeagues();
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
 }
 
 function clearDutchingBtLeagues() {
-    const sel = document.getElementById('dutching-bt-leagues');
-    if (!sel) return;
-    Array.from(sel.options).forEach(o => o.selected = false);
+    document.querySelectorAll('#dutching-bt-leagues-container input[type="checkbox"]').forEach(cb => cb.checked = false);
 }
 
 window.runDutchingBacktest = runDutchingBacktest;

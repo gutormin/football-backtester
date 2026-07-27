@@ -1686,13 +1686,13 @@ window.addEventListener('unhandledrejection', function(e) {
  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
  <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">🏆 Ligas</label>
  <div style="display: flex; gap: 6px;">
- <button type="button" onclick="window.selectAllDutchingBtLeagues()" style="font-size: 10px; padding: 2px 8px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; border-radius: 4px; cursor: pointer;">Todas</button>
- <button type="button" onclick="window.clearDutchingBtLeagues()" style="font-size: 10px; padding: 2px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 4px; cursor: pointer;">Limpar</button>
+ <button type="button" onclick="window.selectAllDutchingBtLeagues()" style="font-size: 10px; padding: 3px 10px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; border-radius: 4px; cursor: pointer; font-weight: 600;">✅ Todas</button>
+ <button type="button" onclick="window.clearDutchingBtLeagues()" style="font-size: 10px; padding: 3px 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 4px; cursor: pointer;">✖ Limpar</button>
  </div>
  </div>
- <select id="dutching-bt-leagues" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; height: 120px;">
- </select>
- <div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">Ctrl+clique para selecionar múltiplas ligas</div>
+ <div id="dutching-bt-leagues-container" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px; height: 120px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">
+ <span style="color: var(--text-muted); font-size: 11px; grid-column: span 2; padding: 4px;">Carregando ligas...</span>
+ </div>
  </div>
  <div>
  <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">📅 Período</label>
@@ -3579,7 +3579,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=153"></script>
+ <script type="module" src="app.js?v=154"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
