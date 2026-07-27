@@ -976,6 +976,21 @@ function renderDutchingBtEquityChart(breakdown) {
     });
 }
 
+function initDutchingBtDates() {
+    const startEl = document.getElementById('dutching-bt-start');
+    const endEl = document.getElementById('dutching-bt-end');
+    if (!startEl || !endEl) return;
+    // Só define se ainda estiver com data futura ou em branco
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    if (!startEl.value || startEl.value >= todayStr) {
+        startEl.value = '2024-08-01';
+    }
+    if (!endEl.value || endEl.value >= todayStr) {
+        endEl.value = '2024-11-30';
+    }
+}
+
 // Load leagues on Dutching tab switch (attach to existing switchTab or init)
 (function() {
     const origSwitchTab = window.switchTab;
@@ -984,12 +999,16 @@ function renderDutchingBtEquityChart(breakdown) {
             origSwitchTab(tabId);
             if (tabId === 'tab-dutching') {
                 loadDutchingBtLeagues();
+                initDutchingBtDates();
             }
         };
     }
     // Also try loading on page init
     window.addEventListener('load', function() {
-        setTimeout(loadDutchingBtLeagues, 2000);
+        setTimeout(() => {
+            loadDutchingBtLeagues();
+            initDutchingBtDates();
+        }, 2000);
     });
 })();
 
