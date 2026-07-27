@@ -387,7 +387,161 @@ def _build_bootstrap_matrix(lambda_home, lambda_away, max_goals=8):
     }
 
 # ═══════════════════════════════════════════════════════════════════════
-# Decision Layer: "Add this score?" and "Bet or skip?" (Melhoria #9)
+# Bankroll Management & Kelly Criterion for Dutching
+# ═══════════════════════════════════════════════════════════════════════
+
+def dutching_stake_recommendation(bankroll, cum_prob, dutching_odd, edge,
+                                  edge_prob_positive=None, max_exposure_pct=0.05,
+                                  kelly_fraction=0.25, min_stake=5.0):
+    """Calculate optimal stake for a Dutching bet using fractional Kelly.
+
+    Dutching is equivalent to a single bet with:
+    - Win probability = cum_prob
+    - Payout = dutching_odd
+    - Net odds = dutching_odd - 1
+
+    Kelly formula: f* = (p·b - 1) / (b - 1) = edge / (dutching_odd - 1)
+
+    This function applies safety layers:
+    1. Fractional Kelly (default 1/4 = conservative)
+    2. Max exposure cap (% of bankroll per bet)
+    3. Edge confidence adjustment (reduces stake when edge uncertain)
+    4. Minimum stake floor (avoids micro-bets)
+
+    Args:
+        bankroll: Current bankroll in currency units
+        cum_prob: Sum of model probabilities for covered scores
+        dutching_odd: Combined Dutching odd
+        edge: Predicted edge (cum_prob * dutching_odd - 1)
+        edge_prob_positive: P(edge > 0) from bootstrap (optional)
+        max_exposure_pct: Max % of bankroll per bet (default 5%)
+        kelly_fraction: Fraction of full Kelly (default 0.25 = 1/4)
+        min_stake: Minimum stake to place (default $5)
+
+    Returns dict with recommended stake, Kelly fraction, and breakdown
+    """
+    if edge <= 0 or dutching_odd <= 1.01 or bankroll <= 0:
+        return {'stake': 0.0, 'kelly_pct': 0.0, 'risk_level': 'skip',
+                'reason': 'Edge negativo ou odd inválida — não apostar'}
+
+    # Full Kelly fraction
+    full_kelly = edge / (dutching_odd - 1.0)
+
+    # Apply fractional Kelly
+    fractional_kelly = full_kelly * kelly_fraction
+
+    # Edge confidence adjustment
+    # When P(edge > 0) < 0.85, reduce Kelly fraction further
+    confidence_mult = 1.0
+    if edge_prob_positive is not None:
+        if edge_prob_positive < 0.65:
+            confidence_mult = 0.0  # too uncertain, don't bet
+        elif edge_prob_positive < 0.80:
+            confidence_mult = 0.5
+        elif edge_prob_positive < 0.90:
+            confidence_mult = 0.75
+        else:
+            confidence_mult = 1.0
+
+    adjusted_kelly = fractional_kelly * confidence_mult
+
+    # Apply max exposure cap
+    adjusted_kelly = min(adjusted_kelly, max_exposure_pct)
+
+    # Calculate stake
+    stake = bankroll * adjusted_kelly
+    stake = max(min_stake, round(stake, 2))
+
+    # Risk level classification
+    exposure_pct = (stake / bankroll * 100) if bankroll > 0 else 0
+    if exposure_pct <= 1.0:
+        risk_level = 'conservative'
+    elif exposure_pct <= 2.5:
+        risk_level = 'moderate'
+    elif exposure_pct <= 5.0:
+        risk_level = 'aggressive'
+    else:
+        risk_level = 'max'
+
+    return {
+        'stake': stake,
+        'kelly_pct': round(adjusted_kelly * 100, 2),
+        'full_kelly_pct': round(full_kelly * 100, 2),
+        'fractional_kelly_pct': round(fractional_kelly * 100, 2),
+        'risk_level': risk_level,
+        'confidence_mult': round(confidence_mult, 2),
+        'max_exposure_pct': round(max_exposure_pct * 100, 1),
+        'expected_profit': round(stake * edge, 2),
+        'reason': _stake_reason(adjusted_kelly, risk_level, confidence_mult, edge),
+    }
+
+
+def _stake_reason(kelly_pct, risk_level, confidence_mult, edge):
+    """Human-readable explanation for the stake recommendation."""
+    if kelly_pct <= 0:
+        return 'Edge com confiança insuficiente — não apostar'
+    if confidence_mult < 0.75:
+        return f'Stake reduzida (confiança {confidence_mult:.0%}). Edge +{edge*100:.1f}%, mas IC do bootstrap cruza zero'
+    if risk_level == 'conservative':
+        return f'Stake conservadora (1/4 Kelly). Edge +{edge*100:.1f}%, boa relação risco/retorno'
+    if risk_level == 'moderate':
+        return f'Stake moderada. Edge significativo (+{edge*100:.1f}%) com boa confiança'
+    if risk_level == 'aggressive':
+        return f'Stake agressiva. Edge forte (+{edge*100:.1f}%) com alta confiança estatística'
+    return f'Stake máxima permitida. Edge excepcional (+{edge*100:.1f}%)'
+
+
+def bankroll_simulation(bankroll, cum_prob, dutching_odd, edge, n_simulations=1000,
+                        kelly_fraction=0.25, max_bets=100, seed=None):
+    """Monte Carlo simulation of bankroll growth with Dutching Kelly staking.
+
+    Simulates n_simulations paths of max_bets consecutive bets with the
+    same edge and odds profile. Useful for visualizing risk of ruin.
+
+    Returns dict with median final bankroll, ruin probability, growth stats.
+    """
+    rng = np.random.RandomState(seed)
+    full_kelly = edge / (dutching_odd - 1.0) if dutching_odd > 1.01 else 0.0
+    stake_pct = min(0.05, full_kelly * kelly_fraction)
+
+    if stake_pct <= 0 or cum_prob <= 0:
+        return {'median_final': bankroll, 'ruin_prob': 1.0,
+                'growth_median_pct': 0, 'growth_p10_pct': 0, 'growth_p90_pct': 0}
+
+    final_bankrolls = []
+    ruins = 0
+    ruin_threshold = bankroll * 0.10  # ruin = < 10% of original
+
+    for _ in range(n_simulations):
+        br = bankroll
+        for _ in range(max_bets):
+            stake = br * stake_pct
+            if stake <= 0 or br <= ruin_threshold:
+                ruins += 1
+                break
+            # Simulate outcome
+            if rng.random() < cum_prob:
+                br += stake * (dutching_odd - 1)
+            else:
+                br -= stake
+            if br <= ruin_threshold:
+                ruins += 1
+                break
+        final_bankrolls.append(max(0.01, br))
+
+    arr = np.array(final_bankrolls)
+    return {
+        'median_final': round(float(np.median(arr)), 2),
+        'ruin_prob': round(ruins / n_simulations, 4),
+        'growth_median_pct': round((np.median(arr) / bankroll - 1) * 100, 1),
+        'growth_p10_pct': round((np.percentile(arr, 10) / bankroll - 1) * 100, 1),
+        'growth_p90_pct': round((np.percentile(arr, 90) / bankroll - 1) * 100, 1),
+        'stake_pct_used': round(stake_pct * 100, 2),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Decision Layer: "Add this score?" and "Bet or skip?"
 # ═══════════════════════════════════════════════════════════════════════
 
 QUALITY_VERDICTS = {

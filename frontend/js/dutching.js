@@ -206,6 +206,9 @@ function calculateDutching() {
     }
     
     updateDutchingChart(labels, stakes);
+
+    // ── Kelly stake recommendation ──
+    renderKellyRecommendation(combinedOdd, realProbPercent, edge, selections);
 }
 
 async function runDutchingScan() {
@@ -481,6 +484,95 @@ function toggleDutchingGuide() {
     if (guide) {
         guide.style.display = guide.style.display === 'none' ? 'block' : 'none';
     }
+}
+
+// ── Kelly Criterion recommendation ──────────────────────────────────
+
+function renderKellyRecommendation(dutchingOdd, modelProbPct, edge, selections) {
+    const card = document.getElementById('dutching-kelly-card');
+    if (!card) return;
+
+    if (edge <= 0 || dutchingOdd <= 1.01 || selections.length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+
+    card.style.display = 'block';
+
+    const bankrollInput = document.getElementById('dutching-bankroll-input');
+    const bankroll = parseFloat(bankrollInput?.value) || 1000.0;
+    const kellyFracInput = document.getElementById('dutching-kelly-fraction');
+    const kellyFraction = parseFloat(kellyFracInput?.value) || 0.25;
+    const maxExposureInput = document.getElementById('dutching-max-exposure');
+    const maxExposure = parseFloat(maxExposureInput?.value) || 5.0;
+
+    // Full Kelly
+    const fullKelly = edge / (dutchingOdd - 1.0);
+    const fracKelly = fullKelly * kellyFraction;
+    const cappedKelly = Math.min(fracKelly, maxExposure / 100);
+
+    // Get edge_prob_positive from quality card if available
+    const edgeProbEl = document.getElementById('dutching-quality-card');
+    let confMult = 1.0;
+    if (edgeProbEl) {
+        const text = edgeProbEl.textContent || '';
+        const match = text.match(/P\(edge>0\):\s*(\d+)%/);
+        if (match) {
+            const pPos = parseInt(match[1]) / 100;
+            if (pPos < 0.65) confMult = 0;
+            else if (pPos < 0.80) confMult = 0.5;
+            else if (pPos < 0.90) confMult = 0.75;
+            else confMult = 1.0;
+        }
+    }
+
+    const adjKelly = cappedKelly * confMult;
+    const stake = bankroll * adjKelly;
+
+    // Risk level
+    const exposurePct = (stake / bankroll * 100);
+    let riskLevel, riskColor;
+    if (exposurePct <= 1.0) { riskLevel = 'Conservador'; riskColor = '#34d399'; }
+    else if (exposurePct <= 2.5) { riskLevel = 'Moderado'; riskColor = '#f59e0b'; }
+    else if (exposurePct <= 5.0) { riskLevel = 'Agressivo'; riskColor = '#f97316'; }
+    else { riskLevel = 'Máximo'; riskColor = '#f87171'; }
+
+    const selectionsAllocation = [];
+    const overround = selections.reduce((s, sel) => s + 1.0 / sel.calculationOdd, 0);
+    selections.forEach(sel => {
+        const selStake = stake * (1.0 / sel.calculationOdd) / overround;
+        selectionsAllocation.push({ name: sel.name, stake: selStake });
+    });
+
+    card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);"><i class="fa-solid fa-coins" style="color: #f59e0b;"></i> Gestão de Banca (Kelly)</span>
+            <span style="font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 700; color: ${riskColor}; background: ${riskColor}15; border: 1px solid ${riskColor}40;">${riskLevel}</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+            <div style="background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; text-align: center;">
+                <div style="font-size: 9px; color: var(--text-muted);">Stake Recomendada</div>
+                <div style="font-size: 18px; font-weight: 700; color: #f59e0b;">$${stake.toFixed(2)}</div>
+                <div style="font-size: 9px; color: var(--text-muted);">${exposurePct.toFixed(2)}% da banca</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; text-align: center;">
+                <div style="font-size: 9px; color: var(--text-muted);">Kelly Cheio</div>
+                <div style="font-size: 16px; font-weight: 700; color: var(--text-primary);">${(fullKelly * 100).toFixed(1)}%</div>
+                <div style="font-size: 9px; color: var(--text-muted);">1/${(1/kellyFraction).toFixed(0)} Kelly = ${(fracKelly * 100).toFixed(1)}%</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; text-align: center;">
+                <div style="font-size: 9px; color: var(--text-muted);">Lucro Esperado</div>
+                <div style="font-size: 16px; font-weight: 700; color: #34d399;">+$${(stake * edge).toFixed(2)}</div>
+                <div style="font-size: 9px; color: var(--text-muted);">EV +${(edge * 100).toFixed(2)}%</div>
+            </div>
+        </div>
+        <details style="font-size: 10px; color: var(--text-muted); margin-top: 5px;">
+            <summary style="cursor: pointer; color: var(--text-secondary);">Alocação por seleção</summary>
+            <div style="margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px;">
+                ${selectionsAllocation.map(s => `<span style="padding: 2px 6px; background: rgba(255,255,255,0.03); border-radius: 3px;">${s.name}: <strong>$${s.stake.toFixed(2)}</strong></span>`).join('')}
+            </div>
+        </details>
+    `;
 }
 
 // ── Dutching Backtest ──────────────────────────────────────────────────
