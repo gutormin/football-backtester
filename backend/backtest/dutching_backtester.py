@@ -412,6 +412,8 @@ class DutchingBacktester:
                                 n_selections=len(outcomes),
                                 market_divergence=game_profile.get('market_divergence', 0),
                                 edge_prob_positive=edge_confidence.get('prob_positive'),
+                                edge_std=edge_confidence.get('edge_std'),
+                                has_real_odds=False,
                             )
 
                             # Calculate stake

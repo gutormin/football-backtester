@@ -398,6 +398,16 @@ QUALITY_VERDICTS = {
 }
 
 
+def _hours_until_match(commence_time_str):
+    """Calculate hours until match kickoff from ISO datetime string."""
+    try:
+        kickoff = datetime.strptime(commence_time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        delta = kickoff - datetime.now(timezone.utc)
+        return max(0.0, delta.total_seconds() / 3600.0)
+    except Exception:
+        return None
+
+
 def evaluate_extra_score(current_outcomes, current_odds, current_cum_prob,
                          cand_score, cand_prob, cand_odd):
     """Evaluate whether adding an extra score improves the Dutching edge.
@@ -465,79 +475,112 @@ def evaluate_extra_score(current_outcomes, current_odds, current_cum_prob,
 
 def dutching_quality_score(edge, edge_ci_95=None, profile_confidence=0.0,
                            dutching_odd=2.0, n_selections=5,
-                           market_divergence=0.0, edge_prob_positive=None):
+                           market_divergence=0.0, edge_prob_positive=None,
+                           edge_std=None, has_real_odds=False,
+                           hours_to_kickoff=None):
     """Aggregate quality score (0-100) for a Dutching bet decision.
 
-    Combines 6 signals into a single score:
-    - Edge magnitude (35%): raw predicted edge
-    - Bootstrap robustness (25%): P(edge > 0) from bootstrap CI
-    - Profile confidence (15%): how clear the game profile is
-    - Dutching odd (10%): odds sweet spot = 2.0-5.0
-    - Market divergence (10%): model-vs-market disagreement
-    - Selection diversity (5%): 5-6 legs is ideal
+    Combines 6 signals into a single score. Weights are ADAPTIVE:
+    - With ESTIMATED odds: less weight on edge (weak signal), more on
+      market divergence and profile confidence (stronger signals)
+    - With REAL CS odds: more weight on edge and bootstrap robustness
+      (each score has independent EV, signal is much stronger)
 
-    Returns dict with score, verdict, and component breakdown.
+    New: Sharpe-like edge scoring (edge/σ_boostrap), time factor bonus
+    for bets placed well before kickoff.
     """
-    # ── 1. Edge magnitude (35%) ─────────────────────────────────
-    # Edge > 15% = perfect, edge ~0 = zero
-    edge_clipped = max(0.0, min(0.20, edge))
-    edge_score = (edge_clipped / 0.20) * 35.0  # linear 0-35
+    # ── Adaptive weights based on odds source ────────────────────
+    if has_real_odds:
+        w_edge = 0.38
+        w_bootstrap = 0.28
+        w_profile = 0.10
+        w_odds = 0.08
+        w_market = 0.08
+        w_selection = 0.08
+    else:
+        # Estimated odds: edge is weak, market divergence is king
+        w_edge = 0.20
+        w_bootstrap = 0.20
+        w_profile = 0.18
+        w_odds = 0.10
+        w_market = 0.22
+        w_selection = 0.10
 
-    # ── 2. Bootstrap robustness (25%) ───────────────────────────
+    # ── 1. Edge: Sharpe-like (edge / σ) instead of raw edge ─────
+    if edge_std is not None and edge_std > 0:
+        sharpe = edge / edge_std
+        # Sharpe 0.5 → score ~15%, Sharpe 3.0 → score ~100%
+        edge_factor = min(1.0, max(0.0, sharpe / 3.0))
+    else:
+        # Fallback: raw edge clipping
+        edge_factor = max(0.0, min(1.0, edge / 0.15))
+    edge_score = edge_factor * w_edge * 100  # scale to component weight
+
+    # ── 2. Bootstrap robustness ─────────────────────────────────
     bootstrap_score = 0.0
     if edge_prob_positive is not None:
-        # P(edge > 0): 50% → 0pts, 100% → 25pts
-        bootstrap_score = max(0.0, (edge_prob_positive - 0.50) / 0.50) * 25.0
+        # P(edge > 0): 50% → 0pts, 100% → full
+        bootstrap_factor = max(0.0, (edge_prob_positive - 0.50) / 0.50)
+        bootstrap_score = bootstrap_factor * w_bootstrap * 100
     elif edge_ci_95 is not None:
         low, high = edge_ci_95
         if low is not None and high is not None:
-            # CI entirely above 0 → high score; straddles 0 → low
             ci_range = high - low if high > low else 0.01
             if low > 0:
-                bootstrap_score = 25.0  # all positive
+                bootstrap_score = w_bootstrap * 100
             elif high > 0:
-                # Fraction of CI above zero
-                bootstrap_score = (high / ci_range) * 25.0
+                bootstrap_score = (high / ci_range) * w_bootstrap * 100
             else:
                 bootstrap_score = 0.0
 
-    # ── 3. Profile confidence (15%) ────────────────────────────
-    profile_score = profile_confidence * 15.0  # 0-15
+    # ── 3. Profile confidence ───────────────────────────────────
+    profile_score = profile_confidence * w_profile * 100
 
-    # ── 4. Dutching odd quality (10%) ──────────────────────────
-    if 1.5 <= dutching_odd <= 5.0:
-        odd_score = 10.0  # sweet spot
+    # ── 4. Dutching odd quality ─────────────────────────────────
+    if 1.5 <= dutching_odd <= 6.0:
+        odd_factor = 1.0
     elif 1.2 <= dutching_odd < 1.5:
-        odd_score = 5.0  # too low, little return
-    elif dutching_odd > 5.0:
-        odd_score = 7.0  # high return but low probability
+        odd_factor = 0.4
+    elif dutching_odd > 6.0:
+        odd_factor = 0.6
     else:
-        odd_score = 0.0
+        odd_factor = 0.0
+    odd_score = odd_factor * w_odds * 100
 
-    # ── 5. Market divergence (10%) ─────────────────────────────
+    # ── 5. Market divergence ────────────────────────────��──────
     div_abs = abs(market_divergence)
     if div_abs > 0.8:
-        div_score = 10.0  # strong disagreement = opportunity
+        div_factor = 1.0
     elif div_abs > 0.4:
-        div_score = 7.0
-    elif div_abs > 0.15:
-        div_score = 4.0
+        div_factor = 0.75
+    elif div_abs > 0.20:
+        div_factor = 0.50
+    elif div_abs > 0.08:
+        div_factor = 0.25
     else:
-        div_score = 1.0  # model agrees with market — no edge
+        div_factor = 0.05
+    div_score = div_factor * w_market * 100
 
-    # ── 6. Selection diversity (5%) ────────────────────────────
+    # ── 6. Selection diversity ──────────────────────────────────
     if 5 <= n_selections <= 6:
-        sel_score = 5.0  # ideal
+        sel_factor = 1.0
     elif n_selections == 4 or n_selections == 7:
-        sel_score = 3.0
+        sel_factor = 0.7
     elif n_selections == 3:
-        sel_score = 2.0  # minimum, risky
+        sel_factor = 0.5
     elif n_selections >= 8:
-        sel_score = 1.0  # too many, diluted
+        sel_factor = 0.3
     else:
-        sel_score = 0.0
+        sel_factor = 0.0
+    sel_score = sel_factor * w_selection * 100
 
     total = edge_score + bootstrap_score + profile_score + odd_score + div_score + sel_score
+
+    # ── Time factor: boost for early bets ───────────────────────
+    if hours_to_kickoff is not None and hours_to_kickoff > 0:
+        time_bonus = min(1.0, hours_to_kickoff / 24.0) * 10.0  # up to +10 for 24h+
+        total = min(100.0, total + time_bonus)
+
     total = round(min(100.0, total), 1)
 
     # ── Verdict ─────────────────────────────────────────────────
@@ -559,8 +602,12 @@ def dutching_quality_score(edge, edge_ci_95=None, profile_confidence=0.0,
         'verdict_label': verdict_label,
         'verdict_color': verdict_color,
         'verdict_icon': verdict_icon,
+        'adaptive_weights': {
+            'edge': w_edge, 'bootstrap': w_bootstrap, 'profile': w_profile,
+            'odd_quality': w_odds, 'market_divergence': w_market, 'selection': w_selection,
+        },
         'breakdown': {
-            'edge_magnitude': round(edge_score, 1),
+            'edge_sharpe': round(edge_score, 1),
             'bootstrap_robustness': round(bootstrap_score, 1),
             'profile_confidence': round(profile_score, 1),
             'odd_quality': round(odd_score, 1),
@@ -989,6 +1036,9 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         n_selections=len(outcomes_to_cover),
                         market_divergence=game_profile.get('market_divergence', 0),
                         edge_prob_positive=edge_ci.get('prob_positive'),
+                        edge_std=edge_ci.get('edge_std'),
+                        has_real_odds=False,
+                        hours_to_kickoff=_hours_until_match(dt),
                     )
 
                     opportunities.append({
@@ -1137,6 +1187,8 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                     n_selections=len(outcomes_b365),
                     market_divergence=game_profile.get('market_divergence', 0),
                     edge_prob_positive=edge_ci.get('prob_positive'),
+                    edge_std=edge_ci.get('edge_std'),
+                    has_real_odds=False,
                 )
                 opportunities.append({
                     'match': match_name,
@@ -1184,6 +1236,7 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         profile_confidence=0.0,
                         dutching_odd=dutching_odd_bf,
                         n_selections=len(outcomes_b365),
+                        edge_std=None, has_real_odds=False,
                     )
                     opportunities.append({
                         'match': match_name,
