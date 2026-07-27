@@ -608,6 +608,9 @@ async function loadDutchingBtLeagues() {
     }
 }
 
+// Store all bets for filtering
+var dutchingBtAllBets = [];
+
 async function runDutchingBacktest() {
     const btn = document.getElementById('btn-run-dutching-bt');
     const statusEl = document.getElementById('dutching-bt-status');
@@ -631,48 +634,61 @@ async function runDutchingBacktest() {
 
     const startDate = document.getElementById('dutching-bt-start').value;
     const endDate = document.getElementById('dutching-bt-end').value;
-    const stakeValue = parseFloat(document.getElementById('dutching-bt-stake').value) || 100;
+    const stakeValue = parseFloat(document.getElementById('dutching-bt-stake').value) || 50;
     const minEdgePct = parseFloat(document.getElementById('dutching-bt-edge').value) || 0;
-    const stakingRule = document.getElementById('dutching-bt-staking').value;
-    const initialBankroll = parseFloat(document.getElementById('dutching-bt-bankroll').value) || 10000;
+    const stakingMode = document.getElementById('dutching-bt-staking').value;
+    const initialBankroll = parseFloat(document.getElementById('dutching-bt-bankroll').value) || 1000;
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-arrows-rotate spinning"></i> Rodando...';
-    statusEl.innerHTML = '<span style="color: #a78bfa;">Processando backtest cronológico... Isso pode levar até 2 minutos.</span>';
-    resultsEl.style.display = 'none';
+    statusEl.innerHTML = '<span style="color: #a78bfa;">Processando backtest cronológico... Pode levar 1-3 minutos.</span>';
+    if (resultsEl) resultsEl.style.display = 'none';
+
+    // Build list of runs: if "both", run fixed + kelly
+    const runs = [];
+    if (stakingMode === 'both') {
+        runs.push({ rule: 'fixed', label: 'Stake Fixa' });
+        runs.push({ rule: 'kelly_quarter', label: '1/4 Kelly' });
+    } else {
+        runs.push({ rule: stakingMode, label: stakingMode === 'fixed' ? 'Stake Fixa' : '1/4 Kelly' });
+    }
 
     try {
-        const payload = {
-            leagues: selectedLeagues,
-            startDate: startDate,
-            endDate: endDate,
-            strategies: selectedStrategies,
-            initialBankroll: initialBankroll,
-            stakeValue: stakeValue,
-            stakingRule: stakingRule,
-            minEdge: minEdgePct / 100.0,
-            maxOverround: 0.92,
-            maxLegs: 8,
-            minSelections: 3,
-        };
+        const allResults = {};
 
-        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/backtest_dutching`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
+        for (const run of runs) {
+            statusEl.innerHTML = `<span style="color: #a78bfa;">Rodando ${run.label}... aguarde.</span>`;
+            const payload = {
+                leagues: selectedLeagues,
+                startDate,
+                endDate,
+                strategies: selectedStrategies,
+                initialBankroll,
+                stakeValue,
+                stakingRule: run.rule,
+                minEdge: minEdgePct / 100.0,
+                maxOverround: 0.92,
+                maxLegs: 8,
+                minSelections: 3,
+            };
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ detail: 'Erro desconhecido' }));
-            throw new Error(err.detail || 'Backtest failed');
+            const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/backtest_dutching`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: 'Erro desconhecido' }));
+                throw new Error(err.detail || 'Backtest failed');
+            }
+
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            allResults[run.rule] = { data, label: run.label };
         }
 
-        const data = await res.json();
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        renderDutchingBacktestResults(data);
+        renderDutchingBacktestResults(allResults, stakingMode);
         statusEl.innerHTML = '<span style="color: #34d399;"><i class="fa-solid fa-circle-check"></i> Backtest concluído!</span>';
         showToast('Backtest Dutching concluído!', 'success');
     } catch (err) {
@@ -681,84 +697,215 @@ async function runDutchingBacktest() {
         showToast('Erro no backtest Dutching: ' + err.message, 'error');
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-play"></i> Rodar Backtest Dutching';
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Rodar Backtest';
     }
 }
 
-function renderDutchingBacktestResults(data) {
+function renderDutchingBacktestResults(allResults, stakingMode) {
     const resultsEl = document.getElementById('dutching-bt-results');
     if (!resultsEl) return;
     resultsEl.style.display = 'block';
 
-    // Summary cards
-    const summary = data.summary || {};
+    // Use primary result (fixed or first available)
+    const primaryKey = allResults['fixed'] ? 'fixed' : Object.keys(allResults)[0];
+    const primary = allResults[primaryKey].data;
+    const summary = primary.summary || {};
+    const breakdown = primary.strategy_breakdown || {};
+
+    // ── KPI Cards (6 cards) ──
     const summaryEl = document.getElementById('dutching-bt-summary');
+    const profitColor = (summary.net_profit || 0) >= 0 ? '#34d399' : '#f87171';
+    const roiColor = (summary.roi || 0) >= 0 ? '#34d399' : '#f87171';
+
+    // If both modes, show Kelly profit alongside
+    let kellyProfitHtml = '';
+    if (allResults['kelly_quarter']) {
+        const ks = allResults['kelly_quarter'].data.summary || {};
+        const kc = (ks.net_profit || 0) >= 0 ? '#34d399' : '#f87171';
+        kellyProfitHtml = `
+        <div style="background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.2); padding: 10px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Lucro 1/4 Kelly</div>
+            <div style="font-size: 18px; font-weight: 700; color: ${kc};">$${(ks.net_profit || 0).toFixed(2)}</div>
+            <div style="font-size: 9px; color: ${kc};">ROI ${(ks.roi || 0) >= 0 ? '+' : ''}${(ks.roi || 0).toFixed(1)}%</div>
+        </div>`;
+    }
+
+    // Avg edge predicted from breakdown
+    let avgEdgePred = 0;
+    const bvals = Object.values(breakdown);
+    if (bvals.length > 0) avgEdgePred = bvals[0].avg_edge_predicted || 0;
+
     summaryEl.innerHTML = `
-        <div style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); padding: 12px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Total de Dutchings</div>
-            <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">${summary.total_bets || 0}</div>
+        <div style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); padding: 10px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Total de Bets</div>
+            <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);">${summary.total_bets || 0}</div>
         </div>
-        <div style="background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.2); padding: 12px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Win Rate</div>
-            <div style="font-size: 20px; font-weight: 700; color: #34d399;">${summary.win_rate || 0}%</div>
+        <div style="background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.2); padding: 10px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Win Rate</div>
+            <div style="font-size: 22px; font-weight: 700; color: #34d399;">${summary.win_rate || 0}%</div>
+            <div style="font-size: 9px; color: var(--text-muted);">${summary.total_wins || 0} acertos</div>
         </div>
-        <div style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); padding: 12px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Lucro Total</div>
-            <div style="font-size: 20px; font-weight: 700; color: ${(summary.net_profit || 0) >= 0 ? '#34d399' : '#f87171'};">
-                $${(summary.net_profit || 0).toFixed(2)}
-            </div>
+        <div style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); padding: 10px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Lucro (Fixo)</div>
+            <div style="font-size: 22px; font-weight: 700; color: ${profitColor};">$${(summary.net_profit || 0).toFixed(2)}</div>
+            <div style="font-size: 9px; color: ${profitColor};">ROI ${(summary.roi || 0) >= 0 ? '+' : ''}${(summary.roi || 0).toFixed(1)}%</div>
         </div>
-        <div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); padding: 12px; border-radius: 6px; text-align: center;">
-            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">ROI</div>
-            <div style="font-size: 20px; font-weight: 700; color: ${(summary.roi || 0) >= 0 ? '#34d399' : '#f87171'};">
-                ${(summary.roi || 0) >= 0 ? '+' : ''}${(summary.roi || 0).toFixed(1)}%
-            </div>
+        ${kellyProfitHtml || `<div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); padding: 10px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">ROI</div>
+            <div style="font-size: 22px; font-weight: 700; color: ${roiColor};">${(summary.roi || 0) >= 0 ? '+' : ''}${(summary.roi || 0).toFixed(1)}%</div>
+        </div>`}
+        <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); padding: 10px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Edge Previsto</div>
+            <div style="font-size: 22px; font-weight: 700; color: #f59e0b;">+${avgEdgePred.toFixed(1)}%</div>
+            <div style="font-size: 9px; color: var(--text-muted);">Edge médio IA</div>
+        </div>
+        <div style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); padding: 10px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase;">Total Apostado</div>
+            <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">$${(summary.total_staked || 0).toFixed(0)}</div>
         </div>
     `;
 
-    // Strategy breakdown table
+    // ── Strategy breakdown table ──
     const tbody = document.getElementById('dutching-bt-strategy-tbody');
     tbody.innerHTML = '';
-    const breakdown = data.strategy_breakdown || {};
-    for (const [key, s] of Object.entries(breakdown)) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><strong style="color: #a78bfa;">${s.label || key}</strong></td>
-            <td>${s.total_bets}</td>
-            <td style="color: ${s.win_rate >= 25 ? '#34d399' : '#f87171'};">${s.win_rate}%</td>
-            <td style="color: ${s.net_profit >= 0 ? '#34d399' : '#f87171'}; font-weight: 600;">$${s.net_profit.toFixed(2)}</td>
-            <td style="color: ${s.roi >= 0 ? '#34d399' : '#f87171'};">${s.roi >= 0 ? '+' : ''}${s.roi}%</td>
-            <td style="color: var(--text-muted);">${s.avg_edge_realized >= 0 ? '+' : ''}${s.avg_edge_realized}%</td>
-            <td style="color: #f87171;">${s.max_drawdown}%</td>
-        `;
-        tbody.appendChild(tr);
+
+    // Show both fixed and kelly rows if both available
+    const rulesWithData = Object.entries(allResults);
+    for (const [rule, { data: rdata, label: rlabel }] of rulesWithData) {
+        const rBreakdown = rdata.strategy_breakdown || {};
+        for (const [key, s] of Object.entries(rBreakdown)) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong style="color: #a78bfa;">${s.label || key}</strong><span style="font-size: 9px; color: var(--text-muted); margin-left: 4px;">(${rlabel})</span></td>
+                <td>${s.total_bets}</td>
+                <td style="color: ${s.win_rate >= 25 ? '#34d399' : '#f87171'};">${s.win_rate}%</td>
+                <td style="color: ${s.net_profit >= 0 ? '#34d399' : '#f87171'}; font-weight: 600;">$${s.net_profit.toFixed(2)}</td>
+                <td style="color: ${s.roi >= 0 ? '#34d399' : '#f87171'};">${s.roi >= 0 ? '+' : ''}${s.roi}%</td>
+                <td style="color: #f87171;">${s.max_drawdown}%</td>
+                <td style="color: ${s.sharpe_ratio >= 0 ? '#34d399' : '#f87171'};">${s.sharpe_ratio}</td>
+            `;
+            tbody.appendChild(tr);
+        }
     }
 
-    // Equity curve chart
-    renderDutchingBtEquityChart(breakdown);
+    // ── Equity chart (all runs + strategies) ──
+    const allBreakdowns = {};
+    for (const [rule, { data: rdata, label: rlabel }] of Object.entries(allResults)) {
+        for (const [key, s] of Object.entries(rdata.strategy_breakdown || {})) {
+            allBreakdowns[`${s.label} (${rlabel})`] = s;
+        }
+    }
+    renderDutchingBtEquityChart(allBreakdowns);
 
-    // Coverage analysis (from first strategy with data)
+    // ── Monthly breakdown (primary, first strategy) ──
+    const monthlyEl = document.getElementById('dutching-bt-monthly');
+    if (monthlyEl) {
+        const firstStrategy = bvals[0];
+        const monthly = firstStrategy?.monthly_breakdown || [];
+        if (monthly.length > 0) {
+            monthlyEl.innerHTML = `<table class="table-styled" style="width:100%;font-size:11px;">
+                <thead><tr><th>Mês</th><th>Bets</th><th>Win%</th><th>Lucro</th><th>ROI%</th></tr></thead>
+                <tbody>${monthly.map(m => `<tr>
+                    <td>${m.month}</td>
+                    <td>${m.bets}</td>
+                    <td style="color:${m.win_rate >= 25 ? '#34d399' : '#f87171'};">${m.win_rate}%</td>
+                    <td style="color:${m.profit >= 0 ? '#34d399' : '#f87171'}; font-weight:600;">$${m.profit.toFixed(2)}</td>
+                    <td style="color:${m.roi >= 0 ? '#34d399' : '#f87171'};">${m.roi >= 0 ? '+' : ''}${m.roi}%</td>
+                </tr>`).join('')}</tbody>
+            </table>`;
+        } else {
+            monthlyEl.innerHTML = '<span style="color:var(--text-muted);font-size:11px;">Sem dados mensais.</span>';
+        }
+    }
+
+    // ── League breakdown ──
+    const leagueEl = document.getElementById('dutching-bt-league');
+    if (leagueEl) {
+        const firstStrategy = bvals[0];
+        const leagues = firstStrategy?.league_breakdown || [];
+        if (leagues.length > 0) {
+            leagueEl.innerHTML = `<table class="table-styled" style="width:100%;font-size:11px;">
+                <thead><tr><th>Liga</th><th>Bets</th><th>Win%</th><th>Lucro</th><th>ROI%</th></tr></thead>
+                <tbody>${leagues.map(l => `<tr>
+                    <td style="font-size:10px;">${l.league}</td>
+                    <td>${l.bets}</td>
+                    <td style="color:${l.win_rate >= 25 ? '#34d399' : '#f87171'};">${l.win_rate}%</td>
+                    <td style="color:${l.profit >= 0 ? '#34d399' : '#f87171'}; font-weight:600;">$${l.profit.toFixed(2)}</td>
+                    <td style="color:${l.roi >= 0 ? '#34d399' : '#f87171'};">${l.roi >= 0 ? '+' : ''}${l.roi}%</td>
+                </tr>`).join('')}</tbody>
+            </table>`;
+        } else {
+            leagueEl.innerHTML = '<span style="color:var(--text-muted);font-size:11px;">Sem dados por liga.</span>';
+        }
+    }
+
+    // ── Coverage Analysis ──
     const coverageEl = document.getElementById('dutching-bt-coverage');
     let hasCoverage = false;
     for (const [key, s] of Object.entries(breakdown)) {
         const cov = s.coverage_analysis;
         if (cov && (cov.most_hit_scores?.length > 0 || cov.most_missed_scores?.length > 0)) {
-            const hitsEl = document.getElementById('dutching-bt-top-hits');
-            const missesEl = document.getElementById('dutching-bt-top-misses');
-
-            hitsEl.innerHTML = cov.most_hit_scores.slice(0, 8).map(
-                sc => `<span style="display: inline-block; margin: 2px; padding: 3px 8px; background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); border-radius: 4px;">${sc.score} <strong style="color: #34d399;">${sc.hits}x</strong></span>`
-            ).join('') || '<span style="color: var(--text-muted);">Nenhum acerto registrado</span>';
-
-            missesEl.innerHTML = cov.most_missed_scores.slice(0, 8).map(
-                sc => `<span style="display: inline-block; margin: 2px; padding: 3px 8px; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); border-radius: 4px;">${sc.score} <strong style="color: #f87171;">errou ${sc.misses}x</strong></span>`
-            ).join('') || '<span style="color: var(--text-muted);">Nenhum erro registrado</span>';
-
+            document.getElementById('dutching-bt-top-hits').innerHTML = cov.most_hit_scores.slice(0, 8).map(
+                sc => `<span style="display:inline-block;margin:2px;padding:3px 8px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:4px;">${sc.score} <strong style="color:#34d399;">${sc.hits}x</strong></span>`
+            ).join('') || '<span style="color:var(--text-muted);">Nenhum acerto</span>';
+            document.getElementById('dutching-bt-top-misses').innerHTML = cov.most_missed_scores.slice(0, 8).map(
+                sc => `<span style="display:inline-block;margin:2px;padding:3px 8px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:4px;">${sc.score} <strong style="color:#f87171;">${sc.misses}x</strong></span>`
+            ).join('') || '<span style="color:var(--text-muted);">Nenhum erro</span>';
             hasCoverage = true;
             break;
         }
     }
     if (coverageEl) coverageEl.style.display = hasCoverage ? 'block' : 'none';
+
+    // ── Bets detail table ──
+    dutchingBtAllBets = primary.bets || [];
+    renderDutchingBtBetsTable(dutchingBtAllBets);
+}
+
+function renderDutchingBtBetsTable(bets) {
+    const tbody = document.getElementById('dutching-bt-bets-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (bets.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:15px;">Nenhuma aposta registrada.</td></tr>';
+        return;
+    }
+
+    bets.forEach(b => {
+        const tr = document.createElement('tr');
+        const won = b.won || b.covered;
+        const profitColor = b.profit >= 0 ? '#34d399' : '#f87171';
+        const resultIcon = won ? '✅' : '❌';
+        const selectionsStr = (b.selections || []).slice(0, 4).join(', ') + (b.selections?.length > 4 ? '...' : '');
+        tr.innerHTML = `
+            <td style="white-space:nowrap;color:var(--text-muted);">${b.date}</td>
+            <td style="font-size:11px;font-weight:600;">${b.home_team} vs ${b.away_team}</td>
+            <td style="font-size:10px;color:var(--text-muted);">${b.league}</td>
+            <td style="font-size:10px;color:#a78bfa;">${b.market_label || b.resolved_strategy || b.strategy}</td>
+            <td style="font-family:monospace;font-size:10px;color:#a78bfa;">${selectionsStr}</td>
+            <td style="font-weight:700;">${resultIcon} ${b.actual_score}</td>
+            <td>$${(b.total_stake || 0).toFixed(2)}</td>
+            <td style="font-weight:700;color:${profitColor};">${b.profit >= 0 ? '+' : ''}$${(b.profit || 0).toFixed(2)}</td>
+            <td style="color:var(--text-secondary);">$${(b.bankroll || 0).toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function filterDutchingBtTable() {
+    const search = (document.getElementById('dutching-bt-search')?.value || '').toLowerCase();
+    const resultFilter = document.getElementById('dutching-bt-filter-result')?.value || 'all';
+
+    let filtered = dutchingBtAllBets.filter(b => {
+        const matchText = `${b.home_team} ${b.away_team} ${b.date} ${b.league}`.toLowerCase();
+        if (search && !matchText.includes(search)) return false;
+        if (resultFilter === 'won' && !(b.won || b.covered)) return false;
+        if (resultFilter === 'lost' && (b.won || b.covered)) return false;
+        return true;
+    });
+
+    renderDutchingBtBetsTable(filtered);
 }
 
 function renderDutchingBtEquityChart(breakdown) {
@@ -850,6 +997,7 @@ window.toggleDutchingGuide = toggleDutchingGuide;
 window.runDutchingBacktest = runDutchingBacktest;
 window.loadDutchingBtLeagues = loadDutchingBtLeagues;
 window.loadDemoOpportunity = loadDemoOpportunity;
+window.filterDutchingBtTable = filterDutchingBtTable;
 
 // ── Demo opportunity (shows all new features without API key) ─────
 

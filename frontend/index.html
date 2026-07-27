@@ -1678,84 +1678,144 @@ window.addEventListener('unhandledrejection', function(e) {
  <!-- Dutching Backtest Section -->
  <div class="glassmorphism" style="margin-top: 20px; padding: 20px;">
  <h3 style="font-size: 15px; color: var(--text-primary); margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-flask" style="color: #a78bfa;"></i> Backtest de Estratégias Dutching</h3>
- <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Valide se o edge teórico do scanner se materializa em lucro real usando dados históricos.</p>
+ <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Simule o que teria acontecido se você tivesse apostado nos jogos sugeridos pelo sistema num período histórico. Compara Stake Fixa vs Kelly automaticamente.</p>
 
  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 15px;">
  <div class="form-group" style="margin-bottom: 0;">
  <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Ligas</label>
- <select id="dutching-bt-leagues" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px; height: 90px;">
+ <select id="dutching-bt-leagues" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px; height: 110px;">
  </select>
+ <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Ctrl+clique para múltiplas</div>
  </div>
  <div class="form-group" style="margin-bottom: 0;">
  <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Período</label>
  <input type="date" id="dutching-bt-start" value="2024-01-01" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px; margin-bottom: 5px;">
- <input type="date" id="dutching-bt-end" value="2024-12-31" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;">
+ <input type="date" id="dutching-bt-end" value="2024-06-30" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;">
+ <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">Períodos curtos são mais rápidos</div>
  </div>
  <div class="form-group" style="margin-bottom: 0;">
- <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Estratégias</label>
- <select id="dutching-bt-strategies" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px; height: 90px;">
- <option value="auto_ia" selected>IA Auto (Recomendada)</option>
- <option value="under">Under / Jogo Truncado</option>
- <option value="over">Over / Goleada</option>
- <option value="draw">Empate</option>
- <option value="home_fav">Favorito Mandante</option>
- <option value="away_fav">Favorito Visitante</option>
- <option value="dynamic">Dinâmico (Todos Placares)</option>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Estratégia IA</label>
+ <select id="dutching-bt-strategies" multiple style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px; height: 110px;">
+ <option value="auto_ia" selected>🤖 IA Auto (Recomendada)</option>
+ <option value="under">📉 Under / Jogo Truncado</option>
+ <option value="over">📈 Over / Goleada</option>
+ <option value="draw">🤝 Empate</option>
+ <option value="home_fav">🏠 Favorito Mandante</option>
+ <option value="away_fav">✈️ Favorito Visitante</option>
+ <option value="dynamic">⚡ Dinâmico (Todos Placares)</option>
  </select>
  </div>
  <div class="form-group" style="margin-bottom: 0;">
  <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Parâmetros</label>
- <div style="display: flex; gap: 6px; flex-wrap: wrap;">
- <input type="number" id="dutching-bt-stake" value="100" min="1" step="10" placeholder="Stake" style="flex: 1; min-width: 60px; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;" title="Valor da stake por dutch">
- <input type="number" id="dutching-bt-edge" value="0" min="0" max="30" step="1" placeholder="Edge%" style="flex: 1; min-width: 55px; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;" title="Edge mínimo (%)">
- <select id="dutching-bt-staking" style="flex: 1; min-width: 70px; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;" title="Regra de staking">
- <option value="fixed">Fixo</option>
- <option value="kelly_quarter">1/4 Kelly</option>
+ <div style="display: flex; flex-direction: column; gap: 6px;">
+ <div style="display: flex; gap: 6px;">
+ <div style="flex: 1;">
+ <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">Banca Inicial ($)</div>
+ <input type="number" id="dutching-bt-bankroll" value="1000" min="100" step="100" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;">
+ </div>
+ <div style="flex: 1;">
+ <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">Stake Fixa ($)</div>
+ <input type="number" id="dutching-bt-stake" value="50" min="1" step="10" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;" title="Usado na comparação Stake Fixa vs Kelly">
+ </div>
+ </div>
+ <div style="display: flex; gap: 6px;">
+ <div style="flex: 1;">
+ <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">Edge Mínimo (%)</div>
+ <input type="number" id="dutching-bt-edge" value="5" min="0" max="30" step="1" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;" title="Só aposta se edge for maior que este valor">
+ </div>
+ <div style="flex: 1;">
+ <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 2px;">Comparar</div>
+ <select id="dutching-bt-staking" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;">
+ <option value="both" selected>Fixo + Kelly</option>
+ <option value="fixed">Só Fixo</option>
+ <option value="kelly_quarter">Só 1/4 Kelly</option>
  </select>
- <input type="number" id="dutching-bt-bankroll" value="10000" min="100" step="1000" placeholder="Banca" style="flex: 1; min-width: 70px; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px; border-radius: 4px; font-size: 12px;" title="Banca inicial ($)">
+ </div>
+ </div>
  </div>
  </div>
  </div>
 
  <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
- <button type="button" class="btn-primary" id="btn-run-dutching-bt" onclick="window.runDutchingBacktest()" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); border: none; font-size: 13px; padding: 10px 20px;">
- <i class="fa-solid fa-play"></i> Rodar Backtest Dutching
+ <button type="button" class="btn-primary" id="btn-run-dutching-bt" onclick="window.runDutchingBacktest()" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); border: none; font-size: 13px; padding: 10px 22px;">
+ <i class="fa-solid fa-play"></i> Rodar Backtest
  </button>
  <span id="dutching-bt-status" style="font-size: 12px; color: var(--text-muted);"></span>
  </div>
 
  <!-- Backtest Results -->
  <div id="dutching-bt-results" style="display: none;">
- <div id="dutching-bt-summary" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 15px;"></div>
 
- <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
- <div id="dutching-bt-strategy-table-container" style="max-height: 300px; overflow-y: auto;">
- <table class="table-styled" style="width: 100%; font-size: 12px;">
+ <!-- KPI cards -->
+ <div id="dutching-bt-summary" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 15px;"></div>
+
+ <!-- Equity chart + Strategy table -->
+ <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 15px; margin-bottom: 15px;">
+ <div style="background: rgba(0,0,0,0.15); border-radius: 8px; border: 1px solid var(--border-color); padding: 10px;">
+ <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📈 Evolução da Banca</div>
+ <canvas id="dutching-bt-equity-chart" style="max-height: 220px; width: 100%;"></canvas>
+ </div>
+ <div id="dutching-bt-strategy-table-container" style="overflow-y: auto; max-height: 260px;">
+ <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">⚖️ Comparação por Estratégia</div>
+ <table class="table-styled" style="width: 100%; font-size: 11px;">
  <thead><tr>
- <th>Estratégia</th><th>Bets</th><th>Win%</th><th>Lucro</th><th>ROI%</th><th>Edge Realizado</th><th>DD%</th>
+ <th>Estratégia</th><th>Bets</th><th>Win%</th><th>Lucro</th><th>ROI%</th><th>DD%</th><th>Sharpe</th>
  </tr></thead>
  <tbody id="dutching-bt-strategy-tbody"></tbody>
  </table>
  </div>
- <div style="background: rgba(0,0,0,0.1); border-radius: 8px; border: 1px solid var(--border-color);">
- <canvas id="dutching-bt-equity-chart" style="max-height: 280px; width: 100%;"></canvas>
+ </div>
+
+ <!-- Monthly + League breakdown -->
+ <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+ <div>
+ <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📅 Resultado por Mês</div>
+ <div id="dutching-bt-monthly" style="max-height: 200px; overflow-y: auto; font-size: 11px;"></div>
+ </div>
+ <div>
+ <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">🏆 Resultado por Liga</div>
+ <div id="dutching-bt-league" style="max-height: 200px; overflow-y: auto; font-size: 11px;"></div>
  </div>
  </div>
 
  <!-- Coverage Analysis -->
- <div id="dutching-bt-coverage" style="margin-bottom: 15px;">
- <h4 style="font-size: 13px; color: var(--text-primary); margin-bottom: 8px;"><i class="fa-solid fa-bullseye" style="color: #a78bfa;"></i> Análise de Cobertura</h4>
+ <div id="dutching-bt-coverage" style="margin-bottom: 15px; display: none;">
+ <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">🎯 Análise de Cobertura de Placares</div>
  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
  <div>
- <div style="font-size: 11px; color: #34d399; margin-bottom: 5px; font-weight: 600;">Placares Mais Acertados</div>
+ <div style="font-size: 11px; color: #34d399; margin-bottom: 5px; font-weight: 600;">✅ Placares Mais Acertados</div>
  <div id="dutching-bt-top-hits" style="font-size: 11px; color: var(--text-secondary);"></div>
  </div>
  <div>
- <div style="font-size: 11px; color: #f87171; margin-bottom: 5px; font-weight: 600;">Placares Mais Previstos (Erros)</div>
+ <div style="font-size: 11px; color: #f87171; margin-bottom: 5px; font-weight: 600;">❌ Placares Mais Previstos (Erros)</div>
  <div id="dutching-bt-top-misses" style="font-size: 11px; color: var(--text-secondary);"></div>
  </div>
  </div>
  </div>
+
+ <!-- Bets detail table -->
+ <div>
+ <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+ <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📋 Detalhamento por Jogo</div>
+ <div style="display: flex; gap: 6px;">
+ <input type="text" id="dutching-bt-search" placeholder="Buscar time ou data..." oninput="window.filterDutchingBtTable()" style="background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 8px; border-radius: 4px; font-size: 11px; width: 160px; outline: none;">
+ <select id="dutching-bt-filter-result" onchange="window.filterDutchingBtTable()" style="background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 4px 6px; border-radius: 4px; font-size: 11px;">
+ <option value="all">Todos</option>
+ <option value="won">✅ Acertos</option>
+ <option value="lost">❌ Erros</option>
+ </select>
+ </div>
+ </div>
+ <div style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+ <table class="table-styled" style="width: 100%; font-size: 11px;" id="dutching-bt-bets-table">
+ <thead style="position: sticky; top: 0; background: var(--bg-dark); z-index: 1;"><tr>
+ <th>Data</th><th>Partida</th><th>Liga</th><th>Estratégia</th><th>Seleções</th><th>Placar Real</th><th>Stake</th><th>Lucro</th><th>Banca</th>
+ </tr></thead>
+ <tbody id="dutching-bt-bets-tbody"></tbody>
+ </table>
+ </div>
+ </div>
+
  </div>
  </div>
 
@@ -3513,7 +3573,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=148"></script>
+ <script type="module" src="app.js?v=149"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
