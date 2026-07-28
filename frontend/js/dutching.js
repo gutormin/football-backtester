@@ -632,10 +632,14 @@ async function runDutchingBacktest() {
     const startDate = document.getElementById('dutching-bt-start').value;
     const endDate = document.getElementById('dutching-bt-end').value;
 
-    // Validar datas
-    const today = new Date().toISOString().split('T')[0];
-    if (endDate >= today) {
-        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ O período deve ser histórico (datas passadas). O backtest só funciona com dados já disponíveis.</span>';
+    // Validar datas — CSVs vão até ~maio 2025
+    const maxDataDate = '2025-05-25';
+    if (endDate > maxDataDate) {
+        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ Os dados históricos vão até maio/2025. Ajuste o período para datas dentro desse intervalo (ex: 2024-08 a 2025-05).</span>';
+        return;
+    }
+    if (startDate > maxDataDate) {
+        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ Data inicial depois de maio/2025 — não há dados disponíveis.</span>';
         return;
     }
 
@@ -1182,14 +1186,13 @@ function initDutchingBtDates() {
     const startEl = document.getElementById('dutching-bt-start');
     const endEl = document.getElementById('dutching-bt-end');
     if (!startEl || !endEl) return;
-    // Só define se ainda estiver com data futura ou em branco
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    if (!startEl.value || startEl.value >= todayStr) {
+    // CSVs históricos vão até ~maio 2025
+    const maxDataDate = '2025-05-25';
+    if (!startEl.value || startEl.value > maxDataDate) {
         startEl.value = '2024-08-01';
     }
-    if (!endEl.value || endEl.value >= todayStr) {
-        endEl.value = '2024-11-30';
+    if (!endEl.value || endEl.value > maxDataDate) {
+        endEl.value = '2025-05-25';
     }
 }
 
