@@ -1689,9 +1689,11 @@ window.addEventListener('unhandledrejection', function(e) {
  <div>
  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
  <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">🏆 Ligas</label>
- <div style="display: flex; gap: 6px;">
- <button type="button" onclick="window.selectAllDutchingBtLeagues()" style="font-size: 10px; padding: 3px 10px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; border-radius: 4px; cursor: pointer; font-weight: 600;">✅ Todas</button>
- <button type="button" onclick="window.clearDutchingBtLeagues()" style="font-size: 10px; padding: 3px 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 4px; cursor: pointer;">✖ Limpar</button>
+ <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+ <button type="button" onclick="window.selectDutchingBtLeaguesBySource('futpython')" style="font-size: 9px; padding: 2px 7px; background: rgba(52,211,153,0.15); border: 1px solid rgba(52,211,153,0.3); color: #34d399; border-radius: 4px; cursor: pointer; font-weight: 600;">🟢 FutPython</button>
+ <button type="button" onclick="window.selectDutchingBtLeaguesBySource('footballdata')" style="font-size: 9px; padding: 2px 7px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); color: #f59e0b; border-radius: 4px; cursor: pointer; font-weight: 600;">🟡 FootballData</button>
+ <button type="button" onclick="window.selectAllDutchingBtLeagues()" style="font-size: 9px; padding: 2px 7px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; border-radius: 4px; cursor: pointer; font-weight: 600;">Todas</button>
+ <button type="button" onclick="window.clearDutchingBtLeagues()" style="font-size: 9px; padding: 2px 7px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 4px; cursor: pointer;">✖</button>
  </div>
  </div>
  <div id="dutching-bt-leagues-container" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px; height: 120px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 2px;">
@@ -3583,7 +3585,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=161"></script>
+ <script type="module" src="app.js?v=162"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,

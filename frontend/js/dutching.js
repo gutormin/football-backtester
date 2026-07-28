@@ -589,42 +589,50 @@ async function loadDutchingBtLeagues() {
     const container = document.getElementById('dutching-bt-leagues-container');
     if (!container) return;
     try {
-        // Load leagues from both sources and merge
+        // Load leagues from both sources
         const [resFP, resDF] = await Promise.allSettled([
             fetch(`${window.API_BASE_URL || window.location.origin}/api/leagues?source=futpython`),
             fetch(`${window.API_BASE_URL || window.location.origin}/api/leagues?source=footballdata`),
         ]);
 
         let leagues = [];
-        const seen = new Set();
+        const seenNames = new Set();
 
-        // FutPython first (has real CS odds)
+        // FutPython first (has real CS odds) — priority
         if (resFP.status === 'fulfilled' && resFP.value.ok) {
             const fpLeagues = await resFP.value.json();
             fpLeagues.forEach(l => {
-                if (!seen.has(l.code)) {
-                    seen.add(l.code);
+                const normName = (l.name || l.code).toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (!seenNames.has(normName)) {
+                    seenNames.add(normName);
                     leagues.push({ ...l, source: 'futpython', badge: '🟢' });
                 }
             });
         }
 
-        // Then FootballData (estimated CS odds)
+        // Then FootballData (estimated CS odds) — only add if not already covered
         if (resDF.status === 'fulfilled' && resDF.value.ok) {
             const fdLeagues = await resDF.value.json();
             fdLeagues.forEach(l => {
-                if (!seen.has(l.code)) {
-                    seen.add(l.code);
+                const normName = (l.name || l.code).toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (!seenNames.has(normName)) {
+                    seenNames.add(normName);
                     leagues.push({ ...l, source: 'footballdata', badge: '🟡' });
                 }
             });
         }
 
         if (leagues.length === 0) return;
-        const defaultSelected = ['E0', 'SP1', 'I1', 'D1', 'F1'];
+
+        // Sort: FutPython first, then alphabetically
+        leagues.sort((a, b) => {
+            if (a.source !== b.source) return a.source === 'futpython' ? -1 : 1;
+            return (a.name || a.code).localeCompare(b.name || b.code);
+        });
+
         container.innerHTML = leagues.map(l => `
-            <label style="display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${l.name || l.code} (${l.source === 'futpython' ? 'CS Real' : 'CS Estimado'})">
-                <input type="checkbox" value="${l.code}" data-source="${l.source || ''}" ${defaultSelected.includes(l.code) ? 'checked' : ''} style="accent-color:#8b5cf6;width:14px;height:14px;flex-shrink:0;">
+            <label style="display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${l.name || l.code} (${l.source === 'futpython' ? 'CS Real — FutPython' : 'CS Estimado — FootballData'})">
+                <input type="checkbox" value="${l.code}" data-source="${l.source || ''}" style="accent-color:${l.source === 'futpython' ? '#34d399' : '#8b5cf6'};width:14px;height:14px;flex-shrink:0;">
                 <span style="font-size:10px;">${l.badge || ''}</span> ${l.name || l.code}
             </label>
         `).join('');
@@ -1262,13 +1270,23 @@ window.toggleDutchingGuide = toggleDutchingGuide;
 async function selectAllDutchingBtLeagues() {
     const container = document.getElementById('dutching-bt-leagues-container');
     if (!container) return;
-    if (container.children.length === 0) await loadDutchingBtLeagues();
+    if (container.querySelectorAll('input[type="checkbox"]').length === 0) await loadDutchingBtLeagues();
     container.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
 }
 
 function clearDutchingBtLeagues() {
     document.querySelectorAll('#dutching-bt-leagues-container input[type="checkbox"]').forEach(cb => cb.checked = false);
 }
+
+function selectDutchingBtLeaguesBySource(source) {
+    const container = document.getElementById('dutching-bt-leagues-container');
+    if (!container) return;
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = cb.dataset.source === source;
+    });
+}
+
+window.selectDutchingBtLeaguesBySource = selectDutchingBtLeaguesBySource;
 
 window.runDutchingBacktest = runDutchingBacktest;
 window.loadDutchingBtLeagues = loadDutchingBtLeagues;
