@@ -405,7 +405,9 @@ def save_telegram_dutching_tips(tips):
         json.dump(tips, f, indent=4, ensure_ascii=False)
     return tips
 
-def add_telegram_dutching_tip(match_name, match_date, edge):
+def add_telegram_dutching_tip(match_name, match_date, edge, selections=None, odds=None,
+                               dutching_odd=None, model_prob=None, bookmaker=None,
+                               market=None, home_team=None, league=None):
     tips = get_telegram_dutching_tips()
     new_tip = {
         "id": str(uuid.uuid4()),
@@ -413,7 +415,19 @@ def add_telegram_dutching_tip(match_name, match_date, edge):
         "date": match_date,
         "edge": float(edge),
         "status": "Enviado",
-        "created_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        "created_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        # Dados completos para backtest de sugestões reais
+        "selections": selections or [],
+        "odds": odds or [],
+        "dutching_odd": dutching_odd,
+        "model_prob": model_prob,
+        "bookmaker": bookmaker,
+        "market": market,
+        "home_team": home_team,
+        "league": league,
+        "result_checked": False,
+        "actual_score": None,
+        "won": None,
     }
     tips.append(new_tip)
     save_telegram_dutching_tips(tips)

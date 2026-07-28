@@ -121,8 +121,26 @@ class DutchingBacktester:
         # ── 1. Load data ──────────────────────────────────────────
         all_matches = []
         for lc in leagues:
-            ds = data_source if data_source != 'auto' else auto_detect_data_source(lc)
-            df = load_league_data(lc, start_date='2020-08-01', data_source=ds, api_key=futpython_api_key)
+            df = pd.DataFrame()
+            
+            # Try FutPython first (has real CS odds)
+            try:
+                df_fp = load_league_data(lc, start_date='2020-08-01', data_source='futpython', api_key=futpython_api_key)
+                if not df_fp.empty and 'CS_1_0' in df_fp.columns:
+                    # Fix LeagueCode to match internal code (FutPython uses slug format)
+                    df_fp['LeagueCode'] = lc
+                    df = df_fp
+                    logger.info(f"[Dutching BT] {lc}: loaded from FutPython (has real CS odds)")
+            except Exception:
+                pass
+            
+            # Fallback to auto-detect (footballdata/datafootball)
+            if df.empty:
+                ds = data_source if data_source != 'auto' else auto_detect_data_source(lc)
+                df = load_league_data(lc, start_date='2020-08-01', data_source=ds, api_key=futpython_api_key)
+                if not df.empty:
+                    logger.info(f"[Dutching BT] {lc}: loaded from {ds} (estimated CS odds)")
+            
             if not df.empty:
                 all_matches.append(df)
 
@@ -363,164 +381,182 @@ class DutchingBacktester:
 
                 if pd.isna(odds_over25) or pd.isna(odds_under25) or \
                    odds_over25 <= 1.0 or odds_under25 <= 1.0:
-                    matches_skipped_no_odds += 1
+                    has_ou25 = False
                 else:
-                    # Reconstruct CS odds from O/U 2.5
+                    has_ou25 = True
+
+                # ── Try REAL CS odds from FutPythonTrader first ──
+                real_cs_odds = _extract_real_cs_odds(row)
+                has_real_cs = len(real_cs_odds) >= 8  # need at least 8 scores
+
+                if has_real_cs:
+                    est_odds = real_cs_odds
+                    using_real_odds = True
+                elif has_ou25:
+                    # Fallback: Reconstruct CS odds from O/U 2.5
                     try:
                         est_odds = estimate_bookmaker_odds(
                             odds_over25, odds_under25,
                             pred['lambda_home'], pred['lambda_away'],
                             pred.get('rho'), bookmaker='Bet365',
                         )
+                        using_real_odds = False
                     except Exception:
                         est_odds = None
+                        using_real_odds = False
+                else:
+                    matches_skipped_no_odds += 1
+                    est_odds = None
+                    using_real_odds = False
 
-                    if est_odds:
-                        # Determine if home is favorite (for auto_ia strategy)
-                        is_home_fav = pred.get('prob_h', 0.37) > pred.get('prob_a', 0.37)
+                if est_odds:
+                    # Determine if home is favorite (for auto_ia strategy)
+                    is_home_fav = pred.get('prob_h', 0.37) > pred.get('prob_a', 0.37)
 
-                        for strategy in strategies:
-                            # Resolve strategy using fuzzy classifier
-                            current_strat = resolve_strategy(strategy, pred, is_home_fav)
-                            game_profile = classify_game_profile(pred, is_home_fav)
+                    for strategy in strategies:
+                        # Resolve strategy using fuzzy classifier
+                        current_strat = resolve_strategy(strategy, pred, is_home_fav)
+                        game_profile = classify_game_profile(pred, is_home_fav)
 
-                            # Build Dutching combination
-                            (outcomes, sel_probs, sel_odds, sel_keys, market_label,
-                             cum_prob, dutching_odd, edge) = build_dynamic_dutch(
-                                pred, est_odds, strategy=current_strat,
-                                max_legs=max_legs, max_overround=max_overround,
-                                min_selections=min_selections,
-                            )
+                        # Build Dutching combination
+                        (outcomes, sel_probs, sel_odds, sel_keys, market_label,
+                        cum_prob, dutching_odd, edge) = build_dynamic_dutch(
+                            pred, est_odds, strategy=current_strat,
+                            max_legs=max_legs, max_overround=max_overround,
+                            min_selections=min_selections,
+                        )
 
-                            if outcomes is None or edge < min_edge:
-                                continue
+                        if outcomes is None or edge < min_edge:
+                            continue
 
-                            # Bootstrap confidence for edge
-                            edge_confidence = bootstrap_dutching_edge(
-                                pred, est_odds, strategy=current_strat,
-                                max_legs=max_legs, max_overround=max_overround,
-                                min_selections=min_selections,
-                                n_bootstrap=150, is_home_fav=is_home_fav,
-                            )
+                        # Bootstrap confidence for edge
+                        edge_confidence = bootstrap_dutching_edge(
+                            pred, est_odds, strategy=current_strat,
+                            max_legs=max_legs, max_overround=max_overround,
+                            min_selections=min_selections,
+                            n_bootstrap=150, is_home_fav=is_home_fav,
+                        )
 
-                            # Quality score
-                            quality = dutching_quality_score(
-                                edge=edge,
-                                edge_ci_95=edge_confidence.get('edge_ci_95'),
-                                profile_confidence=game_profile['confidence'],
-                                dutching_odd=dutching_odd,
-                                n_selections=len(outcomes),
-                                market_divergence=game_profile.get('market_divergence', 0),
-                                edge_prob_positive=edge_confidence.get('prob_positive'),
-                                edge_std=edge_confidence.get('edge_std'),
-                                has_real_odds=False,
-                            )
+                        # Quality score
+                        quality = dutching_quality_score(
+                            edge=edge,
+                            edge_ci_95=edge_confidence.get('edge_ci_95'),
+                            profile_confidence=game_profile['confidence'],
+                            dutching_odd=dutching_odd,
+                            n_selections=len(outcomes),
+                            market_divergence=game_profile.get('market_divergence', 0),
+                            edge_prob_positive=edge_confidence.get('prob_positive'),
+                            edge_std=edge_confidence.get('edge_std'),
+                            has_real_odds=using_real_odds,
+                        )
 
-                            # Calculate stake
-                            if staking_rule == 'kelly_quarter':
-                                # Kelly Criterion: f* = edge / (odds - 1), quarter Kelly
-                                kelly_fraction = edge / (dutching_odd - 1.0) if dutching_odd > 1.01 else 0.0
-                                stake = bankrolls[strategy] * kelly_fraction * 0.25
-                                stake = max(5.0, min(stake, bankrolls[strategy] * 0.05))
-                            else:
-                                stake = stake_value
+                        # Calculate stake
+                        if staking_rule == 'kelly_quarter':
+                            # Kelly Criterion: f* = edge / (odds - 1), quarter Kelly
+                            kelly_fraction = edge / (dutching_odd - 1.0) if dutching_odd > 1.01 else 0.0
+                            stake = bankrolls[strategy] * kelly_fraction * 0.25
+                            stake = max(5.0, min(stake, bankrolls[strategy] * 0.05))
+                        else:
+                            stake = stake_value
 
-                            if stake > bankrolls[strategy]:
-                                stake = bankrolls[strategy]
-                            if stake <= 0:
-                                continue
+                        if stake > bankrolls[strategy]:
+                            stake = bankrolls[strategy]
+                        if stake <= 0:
+                            continue
 
-                            # Evaluate result
-                            covered = actual_score in outcomes
-                            if covered:
-                                idx = outcomes.index(actual_score)
-                                winning_odd = sel_odds[idx]
-                                # Dutching profit: stake allocated to winning leg * its odd - total_stake
-                                overround = sum(1.0 / o for o in sel_odds)
-                                stake_on_winner = stake * (1.0 / winning_odd) / overround
-                                profit = stake_on_winner * winning_odd - stake
-                            else:
-                                winning_odd = 0.0
-                                profit = -stake
+                        # Evaluate result
+                        covered = actual_score in outcomes
+                        if covered:
+                            idx = outcomes.index(actual_score)
+                            winning_odd = sel_odds[idx]
+                            # Dutching profit: stake allocated to winning leg * its odd - total_stake
+                            overround = sum(1.0 / o for o in sel_odds)
+                            stake_on_winner = stake * (1.0 / winning_odd) / overround
+                            profit = stake_on_winner * winning_odd - stake
+                        else:
+                            winning_odd = 0.0
+                            profit = -stake
 
-                            # Update state
-                            bankrolls[strategy] += profit
-                            bankrolls[strategy] = max(0.01, bankrolls[strategy])  # no negative bankroll
-                            total_bets[strategy] += 1
-                            total_profit[strategy] += profit
-                            total_staked[strategy] += stake
-                            if covered:
-                                total_wins[strategy] += 1
+                        # Update state
+                        bankrolls[strategy] += profit
+                        bankrolls[strategy] = max(0.01, bankrolls[strategy])  # no negative bankroll
+                        total_bets[strategy] += 1
+                        total_profit[strategy] += profit
+                        total_staked[strategy] += stake
+                        if covered:
+                            total_wins[strategy] += 1
 
-                            # Track drawdown
-                            if bankrolls[strategy] > peak_bankrolls[strategy]:
-                                peak_bankrolls[strategy] = bankrolls[strategy]
-                                current_dds[strategy] = 0.0
-                            else:
-                                current_dd = 1.0 - bankrolls[strategy] / peak_bankrolls[strategy] \
-                                    if peak_bankrolls[strategy] > 0 else 0.0
-                                max_drawdowns[strategy] = max(max_drawdowns[strategy], current_dd)
+                        # Track drawdown
+                        if bankrolls[strategy] > peak_bankrolls[strategy]:
+                            peak_bankrolls[strategy] = bankrolls[strategy]
+                            current_dds[strategy] = 0.0
+                        else:
+                            current_dd = 1.0 - bankrolls[strategy] / peak_bankrolls[strategy] \
+                                if peak_bankrolls[strategy] > 0 else 0.0
+                            max_drawdowns[strategy] = max(max_drawdowns[strategy], current_dd)
 
-                            # Daily P&L
-                            daily_pnl[strategy][date_str] += profit
+                        # Daily P&L
+                        daily_pnl[strategy][date_str] += profit
 
-                            # Coverage analysis
-                            if covered:
-                                score_hits[strategy][actual_score] += 1
-                            for sel in outcomes:
-                                if sel != actual_score:
-                                    score_misses[strategy][sel] += 1
+                        # Coverage analysis
+                        if covered:
+                            score_hits[strategy][actual_score] += 1
+                        for sel in outcomes:
+                            if sel != actual_score:
+                                score_misses[strategy][sel] += 1
 
-                            # Record bet
-                            all_bets.append({
-                                'date': date_str,
-                                'league': league_code,
-                                'home_team': home_team,
-                                'away_team': away_team,
-                                'actual_score': actual_score,
-                                'total_goals': total_goals,
-                                'strategy': strategy,
-                                'resolved_strategy': current_strat,
-                                'game_profile': game_profile['best_profile'],
-                                'profile_confidence': game_profile['confidence'],
-                                'market_label': f"{'IA ' if strategy == 'auto_ia' else ''}{market_label}",
-                                'dutching_odd': round(dutching_odd, 2),
-                                'model_prob': round(cum_prob, 4),
-                                'predicted_edge': round(edge, 4),
-                                'edge_ci_95_low': edge_confidence.get('edge_ci_95', (None, None))[0],
-                                'edge_ci_95_high': edge_confidence.get('edge_ci_95', (None, None))[1],
-                                'edge_prob_positive': edge_confidence.get('prob_positive'),
-                                'edge_std': edge_confidence.get('edge_std'),
-                                'quality_score': quality['score'],
-                                'quality_verdict': quality['verdict'],
-                                'quality_verdict_label': quality['verdict_label'],
-                                'quality_verdict_color': quality['verdict_color'],
-                                'quality_breakdown': quality['breakdown'],
-                                'selections': outcomes,
-                                'selection_odds': [round(o, 2) for o in sel_odds],
-                                'selection_probs': [round(p, 4) for p in sel_probs],
-                                'total_stake': round(stake, 2),
-                                'covered': covered,
-                                'winning_score': actual_score if covered else None,
-                                'winning_odd': round(winning_odd, 2) if covered else None,
-                                'profit': round(profit, 2),
-                                'bankroll': round(bankrolls[strategy], 2),
-                                'won': covered,
-                                'lambda_home': round(pred.get('lambda_home', 0), 2),
-                                'lambda_away': round(pred.get('lambda_away', 0), 2),
-                                'lambda_total': round(pred.get('lambda_home', 0) + pred.get('lambda_away', 0), 2),
-                                'prob_h': round(pred.get('prob_h', 0), 4),
-                                'prob_d': round(pred.get('prob_d', 0), 4),
-                                'prob_a': round(pred.get('prob_a', 0), 4),
-                                'prob_over25': round(pred.get('prob_over_25', 0), 4),
-                                'prob_under25': round(pred.get('prob_under_25', 0), 4),
-                            })
+                        # Record bet
+                        all_bets.append({
+                            'date': date_str,
+                            'league': league_code,
+                            'home_team': home_team,
+                            'away_team': away_team,
+                            'actual_score': actual_score,
+                            'total_goals': total_goals,
+                            'strategy': strategy,
+                            'resolved_strategy': current_strat,
+                            'game_profile': game_profile['best_profile'],
+                            'profile_confidence': game_profile['confidence'],
+                            'market_label': f"{'IA ' if strategy == 'auto_ia' else ''}{market_label}",
+                            'dutching_odd': round(dutching_odd, 2),
+                            'model_prob': round(cum_prob, 4),
+                            'predicted_edge': round(edge, 4),
+                            'edge_ci_95_low': edge_confidence.get('edge_ci_95', (None, None))[0],
+                            'edge_ci_95_high': edge_confidence.get('edge_ci_95', (None, None))[1],
+                            'edge_prob_positive': edge_confidence.get('prob_positive'),
+                            'edge_std': edge_confidence.get('edge_std'),
+                            'quality_score': quality['score'],
+                            'quality_verdict': quality['verdict'],
+                            'quality_verdict_label': quality['verdict_label'],
+                            'quality_verdict_color': quality['verdict_color'],
+                            'quality_breakdown': quality['breakdown'],
+                            'selections': outcomes,
+                            'selection_odds': [round(o, 2) for o in sel_odds],
+                            'selection_probs': [round(p, 4) for p in sel_probs],
+                            'total_stake': round(stake, 2),
+                            'covered': covered,
+                            'winning_score': actual_score if covered else None,
+                            'winning_odd': round(winning_odd, 2) if covered else None,
+                            'profit': round(profit, 2),
+                            'bankroll': round(bankrolls[strategy], 2),
+                            'won': covered,
+                            'lambda_home': round(pred.get('lambda_home', 0), 2),
+                            'lambda_away': round(pred.get('lambda_away', 0), 2),
+                            'lambda_total': round(pred.get('lambda_home', 0) + pred.get('lambda_away', 0), 2),
+                            'prob_h': round(pred.get('prob_h', 0), 4),
+                            'prob_d': round(pred.get('prob_d', 0), 4),
+                            'prob_a': round(pred.get('prob_a', 0), 4),
+                            'prob_over25': round(pred.get('prob_over_25', 0), 4),
+                            'prob_under25': round(pred.get('prob_under_25', 0), 4),
+                            'has_real_odds': using_real_odds,
+                            'odds_source': 'CS Real (FutPython)' if using_real_odds else 'Estimada (O/U 2.5)',
+                        })
 
-                            # Update equity curve (record after each bet)
-                            equity_curves[strategy].append({
-                                'date': date_str,
-                                'bankroll': round(bankrolls[strategy], 2),
-                            })
+                        # Update equity curve (record after each bet)
+                        equity_curves[strategy].append({
+                            'date': date_str,
+                            'bankroll': round(bankrolls[strategy], 2),
+                        })
 
             # ── 7. Update form AFTER bet decision (prevents look-ahead) ──
             _update_form_trackers(
@@ -587,6 +623,28 @@ def _update_form_trackers(
         team_home_scored_ht, team_home_conceded_ht, team_away_scored_ht, team_away_conceded_ht,
         league_home_goals_ht, league_away_goals_ht, hthg, htag,
     )
+
+
+def _extract_real_cs_odds(row: dict) -> dict:
+    """Extract real Correct Score odds from FutPythonTrader CSV columns.
+    
+    Looks for columns like CS_0_0, CS_0_1, CS_1_0, etc.
+    Returns dict with keys like 'bookie_cs_00', 'bookie_cs_10' matching 
+    the format used by estimate_bookmaker_odds() and build_dynamic_dutch().
+    """
+    cs_odds = {}
+    for h in range(6):  # home goals 0-5
+        for a in range(6):  # away goals 0-5
+            col = f'CS_{h}_{a}'
+            val = row.get(col)
+            if val is not None:
+                try:
+                    v = float(val)
+                    if v > 1.0:
+                        cs_odds[f'bookie_cs_{h}{a}'] = v
+                except (ValueError, TypeError):
+                    continue
+    return cs_odds
 
 
 def _extract_odds(row: dict, candidates: List[str]) -> float:

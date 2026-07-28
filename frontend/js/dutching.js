@@ -1224,15 +1224,26 @@ function renderDutchingBtEquityChart(breakdown) {
 function initDutchingBtDates() {
     const startEl = document.getElementById('dutching-bt-start');
     const endEl = document.getElementById('dutching-bt-end');
-    if (!startEl || !endEl) return;
-    // Default: temporada 2025/26 — set/2025 a mai/2026
-    if (!startEl.value || startEl._initialized !== true) {
-        startEl.value = '2025-09-01';
-        startEl._initialized = true;
+    if (startEl && endEl) {
+        if (!startEl.value || startEl._initialized !== true) {
+            startEl.value = '2025-09-01';
+            startEl._initialized = true;
+        }
+        if (!endEl.value || endEl._initialized !== true) {
+            endEl.value = '2026-05-25';
+            endEl._initialized = true;
+        }
     }
-    if (!endEl.value || endEl._initialized !== true) {
-        endEl.value = '2026-05-25';
-        endEl._initialized = true;
+    // Modo tips: padrão últimos 30 dias
+    const tipsStart = document.getElementById('dutching-tips-start');
+    const tipsEnd = document.getElementById('dutching-tips-end');
+    if (tipsStart && tipsEnd && tipsStart._initialized !== true) {
+        const today = new Date();
+        const monthAgo = new Date(today);
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        tipsEnd.value = today.toISOString().split('T')[0];
+        tipsStart.value = monthAgo.toISOString().split('T')[0];
+        tipsStart._initialized = true;
     }
 }
 
@@ -1286,6 +1297,119 @@ function selectDutchingBtLeaguesBySource(source) {
 }
 
 window.selectDutchingBtLeaguesBySource = selectDutchingBtLeaguesBySource;
+
+// ── Toggle entre modo Sugestões Reais e Simulação Histórica ──
+function setDutchingBtMode(mode) {
+    const tipsMode = document.getElementById('dutching-bt-tips-mode');
+    const histMode = document.getElementById('dutching-bt-historical-mode');
+    const btnTips = document.getElementById('dutching-bt-mode-tips');
+    const btnHist = document.getElementById('dutching-bt-mode-historical');
+
+    const activeStyle = 'linear-gradient(135deg, #8b5cf6, #a78bfa)';
+    if (mode === 'tips') {
+        if (tipsMode) tipsMode.style.display = 'block';
+        if (histMode) histMode.style.display = 'none';
+        if (btnTips) { btnTips.style.background = activeStyle; btnTips.style.color = 'white'; }
+        if (btnHist) { btnHist.style.background = 'transparent'; btnHist.style.color = 'var(--text-muted)'; }
+    } else {
+        if (tipsMode) tipsMode.style.display = 'none';
+        if (histMode) histMode.style.display = 'block';
+        if (btnHist) { btnHist.style.background = activeStyle; btnHist.style.color = 'white'; }
+        if (btnTips) { btnTips.style.background = 'transparent'; btnTips.style.color = 'var(--text-muted)'; }
+        loadDutchingBtLeagues();
+        initDutchingBtDates();
+    }
+}
+window.setDutchingBtMode = setDutchingBtMode;
+
+// ── Backtest de Sugestões Reais ──
+async function runDutchingTipsBacktest() {
+    const statusEl = document.getElementById('dutching-tips-status');
+    const resultsEl = document.getElementById('dutching-tips-results');
+    if (!statusEl) return;
+
+    const startDate = document.getElementById('dutching-tips-start').value || null;
+    const endDate = document.getElementById('dutching-tips-end').value || null;
+    const bankroll = parseFloat(document.getElementById('dutching-tips-bankroll').value) || 1000;
+    const stake = parseFloat(document.getElementById('dutching-tips-stake').value) || 50;
+
+    statusEl.innerHTML = '<span style="color: #a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> Analisando sugestões enviadas...</span>';
+    if (resultsEl) resultsEl.style.display = 'none';
+
+    try {
+        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/backtest_dutching_tips`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate, initialBankroll: bankroll, stakeValue: stake, stakingRule: 'fixed' }),
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || `Erro HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        renderDutchingTipsResults(data);
+        statusEl.innerHTML = `<span style="color: #34d399;"><i class="fa-solid fa-circle-check"></i> ${data.summary.resolved} sugestões analisadas.</span>`;
+    } catch (err) {
+        console.error('Tips backtest error:', err);
+        statusEl.innerHTML = `<span style="color: #f87171;"><i class="fa-solid fa-circle-exclamation"></i> ${err.message}</span>`;
+    }
+}
+window.runDutchingTipsBacktest = runDutchingTipsBacktest;
+
+function renderDutchingTipsResults(data) {
+    const resultsEl = document.getElementById('dutching-tips-results');
+    if (!resultsEl) return;
+    resultsEl.style.display = 'block';
+
+    const s = data.summary;
+    const profitColor = s.net_profit >= 0 ? '#34d399' : '#f87171';
+
+    document.getElementById('dutching-tips-summary').innerHTML = `
+        <div style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Sugestões Analisadas</div>
+            <div style="font-size: 28px; font-weight: 700; color: var(--text-primary);">${s.resolved}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">${s.unresolved} sem resultado</div>
+        </div>
+        <div style="background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Win Rate</div>
+            <div style="font-size: 28px; font-weight: 700; color: #34d399;">${s.win_rate}%</div>
+            <div style="font-size: 11px; color: var(--text-muted);">${s.total_wins} acertos</div>
+        </div>
+        <div style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">Lucro / Prejuízo</div>
+            <div style="font-size: 28px; font-weight: 700; color: ${profitColor};">$${s.net_profit.toFixed(2)}</div>
+            <div style="font-size: 11px; color: ${profitColor};">ROI ${s.roi >= 0 ? '+' : ''}${s.roi}%</div>
+        </div>
+    `;
+
+    const tbody = document.getElementById('dutching-tips-tbody');
+    tbody.innerHTML = '';
+    (data.bets || []).forEach(b => {
+        const tr = document.createElement('tr');
+        let statusIcon, scoreDisplay, profitDisplay;
+        if (b.status === 'resolvido') {
+            statusIcon = b.won ? '✅' : '❌';
+            scoreDisplay = `${statusIcon} ${b.actual_score}`;
+            profitDisplay = `<span style="color:${b.profit >= 0 ? '#34d399' : '#f87171'};font-weight:700;">${b.profit >= 0 ? '+' : ''}$${b.profit.toFixed(2)}</span>`;
+        } else {
+            scoreDisplay = `<span style="color:var(--text-muted);">${b.status === 'pendente' ? '⏳ pendente' : '— sem dados'}</span>`;
+            profitDisplay = '<span style="color:var(--text-muted);">—</span>';
+        }
+        tr.innerHTML = `
+            <td style="white-space:nowrap;color:var(--text-muted);">${b.date}</td>
+            <td style="font-size:11px;font-weight:600;">${b.match}</td>
+            <td style="font-size:10px;color:#a78bfa;">${b.market || '—'}</td>
+            <td style="font-family:monospace;font-size:10px;color:#a78bfa;">${(b.selections || []).join(', ')}</td>
+            <td style="font-weight:700;">${scoreDisplay}</td>
+            <td>$${(b.total_stake || 0).toFixed(2)}</td>
+            <td>${profitDisplay}</td>
+            <td style="color:var(--text-secondary);">$${(b.bankroll || 0).toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
 
 window.runDutchingBacktest = runDutchingBacktest;
 window.loadDutchingBtLeagues = loadDutchingBtLeagues;

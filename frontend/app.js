@@ -1,4 +1,4 @@
-import './js/dutching.js?v=16';
+import './js/dutching.js?v=17';
 import './js/steam_live.js';
 import './js/state.js';
 

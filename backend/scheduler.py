@@ -844,7 +844,17 @@ async def run_automatic_dutching_scan():
         
         ok, msg = send_telegram_message(msg_text)
         if ok:
-            add_telegram_dutching_tip(match_name, match_date, edge_pct)
+            add_telegram_dutching_tip(
+                match_name, match_date, edge_pct,
+                selections=opp.get('selections'),
+                odds=opp.get('odds'),
+                dutching_odd=opp.get('dutching_odd'),
+                model_prob=opp.get('model_prob'),
+                bookmaker=opp.get('bookmaker'),
+                market=opp.get('market'),
+                home_team=opp.get('home_team'),
+                league=opp.get('league'),
+            )
             sent_lookup.add(dup_key)
             sent_count += 1
             await asyncio.sleep(1.0)

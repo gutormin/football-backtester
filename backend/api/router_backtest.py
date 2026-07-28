@@ -252,6 +252,38 @@ async def trigger_sync_league(league_code: str):
     except Exception as e:
         return {"status": "error", "league": league_code, "detail": str(e)}
 
+
+class TipsBacktestRequest(BaseModel):
+    startDate: str = None
+    endDate: str = None
+    initialBankroll: float = 1000.0
+    stakeValue: float = 50.0
+    stakingRule: str = "fixed"
+
+
+@router.post("/backtest_dutching_tips")
+async def api_run_dutching_tips_backtest(req: TipsBacktestRequest):
+    """Backtest sobre as sugestões REAIS que o sistema enviou."""
+    try:
+        from ..backtest.dutching_tips_backtester import run_tips_backtest
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: run_tips_backtest(
+            start_date=req.startDate,
+            end_date=req.endDate,
+            initial_bankroll=req.initialBankroll,
+            stake_value=req.stakeValue,
+            staking_rule=req.stakingRule,
+        ))
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/backtest")
 def run_backtest(req: BacktestRequest):
     try:

@@ -1678,6 +1678,62 @@ window.addEventListener('unhandledrejection', function(e) {
  <!-- Dutching Backtest Section -->
  <div style="margin-top: 20px; padding: 28px; background: var(--bg-card, rgba(255,255,255,0.03)); border: 1px solid rgba(139,92,246,0.2); border-radius: 12px; width: 100%; box-sizing: border-box;">
  <h3 style="font-size: 15px; color: var(--text-primary); margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-flask" style="color: #a78bfa;"></i> Backtest de Estratégias Dutching</h3>
+
+ <!-- Toggle entre modos -->
+ <div style="display: flex; gap: 8px; margin-bottom: 16px; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 8px; width: fit-content;">
+ <button type="button" id="dutching-bt-mode-tips" onclick="window.setDutchingBtMode('tips')" style="padding: 8px 16px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: linear-gradient(135deg, #8b5cf6, #a78bfa); color: white;">
+ 📩 Sugestões Reais Enviadas
+ </button>
+ <button type="button" id="dutching-bt-mode-historical" onclick="window.setDutchingBtMode('historical')" style="padding: 8px 16px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: transparent; color: var(--text-muted);">
+ 🔬 Simulação Histórica
+ </button>
+ </div>
+
+ <!-- MODO SUGESTÕES REAIS -->
+ <div id="dutching-bt-tips-mode">
+ <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Calcula quanto você teria lucrado/perdido se tivesse apostado nas oportunidades que o sistema <strong>realmente sugeriu</strong> (via Telegram/Radar) num período.</p>
+
+ <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; background: rgba(139,92,246,0.04); border: 1px solid rgba(139,92,246,0.12); border-radius: 8px; padding: 14px;">
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 6px;">📅 De</label>
+ <input type="date" id="dutching-tips-start" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; box-sizing: border-box;">
+ </div>
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 6px;">📅 Até</label>
+ <input type="date" id="dutching-tips-end" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 13px; box-sizing: border-box;">
+ </div>
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 6px;">💰 Banca Inicial ($)</label>
+ <input type="number" id="dutching-tips-bankroll" value="1000" min="100" step="100" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+ </div>
+ <div>
+ <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 6px;">🎯 Stake Fixa ($)</label>
+ <input type="number" id="dutching-tips-stake" value="50" min="1" step="10" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+ </div>
+ </div>
+
+ <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+ <button type="button" class="btn-primary" onclick="window.runDutchingTipsBacktest()" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); border: none; font-size: 13px; padding: 10px 22px;">
+ <i class="fa-solid fa-play"></i> Analisar Sugestões
+ </button>
+ <span id="dutching-tips-status" style="font-size: 12px; color: var(--text-muted);"></span>
+ </div>
+
+ <div id="dutching-tips-results" style="display: none;">
+ <div id="dutching-tips-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px;"></div>
+ <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+ <table class="table-styled" style="width: 100%; font-size: 11px;">
+ <thead style="position: sticky; top: 0; background: var(--bg-dark);"><tr>
+ <th>Data</th><th>Partida</th><th>Estratégia</th><th>Seleções</th><th>Placar Real</th><th>Stake</th><th>Lucro</th><th>Banca</th>
+ </tr></thead>
+ <tbody id="dutching-tips-tbody"></tbody>
+ </table>
+ </div>
+ </div>
+ </div>
+
+ <!-- MODO HISTÓRICO -->
+ <div id="dutching-bt-historical-mode" style="display: none;">
  <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Simule o que teria acontecido se você tivesse apostado nos jogos sugeridos pelo sistema num período histórico. Compara Stake Fixa vs Kelly automaticamente.</p>
  <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 12px; display: flex; gap: 14px;">
  <span>🟢 = Odds CS reais (FutPython)</span>
@@ -1831,7 +1887,8 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
  </div>
 
- </div>
+ </div><!-- fim dutching-bt-results -->
+ </div><!-- fim dutching-bt-historical-mode -->
  </div>
  </div>
 
@@ -3585,7 +3642,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=163"></script>
+ <script type="module" src="app.js?v=164"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
