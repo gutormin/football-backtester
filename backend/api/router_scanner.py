@@ -388,12 +388,12 @@ def scan_dutching(source: str = "odds_api", strategy: str = "dynamic", data_sour
 class RecalcDutchingRequest(BaseModel):
     selections: List[str]              # placares, ex: ["1-0", "2-1"]
     odds: List[float]                  # odds editadas pelo usuário
-    selections_probs: List[float] = None   # probs do modelo por placar (se disponível)
-    real_prob: float = None            # prob real combinada (se probs não vier)
+    selections_probs: Optional[List[float]] = None   # probs do modelo por placar (se disponível)
+    real_prob: Optional[float] = None            # prob real combinada (se probs não vier)
     profile_confidence: float = 0.0
     market_divergence: float = 0.0
     has_real_odds: bool = False
-    hours_to_kickoff: float = None
+    hours_to_kickoff: Optional[float] = None
     min_quality: float = 60.0
     min_edge: float = 0.0              # edge mínimo em fração (0.05 = 5%)
 

@@ -511,7 +511,16 @@ async function recalculateDutchingQuality() {
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.detail || `Erro HTTP ${res.status}`);
+            let msg;
+            if (typeof err.detail === 'string') {
+                msg = err.detail;
+            } else if (Array.isArray(err.detail)) {
+                // Erro de validação do Pydantic (422)
+                msg = err.detail.map(e => e.msg || JSON.stringify(e)).join('; ');
+            } else {
+                msg = `Erro HTTP ${res.status}`;
+            }
+            throw new Error(msg);
         }
 
         const data = await res.json();
