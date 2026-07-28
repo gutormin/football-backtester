@@ -1679,6 +1679,10 @@ window.addEventListener('unhandledrejection', function(e) {
  <div style="margin-top: 20px; padding: 28px; background: var(--bg-card, rgba(255,255,255,0.03)); border: 1px solid rgba(139,92,246,0.2); border-radius: 12px; width: 100%; box-sizing: border-box;">
  <h3 style="font-size: 15px; color: var(--text-primary); margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-flask" style="color: #a78bfa;"></i> Backtest de Estratégias Dutching</h3>
  <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Simule o que teria acontecido se você tivesse apostado nos jogos sugeridos pelo sistema num período histórico. Compara Stake Fixa vs Kelly automaticamente.</p>
+ <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 12px; display: flex; gap: 14px;">
+ <span>🟢 = Odds CS reais (FutPython)</span>
+ <span>🟡 = Odds CS estimadas (O/U 2.5)</span>
+ </div>
 
  <!-- Linha 1: Ligas + Período + Estratégia -->
  <div style="display: grid; grid-template-columns: 2fr 1fr 1.5fr; gap: 16px; margin-bottom: 14px;">
@@ -3579,7 +3583,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=160"></script>
+ <script type="module" src="app.js?v=161"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,

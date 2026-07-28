@@ -589,14 +589,43 @@ async function loadDutchingBtLeagues() {
     const container = document.getElementById('dutching-bt-leagues-container');
     if (!container) return;
     try {
-        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/leagues?source=datafootball`);
-        if (!res.ok) return;
-        const leagues = await res.json();
-        const defaultSelected = ['BRAZIL_SERIE_A', 'BRAZIL_SERIE_B', 'E0', 'SP1', 'ARG'];
+        // Load leagues from both sources and merge
+        const [resFP, resDF] = await Promise.allSettled([
+            fetch(`${window.API_BASE_URL || window.location.origin}/api/leagues?source=futpython`),
+            fetch(`${window.API_BASE_URL || window.location.origin}/api/leagues?source=footballdata`),
+        ]);
+
+        let leagues = [];
+        const seen = new Set();
+
+        // FutPython first (has real CS odds)
+        if (resFP.status === 'fulfilled' && resFP.value.ok) {
+            const fpLeagues = await resFP.value.json();
+            fpLeagues.forEach(l => {
+                if (!seen.has(l.code)) {
+                    seen.add(l.code);
+                    leagues.push({ ...l, source: 'futpython', badge: '🟢' });
+                }
+            });
+        }
+
+        // Then FootballData (estimated CS odds)
+        if (resDF.status === 'fulfilled' && resDF.value.ok) {
+            const fdLeagues = await resDF.value.json();
+            fdLeagues.forEach(l => {
+                if (!seen.has(l.code)) {
+                    seen.add(l.code);
+                    leagues.push({ ...l, source: 'footballdata', badge: '🟡' });
+                }
+            });
+        }
+
+        if (leagues.length === 0) return;
+        const defaultSelected = ['E0', 'SP1', 'I1', 'D1', 'F1'];
         container.innerHTML = leagues.map(l => `
-            <label style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${l.name || l.code}">
-                <input type="checkbox" value="${l.code}" ${defaultSelected.includes(l.code) ? 'checked' : ''} style="accent-color:#8b5cf6;width:14px;height:14px;flex-shrink:0;">
-                ${l.name || l.code}
+            <label style="display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${l.name || l.code} (${l.source === 'futpython' ? 'CS Real' : 'CS Estimado'})">
+                <input type="checkbox" value="${l.code}" data-source="${l.source || ''}" ${defaultSelected.includes(l.code) ? 'checked' : ''} style="accent-color:#8b5cf6;width:14px;height:14px;flex-shrink:0;">
+                <span style="font-size:10px;">${l.badge || ''}</span> ${l.name || l.code}
             </label>
         `).join('');
     } catch (e) {
@@ -672,17 +701,7 @@ async function runDutchingBacktest() {
 
             for (let i = 0; i < selectedLeagues.length; i++) {
                 const league = selectedLeagues[i];
-                statusEl.innerHTML = `<span style="color: #a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> ${run.label} — liga ${i + 1}/${selectedLeagues.length}: <strong>${league}</strong> (sincronizando dados...)</span>`;
-
-                // Sync league data from DataFootball API before running
-                try {
-                    await fetch(`${window.API_BASE_URL || window.location.origin}/api/sync_league/${league}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                    }).catch(() => {}); // Silently ignore sync failures
-                } catch(e) { /* ignore */ }
-
-                statusEl.innerHTML = `<span style="color: #a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> ${run.label} — liga ${i + 1}/${selectedLeagues.length}: <strong>${league}</strong> (rodando backtest...)</span>`;
+                statusEl.innerHTML = `<span style="color: #a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> ${run.label} — liga ${i + 1}/${selectedLeagues.length}: <strong>${league}</strong></span>`;
 
                 const payload = {
                     leagues: [league],   // UMA liga por vez
