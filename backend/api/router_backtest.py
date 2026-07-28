@@ -240,6 +240,18 @@ def trigger_sync(source: str = "csv"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/sync_league/{league_code}")
+async def trigger_sync_league(league_code: str):
+    """Sync a single league from DataFootball API (on-demand)."""
+    try:
+        from ..data_loader import sync_single_league_from_api
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: sync_single_league_from_api(league_code, force=True))
+        return {"status": "success" if result else "no_data", "league": league_code}
+    except Exception as e:
+        return {"status": "error", "league": league_code, "detail": str(e)}
+
 @router.post("/backtest")
 def run_backtest(req: BacktestRequest):
     try:

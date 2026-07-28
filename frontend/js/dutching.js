@@ -589,7 +589,7 @@ async function loadDutchingBtLeagues() {
     const container = document.getElementById('dutching-bt-leagues-container');
     if (!container) return;
     try {
-        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/leagues?source=footballdata`);
+        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/leagues?source=datafootball`);
         if (!res.ok) return;
         const leagues = await res.json();
         const defaultSelected = ['BRAZIL_SERIE_A', 'BRAZIL_SERIE_B', 'E0', 'SP1', 'ARG'];
@@ -632,14 +632,14 @@ async function runDutchingBacktest() {
     const startDate = document.getElementById('dutching-bt-start').value;
     const endDate = document.getElementById('dutching-bt-end').value;
 
-    // Validar datas — CSVs vão até ~maio 2025
-    const maxDataDate = '2025-05-25';
-    if (endDate > maxDataDate) {
-        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ Os dados históricos vão até maio/2025. Ajuste o período para datas dentro desse intervalo (ex: 2024-08 a 2025-05).</span>';
+    // Validar datas — não pode ser no futuro
+    const today = new Date().toISOString().split('T')[0];
+    if (startDate > today) {
+        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ Data inicial não pode ser no futuro.</span>';
         return;
     }
-    if (startDate > maxDataDate) {
-        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ Data inicial depois de maio/2025 — não há dados disponíveis.</span>';
+    if (endDate > today) {
+        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ Data final não pode ser no futuro.</span>';
         return;
     }
 
@@ -672,7 +672,17 @@ async function runDutchingBacktest() {
 
             for (let i = 0; i < selectedLeagues.length; i++) {
                 const league = selectedLeagues[i];
-                statusEl.innerHTML = `<span style="color: #a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> ${run.label} — liga ${i + 1}/${selectedLeagues.length}: <strong>${league}</strong></span>`;
+                statusEl.innerHTML = `<span style="color: #a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> ${run.label} — liga ${i + 1}/${selectedLeagues.length}: <strong>${league}</strong> (sincronizando dados...)</span>`;
+
+                // Sync league data from DataFootball API before running
+                try {
+                    await fetch(`${window.API_BASE_URL || window.location.origin}/api/sync_league/${league}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                    }).catch(() => {}); // Silently ignore sync failures
+                } catch(e) { /* ignore */ }
+
+                statusEl.innerHTML = `<span style="color: #a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> ${run.label} — liga ${i + 1}/${selectedLeagues.length}: <strong>${league}</strong> (rodando backtest...)</span>`;
 
                 const payload = {
                     leagues: [league],   // UMA liga por vez
@@ -1186,13 +1196,17 @@ function initDutchingBtDates() {
     const startEl = document.getElementById('dutching-bt-start');
     const endEl = document.getElementById('dutching-bt-end');
     if (!startEl || !endEl) return;
-    // CSVs históricos vão até ~maio 2025
-    const maxDataDate = '2025-05-25';
-    if (!startEl.value || startEl.value > maxDataDate) {
-        startEl.value = '2024-08-01';
+    // Padrão: últimos 3 meses
+    const today = new Date();
+    const threeMonthsAgo = new Date(today);
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const todayStr = today.toISOString().split('T')[0];
+    const startStr = threeMonthsAgo.toISOString().split('T')[0];
+    if (!startEl.value || startEl.value > todayStr) {
+        startEl.value = startStr;
     }
-    if (!endEl.value || endEl.value > maxDataDate) {
-        endEl.value = '2025-05-25';
+    if (!endEl.value || endEl.value > todayStr) {
+        endEl.value = todayStr;
     }
 }
 
