@@ -5,6 +5,10 @@ import requests
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+# Fuso horário de Brasília para exibição correta das datas dos jogos
+BRAZIL_TZ = ZoneInfo("America/Sao_Paulo")
 from collections import defaultdict
 from scipy.special import expit
 
@@ -1051,7 +1055,9 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 match_time = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
                 if match_time < datetime.now(timezone.utc):
                     continue
-                match_date = match_time.strftime("%d/%m/%Y %H:%M")
+                # Converter UTC para horário de Brasília para exibição correta
+                match_time_local = match_time.astimezone(BRAZIL_TZ)
+                match_date = match_time_local.strftime("%d/%m/%Y %H:%M")
             except:
                 continue
                 
@@ -1222,8 +1228,8 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                     opportunities.append({
                         'match': match_name,
                         'date': match_date,
-                        'match_date_sort': match_time.strftime("%Y-%m-%d"),
-                        'match_time_sort': match_time.strftime("%H:%M"),
+                        'match_date_sort': match_time_local.strftime("%Y-%m-%d"),
+                        'match_time_sort': match_time_local.strftime("%H:%M"),
                         'bookmaker': bookie,
                         'market': f"{label_prefix}{market_label}",
                         'selections': outcomes_to_cover,
