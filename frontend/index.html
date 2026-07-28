@@ -1657,6 +1657,18 @@ window.addEventListener('unhandledrejection', function(e) {
  <div id="dutching-quality-card" style="display: none; background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.2); padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 11px;">
  </div>
 
+ <!-- Recalcular com odds editadas -->
+ <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px;">
+ <button type="button" onclick="window.recalculateDutchingQuality()" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); border: none; color: white; font-size: 12px; padding: 9px 18px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+ <i class="fa-solid fa-calculator"></i> Recalcular Quality com Minhas Odds
+ </button>
+ <span style="font-size: 10px; color: var(--text-muted);">Editou as odds ou adicionou placares? Clique para ver se ainda vale a pena.</span>
+ </div>
+
+ <!-- Resultado do recálculo -->
+ <div id="dutching-recalc-result" style="display: none; margin-bottom: 15px;"></div>
+
+
  <!-- Kelly Stake Recommendation Card -->
  <div id="dutching-kelly-card" style="display: none; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 11px;">
  </div>
@@ -3669,7 +3681,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=167"></script>
+ <script type="module" src="app.js?v=168"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,

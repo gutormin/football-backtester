@@ -1242,6 +1242,8 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         'raw_edge': edge,
                         'game_profile': game_profile['best_profile'],
                         'profile_confidence': game_profile['confidence'],
+                        'market_divergence': game_profile.get('market_divergence', 0.0),
+                        'hours_to_kickoff': _hours_until_match(dt),
                         'edge_ci_95': edge_ci.get('edge_ci_95'),
                         'edge_prob_positive': edge_ci.get('prob_positive'),
                         'quality_score': quality['score'],

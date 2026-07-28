@@ -431,7 +431,141 @@ function loadDutchingOpportunityByIndex(index) {
     // ── Quality Score card ──
     renderDutchingQualityCard(opp);
 
+    // Guardar oportunidade carregada para recálculo com odds editadas
+    window.currentDutchingOpp = opp;
+    // Esconder resultado de recálculo anterior
+    const recalcEl = document.getElementById('dutching-recalc-result');
+    if (recalcEl) recalcEl.style.display = 'none';
+
     showToast(`Oportunidade para ${opp.match} carregada na calculadora!`, "success");
+}
+
+// ── Recalcular Quality Score com odds editadas pelo usuário ──
+async function recalculateDutchingQuality() {
+    const resultEl = document.getElementById('dutching-recalc-result');
+    if (!resultEl) return;
+
+    // Ler as linhas atuais da calculadora
+    const rows = document.querySelectorAll('.dutching-input-row');
+    const selections = [];
+    const odds = [];
+    rows.forEach(row => {
+        const nameInput = row.querySelector('.dutching-input-name');
+        const oddInput = row.querySelector('.dutching-input-odd');
+        const name = nameInput ? nameInput.value.trim().replace(' (Betfair)', '') : '';
+        const odd = oddInput ? parseFloat(oddInput.value) : 0;
+        if (odd > 1.0 && name) {
+            selections.push(name);
+            odds.push(odd);
+        }
+    });
+
+    if (odds.length < 2) {
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<div style="background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); padding: 12px; border-radius: 6px; color: #f87171; font-size: 12px;">⚠️ Adicione ao menos 2 seleções com odds válidas (> 1.00).</div>';
+        return;
+    }
+
+    const opp = window.currentDutchingOpp || {};
+
+    // Montar probs por seleção (mapear pelas seleções originais quando possível)
+    let selectionsProbs = null;
+    if (opp.selections && opp.selections_probs) {
+        selectionsProbs = selections.map(sel => {
+            const idx = opp.selections.indexOf(sel);
+            if (idx >= 0 && opp.selections_probs[idx] != null) return opp.selections_probs[idx];
+            // Placar novo adicionado — buscar nos alternativos
+            if (opp.alternative_scores) {
+                const alt = opp.alternative_scores.find(a => a.name === sel);
+                if (alt) return alt.prob;
+            }
+            return null;
+        });
+        // Se algum placar não tem prob, invalidar o array (usa fallback)
+        if (selectionsProbs.some(p => p == null)) selectionsProbs = null;
+    }
+
+    const minQualityEl = document.getElementById('dutching-min-quality');
+    const minQuality = minQualityEl ? parseInt(minQualityEl.value) : 60;
+
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = '<div style="color: #a78bfa; font-size: 12px; padding: 8px;"><i class="fa-solid fa-arrows-rotate spinning"></i> Recalculando...</div>';
+
+    try {
+        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/recalculate_dutching_quality`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                selections,
+                odds,
+                selections_probs: selectionsProbs,
+                real_prob: selectionsProbs ? null : (opp.raw_edge != null && opp.dutching_odd ? (opp.raw_edge + 1) / opp.dutching_odd : null),
+                profile_confidence: opp.profile_confidence || 0.0,
+                market_divergence: opp.market_divergence || 0.0,
+                has_real_odds: opp.odds_source_type === 'real',
+                hours_to_kickoff: opp.hours_to_kickoff || null,
+                min_quality: minQuality,
+                min_edge: 0.0,
+            }),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Erro HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        renderRecalcResult(data);
+    } catch (err) {
+        resultEl.innerHTML = `<div style="background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); padding: 12px; border-radius: 6px; color: #f87171; font-size: 12px;">Erro: ${err.message}</div>`;
+    }
+}
+window.recalculateDutchingQuality = recalculateDutchingQuality;
+
+function renderRecalcResult(data) {
+    const resultEl = document.getElementById('dutching-recalc-result');
+    if (!resultEl) return;
+
+    const passes = data.passes_filter;
+    const edgeColor = data.edge >= 0 ? '#34d399' : '#f87171';
+    const scoreColor = data.quality_score >= 70 ? '#34d399' : (data.quality_score >= 55 ? '#a78bfa' : '#f59e0b');
+    const verdictColor = data.quality_verdict_color || '#f87171';
+
+    const bannerBg = passes ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)';
+    const bannerBorder = passes ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)';
+    const bannerColor = passes ? '#34d399' : '#f87171';
+    const bannerIcon = passes ? 'fa-circle-check' : 'fa-circle-xmark';
+    const bannerText = passes
+        ? `✅ PASSA NO FILTRO — Score ${data.quality_score} ≥ ${data.min_quality}. Vale a pena apostar!`
+        : `❌ NÃO PASSA — Score ${data.quality_score} < ${data.min_quality}. Melhor não apostar com essas odds.`;
+
+    resultEl.innerHTML = `
+        <div style="background: ${bannerBg}; border: 1px solid ${bannerBorder}; padding: 12px 16px; border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid ${bannerIcon}" style="color: ${bannerColor}; font-size: 20px;"></i>
+            <span style="color: ${bannerColor}; font-weight: 700; font-size: 13px;">${bannerText}</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+            <div style="background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.2); padding: 12px; border-radius: 6px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Odd Combinada</div>
+                <div style="font-size: 20px; font-weight: 700; color: #c084fc;">${data.dutching_odd.toFixed(2)}</div>
+            </div>
+            <div style="background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); padding: 12px; border-radius: 6px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Edge</div>
+                <div style="font-size: 20px; font-weight: 700; color: ${edgeColor};">${data.edge_pct >= 0 ? '+' : ''}${data.edge_pct.toFixed(1)}%</div>
+            </div>
+            <div style="background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.2); padding: 12px; border-radius: 6px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Quality Score</div>
+                <div style="font-size: 20px; font-weight: 700; color: ${scoreColor};">${data.quality_score}</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid ${verdictColor}40; padding: 12px; border-radius: 6px; text-align: center;">
+                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Veredito</div>
+                <div style="font-size: 13px; font-weight: 700; color: ${verdictColor};">${data.quality_verdict_icon || ''} ${data.quality_verdict_label || '—'}</div>
+            </div>
+        </div>
+        ${data.quality_breakdown ? `<div style="margin-top: 10px; font-size: 10px; color: var(--text-muted);">
+            Componentes: Edge ${data.quality_breakdown.edge_sharpe || 0} · Robustez ${data.quality_breakdown.bootstrap_robustness || 0} · Perfil ${data.quality_breakdown.profile_confidence || 0} · Odd ${data.quality_breakdown.odd_quality || 0} · Mercado ${data.quality_breakdown.market_divergence || 0} · Diversidade ${data.quality_breakdown.selection_diversity || 0}
+        </div>` : ''}
+    `;
 }
 
 function renderDutchingQualityCard(opp) {

@@ -384,6 +384,86 @@ def scan_dutching(source: str = "odds_api", strategy: str = "dynamic", data_sour
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+class RecalcDutchingRequest(BaseModel):
+    selections: List[str]              # placares, ex: ["1-0", "2-1"]
+    odds: List[float]                  # odds editadas pelo usuário
+    selections_probs: List[float] = None   # probs do modelo por placar (se disponível)
+    real_prob: float = None            # prob real combinada (se probs não vier)
+    profile_confidence: float = 0.0
+    market_divergence: float = 0.0
+    has_real_odds: bool = False
+    hours_to_kickoff: float = None
+    min_quality: float = 60.0
+    min_edge: float = 0.0              # edge mínimo em fração (0.05 = 5%)
+
+
+@router.post("/recalculate_dutching_quality")
+def recalculate_dutching_quality(req: RecalcDutchingRequest):
+    """Recalcula edge, odd combinada e quality score com odds editadas pelo usuário."""
+    try:
+        from ..dutching_scanner import dutching_quality_score
+
+        odds = [o for o in req.odds if o and o > 1.0]
+        if len(odds) < 2:
+            raise HTTPException(status_code=400, detail="Informe ao menos 2 odds válidas (> 1.00).")
+
+        # Odd combinada do dutching
+        overround = sum(1.0 / o for o in odds)
+        dutching_odd = 1.0 / overround if overround > 0 else 0.0
+
+        # Probabilidade real combinada
+        if req.selections_probs and len(req.selections_probs) == len(odds):
+            prob_combined = sum(req.selections_probs)
+        elif req.real_prob is not None:
+            prob_combined = req.real_prob
+        else:
+            # Fallback: usar probabilidade implícita (edge = 0)
+            prob_combined = overround
+
+        # Edge
+        edge = prob_combined * dutching_odd - 1.0
+
+        # Quality score
+        quality = dutching_quality_score(
+            edge=edge,
+            profile_confidence=req.profile_confidence,
+            dutching_odd=dutching_odd,
+            n_selections=len(odds),
+            market_divergence=req.market_divergence,
+            has_real_odds=req.has_real_odds,
+            hours_to_kickoff=req.hours_to_kickoff,
+        )
+
+        passes_quality = quality['score'] >= req.min_quality
+        passes_edge = edge >= req.min_edge
+        passes_filter = passes_quality and passes_edge
+
+        return {
+            'dutching_odd': round(dutching_odd, 3),
+            'combined_prob': round(prob_combined, 4),
+            'edge': round(edge, 4),
+            'edge_pct': round(edge * 100, 2),
+            'quality_score': quality['score'],
+            'quality_verdict': quality['verdict'],
+            'quality_verdict_label': quality['verdict_label'],
+            'quality_verdict_color': quality['verdict_color'],
+            'quality_verdict_icon': quality.get('verdict_icon', ''),
+            'quality_breakdown': quality.get('breakdown', {}),
+            'n_selections': len(odds),
+            'passes_quality': passes_quality,
+            'passes_edge': passes_edge,
+            'passes_filter': passes_filter,
+            'min_quality': req.min_quality,
+            'min_edge_pct': round(req.min_edge * 100, 2),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/arbitrage_scheduler/config")
 def get_arb_scheduler_config_api():
     try:
