@@ -270,6 +270,10 @@ function filterDutchingRadar() {
     const onlyRealEl = document.getElementById('dutching-only-real');
     const onlyReal = onlyRealEl ? onlyRealEl.checked : false;
 
+    // Hide possibly postponed games filter
+    const hidePostponedEl = document.getElementById('dutching-hide-postponed');
+    const hidePostponed = hidePostponedEl ? hidePostponedEl.checked : true;
+
     let filtered = allOpps.filter(opp => {
         // Bookmaker filter
         if (filterVal !== 'best' && opp.bookmaker !== filterVal) return false;
@@ -278,6 +282,8 @@ function filterDutchingRadar() {
         if (minQuality > 0 && (qs === undefined || qs === null || qs < minQuality)) return false;
         // Only real CS odds filter
         if (onlyReal && opp.odds_source_type !== 'real') return false;
+        // Hide possibly postponed
+        if (hidePostponed && opp.possibly_postponed) return false;
         return true;
     });
 
@@ -353,6 +359,7 @@ function filterDutchingRadar() {
             <td>
                 <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${opp.match}</div>
                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;"><i class="fa-solid fa-clock"></i> ${opp.date}</div>
+                ${opp.possibly_postponed ? `<div style="font-size: 10px; color: #f87171; margin-top: 3px; font-weight: 600;" title="As odds desta partida não são atualizadas há ${opp.odds_stale_hours}h (última: ${opp.odds_last_update}). O jogo pode ter sido adiado — confirme na casa antes de apostar."><i class="fa-solid fa-triangle-exclamation"></i> Odds sem atualização há ${opp.odds_stale_hours}h — possível adiamento</div>` : ''}
             </td>
             <td><span style="font-size: 12px; font-weight: 500; color: var(--text-secondary);">${homeTeam}</span></td>
             <td><span class="badge badge-info" style="font-size: 11px;">${opp.bookmaker}</span>${opp.odds_source_type === 'real' ? ' <span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; background: rgba(52,211,153,0.15); color: #34d399; font-weight: 700;" title="Odds reais de Correct Score desta casa — apostáveis diretamente">CS REAL</span>' : ' <span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; background: rgba(245,158,11,0.12); color: #f59e0b;" title="Odds de CS estimadas pelo modelo a partir do mercado Over/Under 2.5 desta casa. NÃO são odds reais de Correct Score — a casa pode ter valores diferentes.">EST (base O/U)</span>'}</td>

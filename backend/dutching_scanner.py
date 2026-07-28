@@ -1066,6 +1066,7 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
 
             for bookie in match.get('bookmakers', []):
                 title = bookie.get('title')
+                bookie_last_update = bookie.get('last_update')  # ISO timestamp UTC
                 h2h = {}
                 h2h_lay = {}
                 totals_by_point = {}  # point -> {name: price}
@@ -1124,6 +1125,7 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         'is_exchange': use_lay,
                         'cs_odds': cs_mapped,
                         'has_real_cs': len(cs_mapped) >= 6,
+                        'last_update': bookie_last_update,
                     }
 
             # Filtrar apenas 1xBet e Pinnacle
@@ -1162,6 +1164,18 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                 is_exchange = data.get('is_exchange', False)
                 real_cs = data.get('cs_odds', {})
                 has_real_cs = data.get('has_real_cs', False)
+
+                # Detectar odds desatualizadas (jogo possivelmente adiado)
+                odds_stale_hours = None
+                odds_last_update_str = None
+                last_upd = data.get('last_update')
+                if last_upd:
+                    try:
+                        upd_dt = datetime.strptime(last_upd, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                        odds_stale_hours = (datetime.now(timezone.utc) - upd_dt).total_seconds() / 3600.0
+                        odds_last_update_str = upd_dt.astimezone(BRAZIL_TZ).strftime("%d/%m %H:%M")
+                    except Exception:
+                        pass
 
                 if not o25_odd or not u25_odd:
                     continue
@@ -1244,6 +1258,9 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
                         'profile_confidence': game_profile['confidence'],
                         'market_divergence': game_profile.get('market_divergence', 0.0),
                         'hours_to_kickoff': _hours_until_match(dt),
+                        'odds_stale_hours': round(odds_stale_hours, 1) if odds_stale_hours is not None else None,
+                        'odds_last_update': odds_last_update_str,
+                        'possibly_postponed': (odds_stale_hours is not None and odds_stale_hours > 8),
                         'edge_ci_95': edge_ci.get('edge_ci_95'),
                         'edge_prob_positive': edge_ci.get('prob_positive'),
                         'quality_score': quality['score'],

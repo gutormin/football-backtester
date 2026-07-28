@@ -1501,6 +1501,9 @@ window.addEventListener('unhandledrejection', function(e) {
  <label style="font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #34d399; font-weight: 600; margin-left: 15px;">
  <input type="checkbox" id="dutching-only-real" onchange="filterDutchingRadar()" style="accent-color: #34d399; width: 15px; height: 15px; cursor: pointer;"> 🟢 Somente odds reais (apostáveis)
  </label>
+ <label style="font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #f87171; font-weight: 600; margin-left: 12px;">
+ <input type="checkbox" id="dutching-hide-postponed" checked onchange="filterDutchingRadar()" style="accent-color: #f87171; width: 15px; height: 15px; cursor: pointer;"> ⚠️ Ocultar possíveis adiamentos
+ </label>
  <span id="dutching-quality-count" style="font-size: 11px; color: var(--text-muted); margin-left: auto;"></span>
  </div>
 
@@ -3681,7 +3684,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=169"></script>
+ <script type="module" src="app.js?v=170"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
