@@ -261,6 +261,45 @@ class TipsBacktestRequest(BaseModel):
     stakingRule: str = "fixed"
 
 
+class ImportTipRequest(BaseModel):
+    text: str  # Mensagem do Telegram colada
+
+
+@router.post("/import_dutching_tip")
+def api_import_dutching_tip(req: ImportTipRequest):
+    """Importa uma sugestão colada da mensagem do Telegram."""
+    try:
+        from ..backtest.dutching_tips_backtester import parse_telegram_tip
+        from ..telegram_bot import get_telegram_dutching_tips, save_telegram_dutching_tips
+
+        parsed = parse_telegram_tip(req.text)
+        if not parsed:
+            raise HTTPException(status_code=400, detail="Não consegui extrair os dados da mensagem. Verifique o formato.")
+
+        # Evitar duplicatas
+        tips = get_telegram_dutching_tips()
+        for t in tips:
+            if t.get('match') == parsed['match'] and t.get('date') == parsed['date']:
+                return {"status": "duplicate", "message": "Essa sugestão já foi importada.", "tip": parsed}
+
+        import uuid
+        from datetime import datetime
+        parsed['id'] = str(uuid.uuid4())
+        parsed['status'] = 'Importado'
+        parsed['created_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        parsed['result_checked'] = False
+        parsed['actual_score'] = None
+        parsed['won'] = None
+        tips.append(parsed)
+        save_telegram_dutching_tips(tips)
+
+        return {"status": "success", "tip": parsed}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/backtest_dutching_tips")
 async def api_run_dutching_tips_backtest(req: TipsBacktestRequest):
     """Backtest sobre as sugestões REAIS que o sistema enviou."""

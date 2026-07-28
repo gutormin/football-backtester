@@ -1358,6 +1358,58 @@ async function runDutchingTipsBacktest() {
 }
 window.runDutchingTipsBacktest = runDutchingTipsBacktest;
 
+// ── Importar sugestões antigas coladas do Telegram ──
+async function importDutchingTips() {
+    const textEl = document.getElementById('dutching-tips-import-text');
+    const statusEl = document.getElementById('dutching-tips-import-status');
+    if (!textEl || !statusEl) return;
+
+    const fullText = textEl.value.trim();
+    if (!fullText) {
+        statusEl.innerHTML = '<span style="color: #f87171;">Cole ao menos uma mensagem.</span>';
+        return;
+    }
+
+    // Separar múltiplas mensagens por linha em branco dupla ou pelo header do alerta
+    let messages = fullText.split(/\n\s*\n/).filter(m => m.trim());
+    // Se não separou, tentar pelo emoji de alerta
+    if (messages.length === 1 && (fullText.match(/ALERTA DE DUTCHING/g) || []).length > 1) {
+        messages = fullText.split(/(?=🤖\s*ALERTA)/).filter(m => m.trim());
+    }
+
+    statusEl.innerHTML = '<span style="color: #a78bfa;">Importando...</span>';
+
+    let imported = 0, duplicates = 0, failed = 0;
+
+    for (const msg of messages) {
+        try {
+            const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/import_dutching_tip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: msg }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.status === 'success') imported++;
+                else if (data.status === 'duplicate') duplicates++;
+            } else {
+                failed++;
+            }
+        } catch (e) {
+            failed++;
+        }
+    }
+
+    let parts = [];
+    if (imported > 0) parts.push(`${imported} importada(s)`);
+    if (duplicates > 0) parts.push(`${duplicates} já existia(m)`);
+    if (failed > 0) parts.push(`${failed} falhou(ram)`);
+
+    statusEl.innerHTML = `<span style="color: ${imported > 0 ? '#34d399' : '#f59e0b'};">✓ ${parts.join(', ')}. Agora clique em "Analisar Sugestões".</span>`;
+    if (imported > 0) textEl.value = '';
+}
+window.importDutchingTips = importDutchingTips;
+
 function renderDutchingTipsResults(data) {
     const resultsEl = document.getElementById('dutching-tips-results');
     if (!resultsEl) return;

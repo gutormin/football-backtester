@@ -143,6 +143,86 @@ def _calc_dutching_profit(selections, odds, actual_score, stake):
     return round(profit, 2), covered
 
 
+def parse_telegram_tip(text):
+    """
+    Extrai os dados de uma mensagem de sugestão de Dutching colada do Telegram.
+
+    Formato esperado:
+        🤖 ALERTA DE DUTCHING PRO DETECTADO
+        ⚽ Jogo: Arsenal vs Chelsea
+        📅 Data/Hora: 20/07/2026 16:00
+        🏦 Casa Recomendada: Bet365
+        🧠 Estratégia Recomendada: Under / Jogo Truncado
+        📋 Seleções e Odds:
+        🔹 1-0: Odd @9.00
+        🔹 0-0: Odd @11.00
+        📉 Odd Combinada Dutching: @3.50
+    """
+    import re
+
+    if not text or not text.strip():
+        return None
+
+    result = {
+        'match': None, 'date': None, 'bookmaker': None, 'market': None,
+        'selections': [], 'odds': [], 'dutching_odd': None, 'model_prob': None,
+        'edge': 0.0, 'home_team': None, 'league': None,
+    }
+
+    # Jogo
+    m = re.search(r'Jogo:\s*(.+?)(?:\n|$)', text)
+    if m:
+        result['match'] = m.group(1).strip()
+        for sep in (' vs ', ' x ', ' - ', ' v '):
+            if sep in result['match']:
+                result['home_team'] = result['match'].split(sep)[0].strip()
+                break
+
+    # Data/Hora
+    m = re.search(r'Data/Hora:\s*(.+?)(?:\n|$)', text)
+    if m:
+        result['date'] = m.group(1).strip()
+
+    # Casa
+    m = re.search(r'Casa Recomendada:\s*(.+?)(?:\n|$)', text)
+    if m:
+        result['bookmaker'] = m.group(1).strip()
+
+    # Estratégia/Mercado
+    m = re.search(r'Estratégia Recomendada:\s*(.+?)(?:\n|$)', text)
+    if m:
+        result['market'] = m.group(1).strip()
+
+    # Seleções e odds: "🔹 1-0: Odd @9.00" ou "1-0: @9.00"
+    sel_pattern = re.findall(r'(\d+[-x]\d+)\s*:?\s*(?:Odd\s*)?@?\s*(\d+\.?\d*)', text)
+    for score, odd in sel_pattern:
+        score_norm = score.replace('x', '-')
+        # Não confundir com "Odd Combinada"
+        result['selections'].append(score_norm)
+        result['odds'].append(float(odd))
+
+    # Odd combinada
+    m = re.search(r'Odd Combinada\s*(?:Dutching)?:\s*@?\s*(\d+\.?\d*)', text)
+    if m:
+        result['dutching_odd'] = float(m.group(1))
+
+    # Probabilidade IA
+    m = re.search(r'Probabilidade\s*(?:Real)?\s*\(?IA\)?:\s*(.+?)(?:\n|$)', text)
+    if m:
+        result['model_prob'] = m.group(1).strip()
+
+    # Edge
+    m = re.search(r'Edge\s*\(?\+?EV\)?:\s*\+?(\d+\.?\d*)\s*%?', text)
+    if m:
+        result['edge'] = float(m.group(1)) / 100.0
+
+    # Precisa ter pelo menos jogo, data e seleções
+    if not result['match'] or not result['date'] or not result['selections']:
+        return None
+
+    return result
+
+
 def run_tips_backtest(start_date=None, end_date=None, initial_bankroll=1000.0,
                       stake_value=50.0, staking_rule='fixed'):
     """
