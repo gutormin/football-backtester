@@ -669,15 +669,17 @@ async function runDutchingBacktest() {
     const startDate = document.getElementById('dutching-bt-start').value;
     const endDate = document.getElementById('dutching-bt-end').value;
 
-    // Validar datas — não pode ser no futuro
+    // Validar datas
     const today = new Date().toISOString().split('T')[0];
-    if (startDate > today) {
-        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ Data inicial não pode ser no futuro.</span>';
+    if (startDate > today || endDate > today) {
+        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ Datas não podem ser no futuro.</span>';
         return;
     }
-    if (endDate > today) {
-        statusEl.innerHTML = '<span style="color: #f87171;">⚠️ Data final não pode ser no futuro.</span>';
-        return;
+    // Avisar sobre off-season (jun-ago na Europa)
+    const endMonth = parseInt(endDate.split('-')[1]);
+    const endYear = parseInt(endDate.split('-')[0]);
+    if (endMonth >= 6 && endMonth <= 8 && endYear >= 2026) {
+        statusEl.innerHTML = '<span style="color: #f59e0b;">⚠️ Jun-Ago é off-season na maioria das ligas europeias. Use set/2025 a mai/2026 para melhores resultados.</span>';
     }
 
     const stakeValue = parseFloat(document.getElementById('dutching-bt-stake').value) || 50;
@@ -1223,17 +1225,14 @@ function initDutchingBtDates() {
     const startEl = document.getElementById('dutching-bt-start');
     const endEl = document.getElementById('dutching-bt-end');
     if (!startEl || !endEl) return;
-    // Padrão: últimos 3 meses
-    const today = new Date();
-    const threeMonthsAgo = new Date(today);
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    const todayStr = today.toISOString().split('T')[0];
-    const startStr = threeMonthsAgo.toISOString().split('T')[0];
-    if (!startEl.value || startEl.value > todayStr) {
-        startEl.value = startStr;
+    // Default: temporada 2025/26 — set/2025 a mai/2026
+    if (!startEl.value || startEl._initialized !== true) {
+        startEl.value = '2025-09-01';
+        startEl._initialized = true;
     }
-    if (!endEl.value || endEl.value > todayStr) {
-        endEl.value = todayStr;
+    if (!endEl.value || endEl._initialized !== true) {
+        endEl.value = '2026-05-25';
+        endEl._initialized = true;
     }
 }
 
