@@ -266,12 +266,18 @@ function filterDutchingRadar() {
     const minQualityEl = document.getElementById('dutching-min-quality');
     const minQuality = minQualityEl ? parseInt(minQualityEl.value) : 0;
 
+    // Only real odds filter
+    const onlyRealEl = document.getElementById('dutching-only-real');
+    const onlyReal = onlyRealEl ? onlyRealEl.checked : false;
+
     let filtered = allOpps.filter(opp => {
         // Bookmaker filter
         if (filterVal !== 'best' && opp.bookmaker !== filterVal) return false;
         // Quality score filter
         const qs = opp.quality_score;
         if (minQuality > 0 && (qs === undefined || qs === null || qs < minQuality)) return false;
+        // Only real CS odds filter
+        if (onlyReal && opp.odds_source_type !== 'real') return false;
         return true;
     });
 
@@ -279,7 +285,11 @@ function filterDutchingRadar() {
     const countEl = document.getElementById('dutching-quality-count');
     if (countEl && totalOpps > 0) {
         const shown = filtered.length;
-        countEl.textContent = `${shown} de ${totalOpps} partidas${minQuality > 0 ? ` (score ≥ ${minQuality})` : ''}`;
+        let filters = [];
+        if (minQuality > 0) filters.push(`score ≥ ${minQuality}`);
+        if (onlyReal) filters.push('só reais');
+        const filterStr = filters.length > 0 ? ` (${filters.join(', ')})` : '';
+        countEl.textContent = `${shown} de ${totalOpps} partidas${filterStr}`;
     }
 
     // Apply text search filter
@@ -345,7 +355,7 @@ function filterDutchingRadar() {
                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;"><i class="fa-solid fa-clock"></i> ${opp.date}</div>
             </td>
             <td><span style="font-size: 12px; font-weight: 500; color: var(--text-secondary);">${homeTeam}</span></td>
-            <td><span class="badge badge-info" style="font-size: 11px;">${opp.bookmaker}</span>${opp.odds_source_type === 'real' ? ' <span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; background: rgba(52,211,153,0.15); color: #34d399; font-weight: 700;" title="Odds reais de Correct Score da API">CS REAL</span>' : ' <span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; background: rgba(245,158,11,0.12); color: #f59e0b;" title="Odds estimadas a partir de O/U 2.5">EST</span>'}</td>
+            <td><span class="badge badge-info" style="font-size: 11px;">${opp.bookmaker}</span>${opp.odds_source_type === 'real' ? ' <span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; background: rgba(52,211,153,0.15); color: #34d399; font-weight: 700;" title="Odds reais de Correct Score desta casa — apostáveis diretamente">CS REAL</span>' : ' <span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; background: rgba(245,158,11,0.12); color: #f59e0b;" title="Odds de CS estimadas pelo modelo a partir do mercado Over/Under 2.5 desta casa. NÃO são odds reais de Correct Score — a casa pode ter valores diferentes.">EST (base O/U)</span>'}</td>
             <td><div style="font-size: 12px; color: var(--text-secondary);">${opp.market}</div></td>
             <td><div style="font-size: 11px; font-family: monospace; color: #a78bfa;">${selectionsWithOdds}</div></td>
             <td><span style="font-weight: 600; color: var(--text-primary); font-size: 13px;">${opp.dutching_odd.toFixed(2)}</span></td>

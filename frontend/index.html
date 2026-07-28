@@ -1494,10 +1494,13 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Filtro de Quality Score -->
- <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 15px; background: rgba(139,92,246,0.06); padding: 10px 15px; border-radius: var(--border-radius-sm); border: 1px solid rgba(139,92,246,0.2);">
+ <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 15px; background: rgba(139,92,246,0.06); padding: 10px 15px; border-radius: var(--border-radius-sm); border: 1px solid rgba(139,92,246,0.2); flex-wrap: wrap;">
  <span style="font-size: 12px; color: #a78bfa; font-weight: 600;"><i class="fa-solid fa-filter"></i> Quality Score Mínimo:</span>
- <input type="range" id="dutching-min-quality" min="0" max="90" value="60" step="5" oninput="window.updateMinQualityLabel()" onchange="filterDutchingRadar()" style="flex: 1; max-width: 300px; accent-color: #8b5cf6; cursor: pointer;">
- <span id="dutching-min-quality-label" style="font-size: 14px; font-weight: 700; color: #34d399; min-width: 90px;">≥ 60</span>
+ <input type="range" id="dutching-min-quality" min="0" max="90" value="60" step="5" oninput="window.updateMinQualityLabel()" onchange="filterDutchingRadar()" style="flex: 1; max-width: 250px; accent-color: #8b5cf6; cursor: pointer;">
+ <span id="dutching-min-quality-label" style="font-size: 14px; font-weight: 700; color: #34d399; min-width: 70px;">≥ 60</span>
+ <label style="font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #34d399; font-weight: 600; margin-left: 15px;">
+ <input type="checkbox" id="dutching-only-real" onchange="filterDutchingRadar()" style="accent-color: #34d399; width: 15px; height: 15px; cursor: pointer;"> 🟢 Somente odds reais (apostáveis)
+ </label>
  <span id="dutching-quality-count" style="font-size: 11px; color: var(--text-muted); margin-left: auto;"></span>
  </div>
 
@@ -3666,7 +3669,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=166"></script>
+ <script type="module" src="app.js?v=167"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,
