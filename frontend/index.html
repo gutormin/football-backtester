@@ -1493,6 +1493,14 @@ window.addEventListener('unhandledrejection', function(e) {
  </button>
  </div>
 
+ <!-- Filtro de Quality Score -->
+ <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 15px; background: rgba(139,92,246,0.06); padding: 10px 15px; border-radius: var(--border-radius-sm); border: 1px solid rgba(139,92,246,0.2);">
+ <span style="font-size: 12px; color: #a78bfa; font-weight: 600;"><i class="fa-solid fa-filter"></i> Quality Score Mínimo:</span>
+ <input type="range" id="dutching-min-quality" min="0" max="90" value="60" step="5" oninput="window.updateMinQualityLabel()" onchange="filterDutchingRadar()" style="flex: 1; max-width: 300px; accent-color: #8b5cf6; cursor: pointer;">
+ <span id="dutching-min-quality-label" style="font-size: 14px; font-weight: 700; color: #34d399; min-width: 90px;">≥ 60</span>
+ <span id="dutching-quality-count" style="font-size: 11px; color: var(--text-muted); margin-left: auto;"></span>
+ </div>
+
  <!-- Definições das Estratégias Collapsible Box -->
  <div id="dutching-strategies-guide" style="display: none; background: rgba(139, 92, 246, 0.04); border: 1px solid rgba(139, 92, 246, 0.15); padding: 15px; border-radius: 6px; margin-bottom: 15px; font-size: 12px; line-height: 1.5; color: var(--text-secondary);">
  <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--text-primary); font-size: 13px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-brain" style="color: #a78bfa;"></i> Estratégias de Dutching (Nova Geração — EV Individual)</h4>
@@ -3658,7 +3666,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=165"></script>
+ <script type="module" src="app.js?v=166"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,

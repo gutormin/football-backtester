@@ -260,10 +260,27 @@ function filterDutchingRadar() {
 
     // Always read from window to pick up demo data and live scan data
     const allOpps = window.dutchingRadarAllOpps || dutchingRadarAllOpps;
+    const totalOpps = allOpps.length;
+
+    // Quality Score minimum filter
+    const minQualityEl = document.getElementById('dutching-min-quality');
+    const minQuality = minQualityEl ? parseInt(minQualityEl.value) : 0;
+
     let filtered = allOpps.filter(opp => {
-        if (filterVal === 'best') return true;
-        return opp.bookmaker === filterVal;
+        // Bookmaker filter
+        if (filterVal !== 'best' && opp.bookmaker !== filterVal) return false;
+        // Quality score filter
+        const qs = opp.quality_score;
+        if (minQuality > 0 && (qs === undefined || qs === null || qs < minQuality)) return false;
+        return true;
     });
+
+    // Update count label
+    const countEl = document.getElementById('dutching-quality-count');
+    if (countEl && totalOpps > 0) {
+        const shown = filtered.length;
+        countEl.textContent = `${shown} de ${totalOpps} partidas${minQuality > 0 ? ` (score ≥ ${minQuality})` : ''}`;
+    }
 
     // Apply text search filter
     if (searchQuery) {
@@ -1356,6 +1373,21 @@ async function runDutchingTipsBacktest() {
         statusEl.innerHTML = `<span style="color: #f87171;"><i class="fa-solid fa-circle-exclamation"></i> ${err.message}</span>`;
     }
 }
+// ── Atualiza o label do slider de Quality Score ──
+function updateMinQualityLabel() {
+    const slider = document.getElementById('dutching-min-quality');
+    const label = document.getElementById('dutching-min-quality-label');
+    if (!slider || !label) return;
+    const val = parseInt(slider.value);
+    label.textContent = val === 0 ? 'Todas' : `≥ ${val}`;
+    // Cor do label conforme o nível
+    if (val === 0) label.style.color = 'var(--text-muted)';
+    else if (val >= 70) label.style.color = '#34d399';
+    else if (val >= 55) label.style.color = '#a78bfa';
+    else label.style.color = '#f59e0b';
+}
+window.updateMinQualityLabel = updateMinQualityLabel;
+
 window.runDutchingTipsBacktest = runDutchingTipsBacktest;
 
 // ── Importar sugestões antigas coladas do Telegram ──
