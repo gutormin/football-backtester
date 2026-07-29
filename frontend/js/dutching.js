@@ -211,6 +211,20 @@ function calculateDutching() {
 
     // ── Kelly stake recommendation ──
     renderKellyRecommendation(combinedOdd, realProbPercent, edge, selections);
+
+    // ── Recálculo automático de Quality Score (debounced) ──
+    scheduleQualityRecalc();
+}
+
+// Debounce para não chamar a API a cada tecla
+var _qualityRecalcTimer = null;
+function scheduleQualityRecalc() {
+    // Só recalcula se houver uma oportunidade carregada
+    if (!window.currentDutchingOpp) return;
+    if (_qualityRecalcTimer) clearTimeout(_qualityRecalcTimer);
+    _qualityRecalcTimer = setTimeout(() => {
+        recalculateDutchingQuality(true);  // true = modo automático (silencioso)
+    }, 600);
 }
 
 async function runDutchingScan() {
@@ -448,7 +462,7 @@ function loadDutchingOpportunityByIndex(index) {
 }
 
 // ── Recalcular Quality Score com odds editadas pelo usuário ──
-async function recalculateDutchingQuality() {
+async function recalculateDutchingQuality(auto = false) {
     const resultEl = document.getElementById('dutching-recalc-result');
     if (!resultEl) return;
 
@@ -468,6 +482,8 @@ async function recalculateDutchingQuality() {
     });
 
     if (odds.length < 2) {
+        // No modo automático, não mostrar erro (usuário ainda está digitando)
+        if (auto) return;
         resultEl.style.display = 'block';
         resultEl.innerHTML = '<div style="background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); padding: 12px; border-radius: 6px; color: #f87171; font-size: 12px;">⚠️ Adicione ao menos 2 seleções com odds válidas (> 1.00).</div>';
         return;
@@ -496,7 +512,9 @@ async function recalculateDutchingQuality() {
     const minQuality = minQualityEl ? parseInt(minQualityEl.value) : 60;
 
     resultEl.style.display = 'block';
-    resultEl.innerHTML = '<div style="color: #a78bfa; font-size: 12px; padding: 8px;"><i class="fa-solid fa-arrows-rotate spinning"></i> Recalculando...</div>';
+    if (!auto) {
+        resultEl.innerHTML = '<div style="color: #a78bfa; font-size: 12px; padding: 8px;"><i class="fa-solid fa-arrows-rotate spinning"></i> Recalculando...</div>';
+    }
 
     try {
         const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/recalculate_dutching_quality`, {
