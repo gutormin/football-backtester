@@ -44,3 +44,4 @@ backups/
 *.bak
 *.zip
 *.xlsx
+data/oddspapi_config.json

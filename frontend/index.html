@@ -1293,9 +1293,15 @@ window.addEventListener('unhandledrejection', function(e) {
  <h2 style="margin: 0; color: #34d399; font-weight: 600;"><i class="fa-solid fa-scale-balanced"></i> Scanner de Arbitragem (Surebets)</h2>
  <p style="margin: 5px 0 0 0; color: #9ca3af; font-size: 14px;">Monitoramento em tempo real de assimetrias globais (Risco Zero).</p>
  </div>
+ <div style="display: flex; align-items: center; gap: 10px;">
+ <select id="arbitrage-source-select" style="background: var(--bg-darker); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 10px; border-radius: 6px; font-size: 13px; outline: none;" title="Fonte de dados de odds">
+ <option value="oddspapi">🟢 OddsPapi (370+ casas)</option>
+ <option value="odds_api">The Odds API (~40 casas)</option>
+ </select>
  <button type="button" class="btn-primary" id="btn-scan-arbitrage" onclick="window.runArbitrageScan()">
  <i class="fa-solid fa-radar"></i> Rastrear Oportunidades
  </button>
+ </div>
  </div>
  </div>
 
@@ -3684,7 +3690,7 @@ window.addEventListener('unhandledrejection', function(e) {
  </div>
 
  <!-- Custom Script com Cache Buster para evitar problemas de atualização -->
- <script type="module" src="app.js?v=170"></script>
+ <script type="module" src="app.js?v=171"></script>
 
 <script>
 // Fallback inline: garante que window.switchTab exista IMEDIATAMENTE,

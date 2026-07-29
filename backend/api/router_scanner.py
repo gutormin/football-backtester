@@ -362,12 +362,12 @@ def run_steam_moves_scan(req: SteamMovesRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/scan_arbitrage")
-def scan_arbitrage(bookies: str = None):
+def scan_arbitrage(bookies: str = None, source: str = "odds_api", category: str = None):
     try:
         allowed_bookies = None
         if bookies:
             allowed_bookies = [b.strip() for b in bookies.split(',') if b.strip()]
-        return fetch_arbitrage_opportunities(allowed_bookies=allowed_bookies)
+        return fetch_arbitrage_opportunities(allowed_bookies=allowed_bookies, source=source, category_filter=category)
     except Exception as e:
         import traceback
         traceback.print_exc()

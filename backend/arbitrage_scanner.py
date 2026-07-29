@@ -173,78 +173,94 @@ def _fetch_odds_api(url, headers):
     return requests.get(url, headers=headers, timeout=15)
 
 
-def fetch_arbitrage_opportunities(allowed_bookies=None):
+def fetch_arbitrage_opportunities(allowed_bookies=None, source='odds_api', category_filter=None):
     """
-    Scan The Odds API for football arbitrage opportunities.
+    Scan for football arbitrage opportunities.
 
-    v3: Queries each soccer league individually (per-league = 1 credit each)
-        instead of the generic 'upcoming' endpoint which returns mostly non-soccer
-        sports during off-season months (June–August).
+    Args:
+        allowed_bookies: lista de casas permitidas
+        source: 'odds_api' (The Odds API) ou 'oddspapi' (OddsPapi)
+        category_filter: filtro de categoria para OddsPapi (ex: 'brazil')
 
     Filters:
-      - Football only (soccer_* sport keys)
+      - Football only
       - Betfair Exchange commission (2–5% on net profit)
       - Slippage model by odds range
       - Min 1.0% net profit, max 15% (cap for stale odds)
       - Quality score 0–100, minimum 30
       - Capture timestamp for staleness detection
     """
-    API_KEY = os.getenv('THE_ODDS_API_KEY')
-    if not API_KEY:
-        logger.error("THE_ODDS_API_KEY not set in environment")
-        return [{'error': 'no_api_key', 'message': 'API key da The Odds API não configurada. Obtenha uma em https://the-odds-api.com e defina THE_ODDS_API_KEY no ambiente do Render.'}]
-
-    headers = {
-        'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                       'AppleWebKit/537.36 (KHTML, like Gecko) '
-                       'Chrome/91.0.4472.124 Safari/537.36')
-    }
-
     captured_at = datetime.now(timezone.utc)
 
-    # Query each soccer league individually — the generic 'upcoming' endpoint
-    # returns mostly non-soccer sports during off-season months
-    all_matches = []
-    total_credits_used = 0
-    total_credits_remaining = 0
+    # ── Fonte: OddsPapi ──────────────────────────────────────────
+    if source == 'oddspapi':
+        from .oddspapi_client import fetch_oddspapi_matches
+        matches, err = fetch_oddspapi_matches(category_filter=category_filter)
+        if err:
+            return [err]
+        all_matches = matches
+        # OddsPapi já vem filtrado por futebol; marcar sport_key p/ compatibilidade
+        for m in all_matches:
+            m['sport_key'] = 'soccer_oddspapi'
+        logger.info(f"OddsPapi: {len(all_matches)} partidas de futebol com odds")
+        data = all_matches
+        _oddspapi_mode = True
+    else:
+        _oddspapi_mode = False
+        API_KEY = os.getenv('THE_ODDS_API_KEY')
+        if not API_KEY:
+            logger.error("THE_ODDS_API_KEY not set in environment")
+            return [{'error': 'no_api_key', 'message': 'API key da The Odds API não configurada. Obtenha uma em https://the-odds-api.com e defina THE_ODDS_API_KEY no ambiente do Render.'}]
 
-    for sport_key in SOCCER_SPORT_KEYS:
-        url = (f'https://api.the-odds-api.com/v4/sports/{sport_key}/odds/'
-               f'?apiKey={API_KEY}&regions={REGIONS}&markets={MARKETS}')
-        try:
-            response = _fetch_odds_api(url, headers)
-        except Exception as e:
-            logger.warning(f"API error for {sport_key}: {e}")
-            continue
+        headers = {
+            'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                           'AppleWebKit/537.36 (KHTML, like Gecko) '
+                           'Chrome/91.0.4472.124 Safari/537.36')
+        }
 
-        total_credits_used = response.headers.get('x-requests-used', '?')
-        total_credits_remaining = response.headers.get('x-requests-remaining', '?')
+        # Query each soccer league individually — the generic 'upcoming' endpoint
+        # returns mostly non-soccer sports during off-season months
+        all_matches = []
+        total_credits_used = 0
+        total_credits_remaining = 0
 
-        if response.status_code == 422:
-            continue  # no upcoming matches for this league
-        if response.status_code == 401:
+        for sport_key in SOCCER_SPORT_KEYS:
+            url = (f'https://api.the-odds-api.com/v4/sports/{sport_key}/odds/'
+                   f'?apiKey={API_KEY}&regions={REGIONS}&markets={MARKETS}')
             try:
-                body = response.json()
-                error_code = body.get('error_code', '')
-            except Exception:
-                error_code = ''
-            if error_code == 'OUT_OF_USAGE_CREDITS':
-                return [{'error': 'no_credits', 'message': 'Créditos da The Odds API esgotados. O plano gratuito renova mensalmente. Acesse https://the-odds-api.com para ver seu plano.'}]
-            return [{'error': 'invalid_api_key', 'message': 'Chave de API inválida. Verifique THE_ODDS_API_KEY no ambiente do Render.'}]
-        if response.status_code != 200:
-            if response.status_code == 429:
-                logger.warning(f"Rate limit atingido em {sport_key}, parando scan")
-                break
-            continue
+                response = _fetch_odds_api(url, headers)
+            except Exception as e:
+                logger.warning(f"API error for {sport_key}: {e}")
+                continue
 
-        league_matches = response.json()
-        if isinstance(league_matches, list) and league_matches:
-            all_matches.extend(league_matches)
+            total_credits_used = response.headers.get('x-requests-used', '?')
+            total_credits_remaining = response.headers.get('x-requests-remaining', '?')
 
-    logger.info(f"Odds API credits: used={total_credits_used}, remaining={total_credits_remaining}")
-    logger.info(f"Fetched {len(all_matches)} soccer matches across {len(SOCCER_SPORT_KEYS)} leagues")
+            if response.status_code == 422:
+                continue  # no upcoming matches for this league
+            if response.status_code == 401:
+                try:
+                    body = response.json()
+                    error_code = body.get('error_code', '')
+                except Exception:
+                    error_code = ''
+                if error_code == 'OUT_OF_USAGE_CREDITS':
+                    return [{'error': 'no_credits', 'message': 'Créditos da The Odds API esgotados. O plano gratuito renova mensalmente. Acesse https://the-odds-api.com para ver seu plano.'}]
+                return [{'error': 'invalid_api_key', 'message': 'Chave de API inválida. Verifique THE_ODDS_API_KEY no ambiente do Render.'}]
+            if response.status_code != 200:
+                if response.status_code == 429:
+                    logger.warning(f"Rate limit atingido em {sport_key}, parando scan")
+                    break
+                continue
 
-    data = all_matches
+            league_matches = response.json()
+            if isinstance(league_matches, list) and league_matches:
+                all_matches.extend(league_matches)
+
+        logger.info(f"Odds API credits: used={total_credits_used}, remaining={total_credits_remaining}")
+        logger.info(f"Fetched {len(all_matches)} soccer matches across {len(SOCCER_SPORT_KEYS)} leagues")
+
+        data = all_matches
 
     # Debug counters
     _dbg_total_matches = len(data)

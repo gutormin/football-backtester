@@ -73,7 +73,13 @@ async function runArbitrageScan() {
     btn.disabled = true;
     
     const selectedBookies = Array.from(document.querySelectorAll('.bookie-cb:checked')).map(cb => cb.value);
-    const bookiesQuery = selectedBookies.length > 0 ? `?bookies=${encodeURIComponent(selectedBookies.join(','))}` : '';
+    const sourceSelect = document.getElementById('arbitrage-source-select');
+    const source = sourceSelect ? sourceSelect.value : 'oddspapi';
+
+    const params = new URLSearchParams();
+    if (selectedBookies.length > 0) params.set('bookies', selectedBookies.join(','));
+    params.set('source', source);
+    const bookiesQuery = '?' + params.toString();
     
     try {
         const res = await fetch(`${API_BASE_URL}/api/scan_arbitrage${bookiesQuery}`);
