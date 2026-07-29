@@ -560,45 +560,39 @@ function renderRecalcResult(data) {
     const resultEl = document.getElementById('dutching-recalc-result');
     if (!resultEl) return;
 
+    // ── Atualizar o card de cima (Quality Score) com os valores recalculados ──
+    // Assim só existe UMA verdade na tela, evitando confusão de dois scores
+    const updatedOpp = {
+        quality_score: data.quality_score,
+        quality_verdict: data.quality_verdict,
+        quality_verdict_label: data.quality_verdict_label,
+        quality_verdict_color: data.quality_verdict_color,
+        quality_verdict_icon: data.quality_verdict_icon,
+        quality_breakdown: data.quality_breakdown,
+        odds_source_type: (window.currentDutchingOpp || {}).odds_source_type,
+        game_profile: (window.currentDutchingOpp || {}).game_profile,
+        edge_prob_positive: (window.currentDutchingOpp || {}).edge_prob_positive,
+        _recalc_edge_pct: data.edge_pct,
+        _recalc_dutching_odd: data.dutching_odd,
+    };
+    renderDutchingQualityCard(updatedOpp);
+
     const passes = data.passes_filter;
-    const edgeColor = data.edge >= 0 ? '#34d399' : '#f87171';
-    const scoreColor = data.quality_score >= 70 ? '#34d399' : (data.quality_score >= 55 ? '#a78bfa' : '#f59e0b');
-    const verdictColor = data.quality_verdict_color || '#f87171';
 
     const bannerBg = passes ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)';
     const bannerBorder = passes ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)';
     const bannerColor = passes ? '#34d399' : '#f87171';
     const bannerIcon = passes ? 'fa-circle-check' : 'fa-circle-xmark';
+    const edgeColor = data.edge >= 0 ? '#34d399' : '#f87171';
     const bannerText = passes
-        ? `✅ PASSA NO FILTRO — Score ${data.quality_score} ≥ ${data.min_quality}. Vale a pena apostar!`
-        : `❌ NÃO PASSA — Score ${data.quality_score} < ${data.min_quality}. Melhor não apostar com essas odds.`;
+        ? `✅ PASSA NO FILTRO — Score ${data.quality_score} ≥ ${data.min_quality}. Edge ${data.edge_pct >= 0 ? '+' : ''}${data.edge_pct.toFixed(1)}% · Odd combinada ${data.dutching_odd.toFixed(2)}. Vale a pena!`
+        : `❌ NÃO PASSA — Score ${data.quality_score} < ${data.min_quality}. Edge ${data.edge_pct >= 0 ? '+' : ''}${data.edge_pct.toFixed(1)}% · Odd combinada ${data.dutching_odd.toFixed(2)}. Melhor não apostar.`;
 
     resultEl.innerHTML = `
-        <div style="background: ${bannerBg}; border: 1px solid ${bannerBorder}; padding: 12px 16px; border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+        <div style="background: ${bannerBg}; border: 1px solid ${bannerBorder}; padding: 12px 16px; border-radius: 8px; display: flex; align-items: center; gap: 10px;">
             <i class="fa-solid ${bannerIcon}" style="color: ${bannerColor}; font-size: 20px;"></i>
             <span style="color: ${bannerColor}; font-weight: 700; font-size: 13px;">${bannerText}</span>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
-            <div style="background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.2); padding: 12px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Odd Combinada</div>
-                <div style="font-size: 20px; font-weight: 700; color: #c084fc;">${data.dutching_odd.toFixed(2)}</div>
-            </div>
-            <div style="background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); padding: 12px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Edge</div>
-                <div style="font-size: 20px; font-weight: 700; color: ${edgeColor};">${data.edge_pct >= 0 ? '+' : ''}${data.edge_pct.toFixed(1)}%</div>
-            </div>
-            <div style="background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.2); padding: 12px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Quality Score</div>
-                <div style="font-size: 20px; font-weight: 700; color: ${scoreColor};">${data.quality_score}</div>
-            </div>
-            <div style="background: rgba(255,255,255,0.02); border: 1px solid ${verdictColor}40; padding: 12px; border-radius: 6px; text-align: center;">
-                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Veredito</div>
-                <div style="font-size: 13px; font-weight: 700; color: ${verdictColor};">${data.quality_verdict_icon || ''} ${data.quality_verdict_label || '—'}</div>
-            </div>
-        </div>
-        ${data.quality_breakdown ? `<div style="margin-top: 10px; font-size: 10px; color: var(--text-muted);">
-            Componentes: Edge ${data.quality_breakdown.edge_sharpe || 0} · Robustez ${data.quality_breakdown.bootstrap_robustness || 0} · Perfil ${data.quality_breakdown.profile_confidence || 0} · Odd ${data.quality_breakdown.odd_quality || 0} · Mercado ${data.quality_breakdown.market_divergence || 0} · Diversidade ${data.quality_breakdown.selection_diversity || 0}
-        </div>` : ''}
     `;
 }
 
@@ -654,6 +648,10 @@ function renderDutchingQualityCard(opp) {
             <span style="color: #a78bfa;">Perfil IA:</span> ${opp.game_profile || '—'}
             ${opp.edge_prob_positive != null ? ` · <span style="color: #a78bfa;">P(edge&gt;0):</span> ${(opp.edge_prob_positive * 100).toFixed(0)}%` : ''}
         </div>
+        ${(opp._recalc_edge_pct != null) ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 16px; font-size: 11px;">
+            <span><span style="color: var(--text-secondary);">Odd combinada:</span> <strong style="color: #c084fc;">${opp._recalc_dutching_odd.toFixed(2)}</strong></span>
+            <span><span style="color: var(--text-secondary);">Edge:</span> <strong style="color: ${opp._recalc_edge_pct >= 0 ? '#34d399' : '#f87171'};">${opp._recalc_edge_pct >= 0 ? '+' : ''}${opp._recalc_edge_pct.toFixed(1)}%</strong></span>
+        </div>` : ''}
     `;
 }
 
