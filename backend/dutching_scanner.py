@@ -1690,3 +1690,210 @@ def get_mock_dutching_opportunities(strategy='auto_ia'):
             }
         ]
     return opps
+
+
+def _score_probs_from_matrix(prob_matrix, max_display=6):
+    """Extrai dict {"1-0": prob, ...} da matriz de probabilidades."""
+    score_probs = {}
+    rows = min(prob_matrix.shape[0], max_display)
+    cols = min(prob_matrix.shape[1], max_display)
+    for i in range(rows):
+        for j in range(cols):
+            score_probs[f"{i}-{j}"] = float(prob_matrix[i, j])
+    return score_probs
+
+
+def fetch_dutching_anchored_opportunities(api_key=None, source='oddspapi', data_source='auto'):
+    """
+    Triagem Ancorada: ranqueia jogos futuros por divergência modelo × mercado
+    REAL (1X2 e Over/Under), SEM inventar odds de Correct Score.
+
+    Retorna lista de jogos ordenados por anchored_score (maior primeiro), cada um
+    com prévia de placares estimados (claramente marcados como estimativa).
+    """
+    from .dutching_anchored import compute_anchored_score
+
+    if not api_key:
+        api_key = os.getenv('THE_ODDS_API_KEY') or get_odds_api_token()
+
+    # ── 1. Buscar jogos futuros conforme a fonte ──
+    matches = []
+    if source == 'oddspapi':
+        from .oddspapi_client import fetch_oddspapi_matches
+        opapi_matches, err = fetch_oddspapi_matches()
+        if err:
+            return [err]
+        for m in opapi_matches:
+            lc = _guess_league_from_teams(m.get('home_team', ''), m.get('away_team', ''))
+            if lc:
+                matches.append({
+                    'home_team': m.get('home_team'),
+                    'away_team': m.get('away_team'),
+                    'commence_time': m.get('commence_time'),
+                    'league_code': lc,
+                    'bookmakers': m.get('bookmakers', []),
+                })
+    elif source in ('datafootball', 'csv_fixtures'):
+        # Reusar o carregamento de fixtures locais/DataFootball
+        df_fixtures = pd.DataFrame()
+        if source == 'datafootball':
+            token = get_api_token()
+            if token:
+                try:
+                    df_fixtures = load_upcoming_from_api(token)
+                except Exception:
+                    pass
+        if df_fixtures.empty:
+            fixtures_path = os.path.join(DATA_DIR, 'fixtures.csv')
+            if os.path.exists(fixtures_path):
+                try:
+                    df_fixtures = pd.read_csv(fixtures_path, encoding='latin1')
+                    df_fixtures.columns = [c.replace('ï»¿', '').replace('\ufeff', '').strip() for c in df_fixtures.columns]
+                except Exception:
+                    pass
+        if df_fixtures.empty:
+            return []
+        for row in df_fixtures.to_dict('records'):
+            lc = row.get('Div')
+            if not lc:
+                continue
+            matches.append({
+                'home_team': row.get('HomeTeam'),
+                'away_team': row.get('AwayTeam'),
+                'commence_time': None,
+                'date_raw': f"{row.get('Date', '')} {row.get('Time', '')}",
+                'league_code': lc,
+                'ou_odds': (row.get('B365>2.5'), row.get('B365<2.5')),
+                'x2_odds': (row.get('B365H'), row.get('B365D'), row.get('B365A')),
+                'bookmakers': [],
+            })
+    else:
+        return [{'error': 'invalid_source', 'message': f'Fonte {source} não suportada na triagem ancorada.'}]
+
+    if not matches:
+        return []
+
+    # ── 2. Carregar dados históricos por liga (lazy) ──
+    leagues_data = {}
+    results = []
+
+    for match in matches:
+        lc = match['league_code']
+        if lc not in leagues_data:
+            try:
+                ds = data_source if data_source != 'auto' else auto_detect_data_source(lc)
+                df = load_league_data(lc, start_date='2020-08-01', data_source=ds)
+                leagues_data[lc] = df if (df is not None and not df.empty) else None
+            except Exception:
+                leagues_data[lc] = None
+        df = leagues_data.get(lc)
+        if df is None:
+            continue
+
+        home = match['home_team']
+        away = match['away_team']
+        if not home or not away:
+            continue
+
+        # ── 3. Rodar o modelo ──
+        try:
+            pred_match_date = pd.Timestamp.now()
+            pred = predict_match_nb(home, away, df, pred_match_date)
+            if pred is None:
+                continue
+        except Exception:
+            continue
+
+        # ── 4. Extrair odds reais de mercado (1X2 e O/U) ──
+        market_ou = match.get('ou_odds')
+        market_1x2 = match.get('x2_odds')
+
+        # Se veio de bookmakers (OddsPapi/OddsAPI), extrair h2h
+        if not market_1x2 and match.get('bookmakers'):
+            for bm in match['bookmakers']:
+                for mk in bm.get('markets', []):
+                    if mk.get('key') == 'h2h':
+                        outs = {o['name']: o['price'] for o in mk.get('outcomes', [])}
+                        h = outs.get(home) or outs.get('Home')
+                        d = outs.get('Draw')
+                        a = outs.get(away) or outs.get('Away')
+                        if h and a:
+                            market_1x2 = (h, d or 0, a)
+                            break
+                if market_1x2:
+                    break
+
+        # Normalizar OU odds
+        def _valid_odd(x):
+            try:
+                v = float(x)
+                return v if v > 1.01 else None
+            except (ValueError, TypeError):
+                return None
+
+        if market_ou:
+            ou_over = _valid_odd(market_ou[0])
+            ou_under = _valid_odd(market_ou[1])
+            market_ou = (ou_over, ou_under) if (ou_over and ou_under) else None
+
+        # ── 5. Placares estimados (prévia) ──
+        prob_matrix = pred.get('prob_matrix')
+        if prob_matrix is None:
+            continue
+        score_probs = _score_probs_from_matrix(prob_matrix)
+
+        # Top placares por probabilidade
+        top_scores = sorted(score_probs.items(), key=lambda kv: kv[1], reverse=True)[:6]
+
+        # ── 6. Score ancorado ──
+        anchored = compute_anchored_score(
+            pred, market_ou_odds=market_ou, market_1x2_odds=market_1x2,
+            score_probs=score_probs, league_code=lc
+        )
+
+        # Data
+        match_date = match.get('date_raw')
+        if not match_date and match.get('commence_time'):
+            try:
+                mt = datetime.strptime(match['commence_time'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                if mt < datetime.now(timezone.utc):
+                    continue
+                match_date = mt.astimezone(BRAZIL_TZ).strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                match_date = '—'
+
+        # Odds estimadas de CS (prévia — claramente marcadas)
+        preview_selections = []
+        for score_str, prob in top_scores:
+            est_odd = round(1.0 / prob, 2) if prob > 0.001 else 999.0
+            preview_selections.append({
+                'score': score_str,
+                'prob': round(prob, 4),
+                'estimated_odd': est_odd,
+            })
+
+        results.append({
+            'match': f"{home} vs {away}",
+            'home_team': home,
+            'away_team': away,
+            'date': match_date or '—',
+            'league': lc,
+            'anchored_score': anchored['anchored_score'],
+            'score_components': anchored['components'],
+            'reasons': anchored['reasons'],
+            'ou_divergence': anchored['ou_divergence'],
+            'x2_divergence': anchored['x2_divergence'],
+            'concentration': anchored['concentration'],
+            'model_confidence': anchored['model_confidence'],
+            'has_real_ou': anchored['has_real_ou'],
+            'has_real_1x2': anchored['has_real_1x2'],
+            'preview_selections': preview_selections,
+            'market_ou': market_ou,
+            'market_1x2': market_1x2,
+            'lambda_home': round(pred.get('lambda_home', 0), 2),
+            'lambda_away': round(pred.get('lambda_away', 0), 2),
+        })
+
+    # ── 7. Ordenar por score de oportunidade ──
+    results.sort(key=lambda r: r['anchored_score'], reverse=True)
+    return results

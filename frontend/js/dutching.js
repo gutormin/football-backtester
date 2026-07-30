@@ -1744,3 +1744,134 @@ function loadDemoOpportunity() {
 
 // --- RESTORED LIVE RADAR CODE ---
 
+
+// ══════════════════════════════════════════════════════════
+// SUBMÓDULO: Triagem Ancorada
+// ══════════════════════════════════════════════════════════
+
+function setDutchingRadarMode(mode) {
+    const csreal = document.getElementById('dutching-csreal-section');
+    const anchored = document.getElementById('dutching-anchored-section');
+    const btnCs = document.getElementById('dutch-mode-csreal');
+    const btnAn = document.getElementById('dutch-mode-anchored');
+    const desc = document.getElementById('dutch-mode-description');
+    const active = 'linear-gradient(135deg, #8b5cf6, #a78bfa)';
+
+    if (mode === 'anchored') {
+        if (csreal) csreal.style.display = 'none';
+        if (anchored) anchored.style.display = 'block';
+        if (btnAn) { btnAn.style.background = active; btnAn.style.color = 'white'; }
+        if (btnCs) { btnCs.style.background = 'transparent'; btnCs.style.color = 'var(--text-muted)'; }
+        if (desc) desc.innerHTML = '<strong>Triagem Ancorada:</strong> ranqueia jogos por divergência entre o modelo e as odds reais de mercado (1X2, Over/Under). Não inventa odds de CS — mostra os jogos que valem a pena investigar. Você digita as odds reais depois.';
+    } else {
+        if (csreal) csreal.style.display = 'block';
+        if (anchored) anchored.style.display = 'none';
+        if (btnCs) { btnCs.style.background = active; btnCs.style.color = 'white'; }
+        if (btnAn) { btnAn.style.background = 'transparent'; btnAn.style.color = 'var(--text-muted)'; }
+        if (desc) desc.innerHTML = '<strong>CS Real:</strong> usa odds reais de Correct Score da The Odds API. Só mostra jogos onde a casa fornece CS de verdade.';
+    }
+}
+window.setDutchingRadarMode = setDutchingRadarMode;
+
+async function runAnchoredTriage() {
+    const statusEl = document.getElementById('anchored-status');
+    const resultsEl = document.getElementById('anchored-results');
+    const sourceSelect = document.getElementById('anchored-source-select');
+    const source = sourceSelect ? sourceSelect.value : 'oddspapi';
+
+    if (statusEl) statusEl.innerHTML = '<span style="color:#a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> Ranqueando jogos...</span>';
+    if (resultsEl) resultsEl.innerHTML = '';
+
+    try {
+        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/scan_dutching_anchored?source=${source}`);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `Erro HTTP ${res.status}`);
+        }
+        const data = await res.json();
+
+        if (Array.isArray(data) && data.length > 0 && data[0].error) {
+            throw new Error(data[0].message || 'Erro na triagem');
+        }
+        if (!Array.isArray(data) || data.length === 0) {
+            if (statusEl) statusEl.innerHTML = '<span style="color:#f59e0b;">Nenhum jogo encontrado para ranquear.</span>';
+            return;
+        }
+
+        renderAnchoredResults(data);
+        if (statusEl) statusEl.innerHTML = `<span style="color:#34d399;"><i class="fa-solid fa-circle-check"></i> ${data.length} jogos ranqueados.</span>`;
+    } catch (err) {
+        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;"><i class="fa-solid fa-circle-exclamation"></i> ${err.message}</span>`;
+    }
+}
+window.runAnchoredTriage = runAnchoredTriage;
+
+function renderAnchoredResults(games) {
+    const el = document.getElementById('anchored-results');
+    if (!el) return;
+
+    el.innerHTML = games.map((g, idx) => {
+        const scoreColor = g.anchored_score >= 65 ? '#34d399' : (g.anchored_score >= 45 ? '#f59e0b' : '#9ca3af');
+        const rankBadge = idx < 3 ? ['🥇','🥈','🥉'][idx] : `#${idx+1}`;
+        const preview = (g.preview_selections || []).slice(0, 5).map(s =>
+            `<span style="display:inline-block; margin:2px; padding:3px 8px; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.2); border-radius:4px; font-size:11px;">
+                <strong style="color:#c084fc;">${s.score}</strong> <span style="color:var(--text-muted);">~${s.estimated_odd}</span>
+            </span>`
+        ).join('');
+
+        return `
+        <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:8px; padding:14px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:200px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:16px;">${rankBadge}</span>
+                        <span style="font-size:14px; font-weight:700; color:var(--text-primary);">${g.match}</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">
+                        ${g.date} · ${g.league} · λ ${g.lambda_home}-${g.lambda_away}
+                    </div>
+                    <div style="font-size:11px; color:var(--text-secondary); margin-top:6px;">
+                        ${(g.reasons || []).map(r => `<span style="display:inline-block; margin-right:8px;">• ${r}</span>`).join('')}
+                    </div>
+                </div>
+                <div style="text-align:center; min-width:80px;">
+                    <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase;">Score</div>
+                    <div style="font-size:26px; font-weight:700; color:${scoreColor};">${g.anchored_score}</div>
+                    <div style="font-size:9px; color:var(--text-muted);">Merc ${g.score_components.market_divergence} · Conc ${g.score_components.concentration} · Conf ${g.score_components.confidence}</div>
+                </div>
+            </div>
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+                <div style="font-size:10px; color:var(--text-muted); margin-bottom:5px; text-transform:uppercase;">Placares prováveis (odds estimadas — confira as reais):</div>
+                ${preview}
+                <button type="button" onclick='window.loadAnchoredToCalculator(${JSON.stringify(g).replace(/'/g, "&#39;")})' style="display:block; margin-top:10px; background:linear-gradient(135deg,#8b5cf6,#a78bfa); border:none; color:white; font-size:12px; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600;">
+                    <i class="fa-solid fa-arrow-down"></i> Carregar na Calculadora (digitar odds reais)
+                </button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function loadAnchoredToCalculator(game) {
+    const container = document.getElementById('dutching-rows-container');
+    if (container) container.innerHTML = '';
+
+    (game.preview_selections || []).forEach(s => {
+        addDutchingRow(s.score, s.estimated_odd, s.prob);
+    });
+
+    window.currentDutchingOpp = {
+        match: game.match,
+        selections: (game.preview_selections || []).map(s => s.score),
+        selections_probs: (game.preview_selections || []).map(s => s.prob),
+        odds_source_type: 'estimated',
+        game_profile: null,
+        profile_confidence: game.model_confidence || 0,
+        market_divergence: game.ou_divergence || 0,
+    };
+
+    calculateDutching();
+    showToast(`${game.match} carregado! Substitua as odds pelas reais da casa.`, 'success');
+
+    if (container) container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+window.loadAnchoredToCalculator = loadAnchoredToCalculator;

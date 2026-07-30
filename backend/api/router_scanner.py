@@ -385,6 +385,23 @@ def scan_dutching(source: str = "odds_api", strategy: str = "dynamic", data_sour
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/scan_dutching_anchored")
+def scan_dutching_anchored(source: str = "oddspapi", data_source: str = "auto"):
+    """Triagem Ancorada: ranqueia jogos futuros por divergência modelo×mercado
+    REAL (1X2, Over/Under), sem inventar odds de Correct Score.
+
+    Retorna jogos ordenados por score de oportunidade, com prévia de placares
+    estimados. O usuário digita as odds reais de CS depois."""
+    try:
+        from ..dutching_scanner import fetch_dutching_anchored_opportunities, get_odds_api_token
+        token = os.getenv('THE_ODDS_API_KEY') or get_odds_api_token()
+        return fetch_dutching_anchored_opportunities(api_key=token, source=source, data_source=data_source)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class RecalcDutchingRequest(BaseModel):
     selections: List[str]              # placares, ex: ["1-0", "2-1"]
     odds: List[float]                  # odds editadas pelo usuário
