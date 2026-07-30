@@ -429,13 +429,14 @@ def recalculate_dutching_quality(req: RecalcDutchingRequest):
     """
     try:
         from ..dutching.core import dutching_quality_score
-        if len(odds) < 2:
+        user_odds = [o for o in req.odds if o and o > 1.0]
+        if len(user_odds) < 2:
             raise HTTPException(status_code=400, detail="Informe ao menos 2 odds válidas (> 1.00).")
 
-        overround = sum(1.0 / o for o in odds)
+        overround = sum(1.0 / o for o in user_odds)
         dutching_odd = 1.0 / overround if overround > 0 else 0.0
 
-        if req.selections_probs and len(req.selections_probs) == len(odds):
+        if req.selections_probs and len(req.selections_probs) == len(user_odds):
             prob_combined = sum(req.selections_probs)
         elif req.real_prob is not None:
             prob_combined = req.real_prob
@@ -450,7 +451,7 @@ def recalculate_dutching_quality(req: RecalcDutchingRequest):
             edge=edge,
             profile_confidence=req.profile_confidence,
             dutching_odd=dutching_odd,
-            n_selections=len(odds),
+            n_selections=len(user_odds),
             market_divergence=req.market_divergence,
             has_real_odds=req.has_real_odds,
             hours_to_kickoff=req.hours_to_kickoff,
@@ -471,7 +472,7 @@ def recalculate_dutching_quality(req: RecalcDutchingRequest):
             'quality_verdict_color': quality['verdict_color'],
             'quality_verdict_icon': quality.get('verdict_icon', ''),
             'quality_breakdown': quality.get('breakdown', {}),
-            'n_selections': len(odds),
+            'n_selections': len(user_odds),
             'passes_quality': passes_quality,
             'passes_edge': passes_edge,
             'passes_filter': passes_filter,
