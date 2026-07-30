@@ -887,7 +887,7 @@ def _get_dutching_ml_ensemble():
     if _dutching_ml_cache is None:
         try:
             if os.path.exists(_dutching_ml_path):
-                from .dutching_ml import DutchingMLEnsemble
+                from .dutching.ml import DutchingMLEnsemble
                 _dutching_ml_cache = DutchingMLEnsemble.load(_dutching_ml_path)
                 logger.info(f"[ML] Dutching ensemble loaded from {_dutching_ml_path}. "
                            f"Fitted: {_dutching_ml_cache.fitted}")

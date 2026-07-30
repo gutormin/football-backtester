@@ -237,7 +237,15 @@ async function runDutchingScan() {
     try {
         const source = document.getElementById('dutching-source-select')?.value || 'odds_api';
         const strategy = document.getElementById('dutching-strategy-select')?.value || 'auto_ia';
-        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/scan_dutching?source=${source}&strategy=${strategy}`);
+
+        // Use new modular endpoints
+        let endpoint;
+        if (source === 'oddspapi') {
+            endpoint = `${window.API_BASE_URL || window.location.origin}/api/dutching/oddspapi/scan?strategy=${strategy}`;
+        } else {
+            endpoint = `${window.API_BASE_URL || window.location.origin}/api/dutching/odds-api/scan?strategy=${strategy}`;
+        }
+        const res = await fetch(endpoint);
         if (!res.ok) throw new Error("Dutching scan failed");
 
         const opps = await res.json();
@@ -491,6 +499,12 @@ async function recalculateDutchingQuality(auto = false) {
 
     const opp = window.currentDutchingOpp || {};
 
+    // Detectar qual módulo e escolher endpoint de recálculo completo
+    const oddsSourceType = opp.odds_source_type || 'estimated';
+    const recalcEndpoint = oddsSourceType === 'real'
+        ? `${window.API_BASE_URL || window.location.origin}/api/dutching/odds-api/recalculate`
+        : `${window.API_BASE_URL || window.location.origin}/api/dutching/oddspapi/recalculate`;
+
     // Montar probs por seleção (mapear pelas seleções originais quando possível)
     let selectionsProbs = null;
     if (opp.selections && opp.selections_probs) {
@@ -508,29 +522,35 @@ async function recalculateDutchingQuality(auto = false) {
         if (selectionsProbs.some(p => p == null)) selectionsProbs = null;
     }
 
-    const minQualityEl = document.getElementById('dutching-min-quality');
-    const minQuality = minQualityEl ? parseInt(minQualityEl.value) : 60;
+    const bankroll = parseFloat(document.getElementById('dutching-bankroll-input')?.value || '1000');
+    const kellyFraction = parseFloat(document.getElementById('dutching-kelly-fraction')?.value || '0.25');
+    const maxExposure = parseFloat(document.getElementById('dutching-max-exposure')?.value || '0.05');
 
     resultEl.style.display = 'block';
     if (!auto) {
-        resultEl.innerHTML = '<div style="color: #a78bfa; font-size: 12px; padding: 8px;"><i class="fa-solid fa-arrows-rotate spinning"></i> Recalculando...</div>';
+        resultEl.innerHTML = '<div style="color: #a78bfa; font-size: 12px; padding: 8px;"><i class="fa-solid fa-arrows-rotate spinning"></i> Recalculando todas as métricas (bootstrap, Kelly, simulação)...</div>';
     }
 
     try {
-        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/recalculate_dutching_quality`, {
+        const res = await fetch(recalcEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                match_name: opp.match || `${opp.home_team || ''} vs ${opp.away_team || ''}`,
+                home_team: opp.home_team || '',
+                away_team: opp.away_team || '',
+                league_code: opp.league_code || '',
+                commence_time: opp.commence_time || null,
                 selections,
                 odds,
                 selections_probs: selectionsProbs,
-                real_prob: selectionsProbs ? null : (opp.raw_edge != null && opp.dutching_odd ? (opp.raw_edge + 1) / opp.dutching_odd : null),
-                profile_confidence: opp.profile_confidence || 0.0,
-                market_divergence: opp.market_divergence || 0.0,
-                has_real_odds: opp.odds_source_type === 'real',
-                hours_to_kickoff: opp.hours_to_kickoff || null,
-                min_quality: minQuality,
-                min_edge: 0.0,
+                bookmaker: opp.bookmaker || 'Bet365',
+                o25_odd: opp.o25_odd || null,
+                u25_odd: opp.u25_odd || null,
+                bankroll: bankroll,
+                kelly_fraction: kellyFraction,
+                max_exposure_pct: maxExposure,
+                odds_source_type: oddsSourceType,
             }),
         });
 
@@ -561,7 +581,6 @@ function renderRecalcResult(data) {
     if (!resultEl) return;
 
     // ── Atualizar o card de cima (Quality Score) com os valores recalculados ──
-    // Assim só existe UMA verdade na tela, evitando confusão de dois scores
     const updatedOpp = {
         quality_score: data.quality_score,
         quality_verdict: data.quality_verdict,
@@ -569,9 +588,9 @@ function renderRecalcResult(data) {
         quality_verdict_color: data.quality_verdict_color,
         quality_verdict_icon: data.quality_verdict_icon,
         quality_breakdown: data.quality_breakdown,
-        odds_source_type: (window.currentDutchingOpp || {}).odds_source_type,
-        game_profile: (window.currentDutchingOpp || {}).game_profile,
-        edge_prob_positive: (window.currentDutchingOpp || {}).edge_prob_positive,
+        odds_source_type: data.odds_source_type || (window.currentDutchingOpp || {}).odds_source_type,
+        game_profile: data.game_profile || (window.currentDutchingOpp || {}).game_profile,
+        edge_prob_positive: data.edge_prob_positive,
         _recalc_edge_pct: data.edge_pct,
         _recalc_dutching_odd: data.dutching_odd,
     };
@@ -583,17 +602,73 @@ function renderRecalcResult(data) {
     const bannerBorder = passes ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)';
     const bannerColor = passes ? '#34d399' : '#f87171';
     const bannerIcon = passes ? 'fa-circle-check' : 'fa-circle-xmark';
-    const edgeColor = data.edge >= 0 ? '#34d399' : '#f87171';
-    const bannerText = passes
-        ? `✅ PASSA NO FILTRO — Score ${data.quality_score} ≥ ${data.min_quality}. Edge ${data.edge_pct >= 0 ? '+' : ''}${data.edge_pct.toFixed(1)}% · Odd combinada ${data.dutching_odd.toFixed(2)}. Vale a pena!`
-        : `❌ NÃO PASSA — Score ${data.quality_score} < ${data.min_quality}. Edge ${data.edge_pct >= 0 ? '+' : ''}${data.edge_pct.toFixed(1)}% · Odd combinada ${data.dutching_odd.toFixed(2)}. Melhor não apostar.`;
 
-    resultEl.innerHTML = `
-        <div style="background: ${bannerBg}; border: 1px solid ${bannerBorder}; padding: 12px 16px; border-radius: 8px; display: flex; align-items: center; gap: 10px;">
+    // ── Build the full result panel ──
+    let html = `
+        <div style="background: ${bannerBg}; border: 1px solid ${bannerBorder}; padding: 12px 16px; border-radius: 8px; display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
             <i class="fa-solid ${bannerIcon}" style="color: ${bannerColor}; font-size: 20px;"></i>
-            <span style="color: ${bannerColor}; font-weight: 700; font-size: 13px;">${bannerText}</span>
-        </div>
-    `;
+            <span style="color: ${bannerColor}; font-weight: 700; font-size: 13px;">${data.verdict_summary || (passes ? '✅ PASSA NO FILTRO' : '❌ NÃO PASSA')}</span>
+        </div>`;
+
+    // ── Métricas expandidas ──
+    html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">';
+
+    // Coluna esquerda: Core + Bootstrap
+    html += '<div>';
+    html += '<div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; font-size: 12px;">📊 Métricas</div>';
+    html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Edge:</span> <strong style="color: ${data.edge >= 0 ? '#34d399' : '#f87171'};">${data.edge >= 0 ? '+' : ''}${data.edge_pct.toFixed(2)}%</strong></div>`;
+    html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Odd Combinada:</span> <strong style="color: #c084fc;">${data.dutching_odd.toFixed(2)}</strong></div>`;
+    html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Prob. Combinada:</span> ${(data.combined_prob * 100).toFixed(1)}%</div>`;
+    html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Perfil:</span> ${data.game_profile || '—'}</div>`;
+
+    if (data.edge_ci_95) {
+        const [low, high] = data.edge_ci_95;
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">IC 95%:</span> [${(low*100).toFixed(1)}%, ${(high*100).toFixed(1)}%]</div>`;
+    }
+    if (data.edge_prob_positive != null) {
+        const probColor = data.edge_prob_positive >= 0.8 ? '#34d399' : (data.edge_prob_positive >= 0.65 ? '#f59e0b' : '#f87171');
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">P(edge>0):</span> <strong style="color: ${probColor};">${(data.edge_prob_positive * 100).toFixed(0)}%</strong></div>`;
+    }
+    html += '</div>';
+
+    // Coluna direita: Kelly + Simulação
+    html += '<div>';
+    const sr = data.stake_recommendation || {};
+    const bs = data.bankroll_simulation || {};
+
+    if (sr.stake != null) {
+        html += '<div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; font-size: 12px;">💰 Stake (Kelly)</div>';
+        const riskColors = { conservative: '#34d399', moderate: '#f59e0b', aggressive: '#f97316', max: '#f87171', skip: '#6b7280' };
+        const riskColor = riskColors[sr.risk_level] || '#6b7280';
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Stake:</span> <strong style="color: #c084fc;">R$ ${sr.stake.toFixed(2)}</strong></div>`;
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">% da Banca:</span> ${sr.kelly_pct.toFixed(2)}%</div>`;
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Risco:</span> <strong style="color: ${riskColor};">${sr.risk_level || '—'}</strong></div>`;
+        if (sr.expected_profit != null) {
+            html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Lucro Esp.:</span> <strong style="color: #34d399;">R$ ${sr.expected_profit.toFixed(2)}</strong></div>`;
+        }
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px; font-size: 9px; font-style: italic;">${sr.reason || ''}</div>`;
+    }
+
+    if (bs.growth_median_pct != null) {
+        html += '<div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; margin-top: 8px; font-size: 12px;">📈 Simulação (Monte Carlo)</div>';
+        const growthColor = bs.growth_median_pct >= 0 ? '#34d399' : '#f87171';
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Cresc. Mediano:</span> <strong style="color: ${growthColor};">${bs.growth_median_pct >= 0 ? '+' : ''}${bs.growth_median_pct.toFixed(0)}%</strong></div>`;
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">P10:</span> ${bs.growth_p10_pct >= 0 ? '+' : ''}${bs.growth_p10_pct.toFixed(0)}%</div>`;
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">P90:</span> ${bs.growth_p90_pct >= 0 ? '+' : ''}${bs.growth_p90_pct.toFixed(0)}%</div>`;
+        const ruinColor = bs.ruin_prob <= 0.05 ? '#34d399' : (bs.ruin_prob <= 0.15 ? '#f59e0b' : '#f87171');
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Prob. Ruína:</span> <strong style="color: ${ruinColor};">${(bs.ruin_prob * 100).toFixed(1)}%</strong></div>`;
+        html += `<div style="color: var(--text-muted); margin-bottom: 3px;"><span style="color: var(--text-secondary);">Banca Final Med.:</span> R$ ${bs.median_final.toFixed(2)}</div>`;
+    }
+    html += '</div>';
+
+    html += '</div>'; // end grid
+
+    // Metadata footer
+    html += `<div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); font-size: 9px; color: var(--text-muted);">
+        Recalculado: ${data.recalculated_at ? new Date(data.recalculated_at).toLocaleString() : 'agora'} · Fonte: ${data.odds_source_type === 'real' ? '🟢 CS Real' : '🟡 CS Estimado'}
+    </div>`;
+
+    resultEl.innerHTML = html;
 }
 
 function renderDutchingQualityCard(opp) {
@@ -1783,7 +1858,7 @@ async function runAnchoredTriage() {
     if (resultsEl) resultsEl.innerHTML = '';
 
     try {
-        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/scan_dutching_anchored?source=${source}`);
+        const res = await fetch(`${window.API_BASE_URL || window.location.origin}/api/dutching/anchored?source=${source}`);
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || `Erro HTTP ${res.status}`);

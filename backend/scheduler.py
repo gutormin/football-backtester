@@ -85,7 +85,9 @@ from .telegram_bot import (
     get_telegram_dutching_tips, add_telegram_dutching_tip, format_telegram_dutching_tip
 )
 from .arbitrage_scanner import fetch_arbitrage_opportunities
-from .dutching_scanner import fetch_dutching_opportunities
+from .dutching_scanner import fetch_dutching_opportunities  # backward compat wrapper
+from .dutching.scanner_odds_api import fetch_odds_api_opportunities
+from .dutching.scanner_oddspapi import fetch_oddspapi_opportunities
 CONFIG_PATH = os.path.join(DATA_DIR, 'telegram_scheduler_config.json')
 
 DEFAULT_CONFIG = {
@@ -795,8 +797,11 @@ async def run_automatic_dutching_scan(force=False, source='odds_api'):
     token = os.getenv('THE_ODDS_API_KEY')
 
     try:
-        # Puxar oportunidades (fonte configurável: odds_api ou oddspapi)
-        opps = await loop.run_in_executor(None, lambda: fetch_dutching_opportunities(api_key=token, source=source, strategy='auto_ia', data_source='auto'))
+        # Usar novos módulos modulares: odds_api (CS real) ou oddspapi (CS estimado)
+        if source == 'oddspapi':
+            opps = await loop.run_in_executor(None, lambda: fetch_oddspapi_opportunities(strategy='auto_ia', data_source='auto'))
+        else:
+            opps = await loop.run_in_executor(None, lambda: fetch_odds_api_opportunities(api_key=token, strategy='auto_ia', data_source='auto'))
     except Exception as e:
         return {"status": "error", "message": f"Erro ao buscar Dutching: {e}"}
         

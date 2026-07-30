@@ -71,7 +71,7 @@ def compute_anchored_score(pred, market_ou_odds=None, market_1x2_odds=None,
     Returns:
         dict com score (0-100), componentes e explicação.
     """
-    from .dutching.core import _solve_lambda_from_under25_fast, _get_league_avg_goals
+    from backend.dutching.core import _solve_lambda_from_under25_fast, _get_league_avg_goals
 
     lambda_home = pred.get('lambda_home', 1.2)
     lambda_away = pred.get('lambda_away', 1.0)

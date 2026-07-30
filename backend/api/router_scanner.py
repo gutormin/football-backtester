@@ -17,6 +17,9 @@ from ..backtester import ChronologicalBacktester
 from ..smart_money import SmartMoneyBacktester, calculate_confidence_score
 from ..arbitrage_scanner import fetch_arbitrage_opportunities
 from ..dutching_scanner import fetch_dutching_opportunities
+from ..dutching.recalculate import RecalculateRequest, RecalculateResponse, full_recalculate
+from ..dutching.scanner_odds_api import fetch_odds_api_opportunities
+from ..dutching.scanner_oddspapi import fetch_oddspapi_opportunities
 from ..telegram_bot import (
     get_telegram_config, save_telegram_config, send_test_message,
     send_telegram_message, format_telegram_tip, get_telegram_tips,
@@ -417,31 +420,32 @@ class RecalcDutchingRequest(BaseModel):
 
 @router.post("/recalculate_dutching_quality")
 def recalculate_dutching_quality(req: RecalcDutchingRequest):
-    """Recalcula edge, odd combinada e quality score com odds editadas pelo usuário."""
-    try:
-        from ..dutching_scanner import dutching_quality_score
+    """Legado: Recalcula edge, odd combinada e quality score com odds editadas.
 
-        odds = [o for o in req.odds if o and o > 1.0]
+    Para recálculo COMPLETO (bootstrap, Kelly, simulação), use:
+    - POST /api/dutching/odds-api/recalculate (Módulo A, CS real)
+    - POST /api/dutching/oddspapi/recalculate (Módulo B, CS estimado)
+    - POST /api/dutching/recalculate (unificado)
+    """
+    try:
+        from ..dutching.core import dutching_quality_score
         if len(odds) < 2:
             raise HTTPException(status_code=400, detail="Informe ao menos 2 odds válidas (> 1.00).")
 
-        # Odd combinada do dutching
         overround = sum(1.0 / o for o in odds)
         dutching_odd = 1.0 / overround if overround > 0 else 0.0
 
-        # Probabilidade real combinada
         if req.selections_probs and len(req.selections_probs) == len(odds):
             prob_combined = sum(req.selections_probs)
         elif req.real_prob is not None:
             prob_combined = req.real_prob
         else:
-            # Fallback: usar probabilidade implícita (edge = 0)
             prob_combined = overround
 
-        # Edge
         edge = prob_combined * dutching_odd - 1.0
 
-        # Quality score
+        # Use full quality score from core
+        from ..dutching.core import dutching_quality_score
         quality = dutching_quality_score(
             edge=edge,
             profile_confidence=req.profile_confidence,
@@ -480,6 +484,110 @@ def recalculate_dutching_quality(req: RecalcDutchingRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# New Modular Dutching Endpoints
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/dutching/odds-api/scan")
+def scan_dutching_odds_api(strategy: str = "auto_ia", data_source: str = "auto", futpython_api_key: str = ""):
+    """Módulo A: Scan The Odds API com odds REAIS de Correct Score."""
+    try:
+        from ..dutching_scanner import get_odds_api_token
+        token = os.getenv('THE_ODDS_API_KEY') or get_odds_api_token()
+        return fetch_odds_api_opportunities(
+            api_key=token, strategy=strategy,
+            data_source=data_source, futpython_api_key=futpython_api_key
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/dutching/oddspapi/scan")
+def scan_dutching_oddspapi(strategy: str = "auto_ia", data_source: str = "auto", futpython_api_key: str = ""):
+    """Módulo B: Scan OddsPapi com odds ESTIMADAS de Correct Score."""
+    try:
+        return fetch_oddspapi_opportunities(
+            strategy=strategy, data_source=data_source,
+            futpython_api_key=futpython_api_key
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/dutching/odds-api/recalculate")
+def recalculate_odds_api(req: RecalculateRequest):
+    """Módulo A: Recálculo completo com odds editadas (CS real)."""
+    try:
+        if req.odds_source_type != 'real':
+            req.odds_source_type = 'real'  # force module A default
+        result = full_recalculate(req)
+        return result.model_dump()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/dutching/oddspapi/recalculate")
+def recalculate_oddspapi(req: RecalculateRequest):
+    """Módulo B: Recálculo completo com odds editadas (CS estimado)."""
+    try:
+        if req.odds_source_type != 'estimated':
+            req.odds_source_type = 'estimated'  # force module B default
+        result = full_recalculate(req)
+        return result.model_dump()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/dutching/anchored")
+def scan_dutching_anchored_new(source: str = "oddspapi", data_source: str = "auto"):
+    """Triagem Ancorada (nova rota): ranqueia jogos por divergência modelo×mercado."""
+    try:
+        from ..dutching_scanner import fetch_dutching_anchored_opportunities, get_odds_api_token
+        token = os.getenv('THE_ODDS_API_KEY') or get_odds_api_token()
+        return fetch_dutching_anchored_opportunities(api_key=token, source=source, data_source=data_source)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Backward-Compatible Legacy Endpoint (upgraded)
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.post("/dutching/recalculate")
+def recalculate_dutching_full(req: RecalculateRequest):
+    """Recálculo completo (unificado): detecta módulo via odds_source_type."""
+    try:
+        result = full_recalculate(req)
+        return result.model_dump()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/arbitrage_scheduler/config")
 def get_arb_scheduler_config_api():
