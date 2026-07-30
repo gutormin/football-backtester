@@ -377,11 +377,8 @@ async function testDutchingTelegramAlert() {
 async function triggerDutchingAlertsNow() {
     const statusEl = document.getElementById('dutching-trigger-status');
     const sourceSelect = document.getElementById('dutching-source-select');
-    // Usa a mesma fonte selecionada no radar
-    let source = 'odds_api';
-    if (sourceSelect && sourceSelect.value) {
-        source = sourceSelect.value === 'oddspapi' ? 'oddspapi' : 'odds_api';
-    }
+    // Usa exatamente a fonte selecionada no radar
+    const source = (sourceSelect && sourceSelect.value) ? sourceSelect.value : 'odds_api';
 
     if (statusEl) statusEl.innerHTML = '<span style="color:#a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> Buscando oportunidades e enviando alertas...</span>';
     try {
