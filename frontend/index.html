@@ -1458,7 +1458,13 @@ window.addEventListener('unhandledrejection', function(e) {
  <i class="fa-solid fa-paper-plane"></i> Testar Alerta
  </button>
  </div>
+ <div style="flex: 1; min-width: 150px; padding-bottom: 2px;">
+ <button type="button" class="btn-primary" onclick="window.triggerDutchingAlertsNow()" style="width: 100%; background: linear-gradient(135deg, #8b5cf6, #a78bfa); border: none; color: white; font-size: 12px; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+ <i class="fa-solid fa-satellite-dish"></i> Enviar Alertas Agora
+ </button>
  </div>
+ </div>
+ <div id="dutching-trigger-status" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;"></div>
  </div>
 
  <!-- Radar Section -->

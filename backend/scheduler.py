@@ -781,11 +781,11 @@ def save_dutching_scheduler_config(config):
         json.dump(config, f, indent=4, ensure_ascii=False)
     return config
 
-async def run_automatic_dutching_scan():
+async def run_automatic_dutching_scan(force=False, source='odds_api'):
     config = get_dutching_scheduler_config()
-    if not config.get("enabled"):
-        return {"status": "skipped", "message": "Robô de Dutching desativado."}
-        
+    if not config.get("enabled") and not force:
+        return {"status": "skipped", "message": "Robô de Dutching desativado. Ative os alertas primeiro."}
+
     loop = asyncio.get_event_loop()
     min_edge = config.get("min_edge_pct", 1.0)
     min_hours_before = config.get("min_hours_before", 2.0)
@@ -793,10 +793,10 @@ async def run_automatic_dutching_scan():
     from dotenv import load_dotenv
     load_dotenv()
     token = os.getenv('THE_ODDS_API_KEY')
-    
+
     try:
-        # Puxar oportunidades via The Odds API (live)
-        opps = await loop.run_in_executor(None, lambda: fetch_dutching_opportunities(api_key=token, source='odds_api', strategy='auto_ia', data_source='auto'))
+        # Puxar oportunidades (fonte configurável: odds_api ou oddspapi)
+        opps = await loop.run_in_executor(None, lambda: fetch_dutching_opportunities(api_key=token, source=source, strategy='auto_ia', data_source='auto'))
     except Exception as e:
         return {"status": "error", "message": f"Erro ao buscar Dutching: {e}"}
         
@@ -813,12 +813,18 @@ async def run_automatic_dutching_scan():
         sent_lookup.add(key)
         
     sent_count = 0
-    
+    min_quality = config.get("min_quality_score", 60.0)  # padrão: só envia score >= 60
+
     for opp in opps:
         edge_pct = opp.get('raw_edge', 0.0) * 100.0
         if edge_pct < min_edge:
             continue
-            
+
+        # Filtro de Quality Score — só envia partidas com score bom
+        quality = opp.get('quality_score')
+        if quality is not None and quality < min_quality:
+            continue
+
         match_name = opp.get('match')
         match_date = opp.get('date')
         

@@ -1044,6 +1044,23 @@ def save_tg_dutching_config_api(req: TelegramDutchingConfigRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/telegram/trigger_dutching_now")
+async def trigger_dutching_alerts_now(source: str = "odds_api"):
+    """Roda o scan de dutching e envia os alertas no Telegram imediatamente.
+
+    Útil no Render, onde os schedulers de background não rodam.
+    Pode ser chamado manualmente ou por um cron externo (cron-job.org).
+    """
+    try:
+        from ..scheduler import run_automatic_dutching_scan
+        result = await run_automatic_dutching_scan(force=True, source=source)
+        return result or {"status": "done"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/telegram/test_dutching")
 def test_tg_dutching_connection():
     try:

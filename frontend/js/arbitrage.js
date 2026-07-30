@@ -374,6 +374,37 @@ async function testDutchingTelegramAlert() {
     }
 }
 
+async function triggerDutchingAlertsNow() {
+    const statusEl = document.getElementById('dutching-trigger-status');
+    const sourceSelect = document.getElementById('dutching-source-select');
+    // Usa a mesma fonte selecionada no radar (odds_api ou oddspapi)
+    let source = 'odds_api';
+    if (sourceSelect && sourceSelect.value) {
+        const v = sourceSelect.value;
+        if (v.includes('oddspapi') || v === 'oddspapi') source = 'oddspapi';
+    }
+
+    if (statusEl) statusEl.innerHTML = '<span style="color:#a78bfa;"><i class="fa-solid fa-arrows-rotate spinning"></i> Buscando oportunidades e enviando alertas...</span>';
+    try {
+        const res = await fetch(`/api/telegram/trigger_dutching_now?source=${source}`, { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok) {
+            const msg = data.message || `${data.sent_tips || 0} alerta(s) enviado(s).`;
+            if (statusEl) statusEl.innerHTML = `<span style="color:#34d399;"><i class="fa-solid fa-circle-check"></i> ${msg}</span>`;
+            showToast(msg, "success");
+        } else {
+            const err = data.detail || data.message || 'Erro desconhecido';
+            if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;"><i class="fa-solid fa-circle-exclamation"></i> ${err}</span>`;
+            showToast("Falha: " + err, "error");
+        }
+    } catch (e) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Erro de conexão.</span>';
+        showToast("Erro ao disparar alertas.", "error");
+    }
+}
+window.triggerDutchingAlertsNow = triggerDutchingAlertsNow;
+
 async function loadOddsApiKey() {
     try {
         const res = await fetch(`${API_BASE_URL}/api/telegram/odds_api_config`);
