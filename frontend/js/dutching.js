@@ -124,8 +124,16 @@ function calculateDutching() {
     if (selections.length === 0 || sumProbabilityImplied <= 0) {
         allocationList.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 15px;">Adicione seleções válidas com odds > 1.00.</td></tr>`;
         if (document.getElementById('dutching-combined-odd-value')) document.getElementById('dutching-combined-odd-value').innerText = '0.00';
-        if (document.getElementById('dutching-real-prob-value')) document.getElementById('dutching-real-prob-value').innerText = '0.00%';
-        if (document.getElementById('dutching-edge-value')) document.getElementById('dutching-edge-value').innerText = '+0.00%';
+        if (document.getElementById('dutching-real-prob-value')) {
+            const el = document.getElementById('dutching-real-prob-value');
+            el.innerText = '--';
+            el.style.color = '#6b7280';
+        }
+        if (document.getElementById('dutching-edge-value')) {
+            const el = document.getElementById('dutching-edge-value');
+            el.innerText = '--';
+            el.style.color = '#6b7280';
+        }
         if (document.getElementById('dutching-profit-value')) document.getElementById('dutching-profit-value').innerText = '$0.00';
         updateDutchingChart([], []);
         return;
@@ -182,20 +190,38 @@ function calculateDutching() {
     });
     
     const combinedOdd = sumProbabilityImplied > 0 ? (1.0 / sumProbabilityImplied) : 0.0;
+    const hasModelData = sumProbabilityReal > 0;
     const realProbPercent = sumProbabilityReal * 100;
-    const edge = combinedOdd > 0 ? (sumProbabilityReal * combinedOdd - 1.0) : -1.0;
-    const edgePercent = edge * 100;
+    const edge = (hasModelData && combinedOdd > 0) ? (sumProbabilityReal * combinedOdd - 1.0) : null;
+    const edgePercent = edge != null ? edge * 100 : null;
 
     const combinedOddEl = document.getElementById('dutching-combined-odd-value');
     if (combinedOddEl) combinedOddEl.innerText = combinedOdd.toFixed(2);
 
     const realProbEl = document.getElementById('dutching-real-prob-value');
-    if (realProbEl) realProbEl.innerText = realProbPercent.toFixed(2) + '%';
+    if (realProbEl) {
+        if (hasModelData) {
+            realProbEl.innerText = realProbPercent.toFixed(2) + '%';
+            realProbEl.style.color = '#a78bfa';
+            realProbEl.title = 'Probabilidade estimada pela IA para os placares selecionados';
+        } else {
+            realProbEl.innerText = '--';
+            realProbEl.style.color = '#6b7280';
+            realProbEl.title = 'Escaneie o radar e clique numa oportunidade para carregar as probabilidades da IA';
+        }
+    }
 
     const edgeEl = document.getElementById('dutching-edge-value');
     if (edgeEl) {
-        edgeEl.innerText = (edgePercent >= 0 ? '+' : '') + edgePercent.toFixed(2) + '%';
-        edgeEl.style.color = edgePercent >= 0 ? '#34d399' : '#f87171';
+        if (edgePercent != null) {
+            edgeEl.innerText = (edgePercent >= 0 ? '+' : '') + edgePercent.toFixed(2) + '%';
+            edgeEl.style.color = edgePercent >= 0 ? '#34d399' : '#f87171';
+            edgeEl.title = 'Valor Esperado (+EV) do Dutching com base nas probabilidades reais';
+        } else {
+            edgeEl.innerText = '--';
+            edgeEl.style.color = '#6b7280';
+            edgeEl.title = 'Sem dados de IA — carregue uma oportunidade do radar para ver o edge estimado';
+        }
     }
     
     if (mode === 'total_stake') {
