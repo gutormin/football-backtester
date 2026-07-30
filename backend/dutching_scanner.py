@@ -966,6 +966,39 @@ def resolve_strategy(strategy_name, pred, is_home_fav):
         return 'dynamic'
 
 
+def _guess_league_from_teams(home_team, away_team):
+    """Best-effort: mapeia times para um codigo de liga com dados historicos.
+    Retorna None se nao conseguir identificar (jogo sera ignorado)."""
+    cache = globals().get('_TEAM_LEAGUE_CACHE')
+    if cache is None:
+        cache = {}
+        priority_leagues = ['BRA', 'BRAZIL_SERIE_B', 'E0', 'SP1', 'I1', 'D1', 'F1',
+                            'E1', 'SP2', 'I2', 'N1', 'P1', 'ARG']
+        for lc in priority_leagues:
+            try:
+                df = load_league_data(lc, start_date='2023-01-01', data_source=auto_detect_data_source(lc))
+                if df is not None and not df.empty:
+                    teams = set(df['HomeTeam'].dropna().unique()) | set(df['AwayTeam'].dropna().unique())
+                    for t in teams:
+                        cache[str(t).lower().strip()] = lc
+            except Exception:
+                continue
+        globals()['_TEAM_LEAGUE_CACHE'] = cache
+
+    h = (home_team or '').lower().strip()
+    a = (away_team or '').lower().strip()
+    if h in cache:
+        return cache[h]
+    if a in cache:
+        return cache[a]
+    for team_name, lc in cache.items():
+        if h and (h in team_name or team_name in h):
+            return lc
+        if a and (a in team_name or team_name in a):
+            return lc
+    return None
+
+
 def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto_ia', data_source='auto', futpython_api_key=''):
     if not api_key:
         api_key = os.getenv('THE_ODDS_API_KEY') or get_odds_api_token()
@@ -982,6 +1015,23 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
             pass
         return None
 
+    # Pré-fetch OddsPapi (fonte alternativa à The Odds API)
+    # A OddsPapi retorna jogos no formato compatível; injetamos e reusamos o pipeline.
+    _prefetched_matches = None
+    if source == 'oddspapi':
+        from .oddspapi_client import fetch_oddspapi_matches
+        _opapi_matches, _opapi_err = fetch_oddspapi_matches()
+        if _opapi_err:
+            return [_opapi_err]
+        if not _opapi_matches:
+            return []
+        # Mapear cada match para uma liga com dados históricos, pelos nomes dos times
+        for m in _opapi_matches:
+            m['sport_key'] = 'soccer_oddspapi'
+            m['_league_code'] = _guess_league_from_teams(m.get('home_team', ''), m.get('away_team', ''))
+        _prefetched_matches = [m for m in _opapi_matches if m['_league_code']]
+        source = 'odds_api'  # reusar o pipeline
+
     # 1. FONTE: THE ODDS API (Tempo Real Betfair/Bet365)
     if source == 'odds_api':
         REGIONS = 'eu,uk,us'
@@ -993,35 +1043,40 @@ def fetch_dutching_opportunities(api_key=None, source='odds_api', strategy='auto
             return requests.get(url, headers=headers, timeout=8)
 
         if not api_key or api_key == 'test':
-            return [{'error': 'no_api_key', 'message': 'API key da The Odds API não configurada. Obtenha uma em https://the-odds-api.com e configure THE_ODDS_API_KEY no ambiente ou em data/odds_api_config.json.'}]
+            if _prefetched_matches is None:
+                return [{'error': 'no_api_key', 'message': 'API key da The Odds API não configurada. Obtenha uma em https://the-odds-api.com e configure THE_ODDS_API_KEY no ambiente ou em data/odds_api_config.json.'}]
 
         # Fetch live matches from API first (lightweight), then load data only for leagues with games
         matches_found = []
         api_errors = []
-        for sport_key, league_code in SPORT_LEAGUE_MAP.items():
-            url = f'https://api.the-odds-api.com/v4/sports/{sport_key}/odds/?apiKey={api_key}&regions={REGIONS}&markets={MARKETS}'
-            try:
-                response = _get_odds(url)
-                if response.status_code == 200:
-                    data = response.json()
-                    for m in data:
-                        m['_league_code'] = league_code
-                    matches_found.extend(data)
-                elif response.status_code == 401:
-                    try:
-                        body = response.json()
-                        error_code = body.get('error_code', '')
-                    except Exception:
-                        error_code = ''
-                    if error_code == 'OUT_OF_USAGE_CREDITS':
-                        api_errors.append('Créditos da The Odds API esgotados. O plano gratuito renova mensalmente.')
+        if _prefetched_matches is not None:
+            # Já temos os jogos da OddsPapi
+            matches_found = _prefetched_matches
+        else:
+            for sport_key, league_code in SPORT_LEAGUE_MAP.items():
+                url = f'https://api.the-odds-api.com/v4/sports/{sport_key}/odds/?apiKey={api_key}&regions={REGIONS}&markets={MARKETS}'
+                try:
+                    response = _get_odds(url)
+                    if response.status_code == 200:
+                        data = response.json()
+                        for m in data:
+                            m['_league_code'] = league_code
+                        matches_found.extend(data)
+                    elif response.status_code == 401:
+                        try:
+                            body = response.json()
+                            error_code = body.get('error_code', '')
+                        except Exception:
+                            error_code = ''
+                        if error_code == 'OUT_OF_USAGE_CREDITS':
+                            api_errors.append('Créditos da The Odds API esgotados. O plano gratuito renova mensalmente.')
+                        else:
+                            api_errors.append('Chave de API inválida (HTTP 401). Verifique THE_ODDS_API_KEY.')
+                        break
                     else:
-                        api_errors.append('Chave de API inválida (HTTP 401). Verifique THE_ODDS_API_KEY.')
-                    break
-                else:
-                    api_errors.append(f'{sport_key}: HTTP {response.status_code}')
-            except Exception as e:
-                logger.error(f"Erro ao buscar Odds API para {sport_key}: {e}", exc_info=True)
+                        api_errors.append(f'{sport_key}: HTTP {response.status_code}')
+                except Exception as e:
+                    logger.error(f"Erro ao buscar Odds API para {sport_key}: {e}", exc_info=True)
 
         if api_errors and not matches_found:
             return [{'error': 'api_error', 'message': api_errors[0]}]
