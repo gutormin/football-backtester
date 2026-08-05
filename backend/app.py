@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 from fastapi import FastAPI, Response, status
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import Response
+from starlette.responses import Response, FileResponse, HTMLResponse
 from starlette.types import Scope
 
 class SPAStaticFiles:
@@ -154,6 +154,11 @@ async def favicon():
 
 # Register heavy routers BEFORE mounting static files (critical: mount at "/" catches all)
 _register_all_routers(app)
+
+# Mount Dutching analysis dashboard static directory
+dutching_analysis_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'dutching_analysis')
+if os.path.exists(dutching_analysis_dir):
+    app.mount("/dutching-analysis", StaticFiles(directory=dutching_analysis_dir, html=True), name="dutching_analysis")
 
 # Mount frontend static files last — only matches GET paths not handled by routers above
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend')

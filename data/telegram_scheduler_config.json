@@ -1,18 +1,18 @@
 {
-    "enabled": true,
+    "enabled": false,
     "mode": "manual",
     "check_interval_hours": 6,
     "leagues": [
-        "brazil/serie-c"
+        "germany/dfb-pokal"
     ],
     "market": [
-        "lay_away"
+        "lay_draw"
     ],
-    "value_threshold": 1.12,
+    "value_threshold": 1.05,
     "min_odds": 1.0,
-    "max_odds": 1.5,
-    "staking_rule": "kelly",
-    "stake_value": 0.25,
+    "max_odds": 10.0,
+    "staking_rule": "fixed",
+    "stake_value": 10.0,
     "initial_bankroll": 1000.0,
     "upcoming_source": "api"
 }

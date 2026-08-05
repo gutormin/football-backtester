@@ -45,3 +45,4 @@ backups/
 *.zip
 *.xlsx
 data/oddspapi_config.json
+data/dutching_analysis/
