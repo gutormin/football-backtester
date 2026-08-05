@@ -285,8 +285,8 @@ class DutchingBacktester:
                 continue
 
             matches_total += 1
-            fthg = int(fthg)
-            ftag = int(ftag)
+            fthg = int(float(fthg))
+            ftag = int(float(ftag))
             actual_score = f"{fthg}-{ftag}"
             total_goals = fthg + ftag
 
@@ -348,8 +348,11 @@ class DutchingBacktester:
 
                 # Also give pred direct access to bundle attrs for CS access
                 pred['prob_matrix'] = bundle.prob_matrix
-            except Exception:
+            except Exception as e:
                 # If prediction fails, still update form but skip betting
+                if matches_total <= 3:
+                    logger.warning(f"[DutchingBT] compute_all failed for {home_team} vs {away_team}: "
+                                   f"{type(e).__name__}: {e}")
                 _update_form_trackers(
                     team_home_scored, team_home_conceded, team_away_scored, team_away_conceded,
                     league_home_goals, league_away_goals, league_code,
@@ -436,6 +439,12 @@ class DutchingBacktester:
                             min_selections=min_selections,
                             n_bootstrap=150, is_home_fav=is_home_fav,
                         )
+                        if edge_confidence is None:
+                            edge_confidence = {
+                                'edge_median': edge, 'edge_ci_95': (None, None),
+                                'edge_ci_80': (None, None), 'prob_positive': 0.5,
+                                'edge_mean': edge, 'edge_std': 0.05, 'insufficient_samples': True,
+                            }
 
                         # Quality score
                         quality = dutching_quality_score(
@@ -521,8 +530,8 @@ class DutchingBacktester:
                             'dutching_odd': round(dutching_odd, 2),
                             'model_prob': round(cum_prob, 4),
                             'predicted_edge': round(edge, 4),
-                            'edge_ci_95_low': edge_confidence.get('edge_ci_95', (None, None))[0],
-                            'edge_ci_95_high': edge_confidence.get('edge_ci_95', (None, None))[1],
+                            'edge_ci_95_low': (edge_confidence.get('edge_ci_95') or (None, None))[0],
+                            'edge_ci_95_high': (edge_confidence.get('edge_ci_95') or (None, None))[1],
                             'edge_prob_positive': edge_confidence.get('prob_positive'),
                             'edge_std': edge_confidence.get('edge_std'),
                             'quality_score': quality['score'],
