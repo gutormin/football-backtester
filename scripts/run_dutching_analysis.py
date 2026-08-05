@@ -308,8 +308,19 @@ def aggregate_results(all_results: dict) -> dict:
 # ── HTML Generator ────────────────────────────────────────────────────────
 
 def generate_html_report(aggregated: dict, output_path: Path):
-    """Generate a standalone interactive HTML dashboard."""
+    """Generate a standalone interactive HTML dashboard.
+
+    Saves data as a separate data.js file (var DATA = {...}) loaded via <script src>,
+    avoiding browser parser issues with 8MB+ inline JSON while keeping synchronous loading.
+    """
     data_json = json.dumps(aggregated, ensure_ascii=False, default=str)
+    data_js_path = output_path.parent / 'data.js'
+    with open(data_js_path, 'w', encoding='utf-8') as f:
+        f.write('var DATA = ')
+        f.write(data_json)
+        f.write(';')
+    data_size_mb = data_js_path.stat().st_size / (1024 * 1024)
+    print(f"  [INFO] Dados salvos em data.js ({data_size_mb:.1f} MB)")
 
     html = f'''<!DOCTYPE html>
 <html lang="pt-BR">
@@ -318,6 +329,7 @@ def generate_html_report(aggregated: dict, output_path: Path):
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dutching Backtest — Análise Multi-Liga</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="data.js"></script>
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }}
@@ -368,7 +380,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans
 <div class="footer">Dutching Backtester &bull; {len(aggregated['config']['strategies'])} estrategias &bull; Staking: Fixo R${STAKE_VALUE:.0f}</div>
 
 <script>
-const DATA = {data_json};
+// DATA is loaded via <script src="data.js"> above — available synchronously
 
 // ── KPI Cards ──
 (function() {{
@@ -419,7 +431,7 @@ const DATA = {data_json};
 // ── Strategy Bars ──
 (function() {{
   const strats = {json.dumps(STRATEGIES)};
-  const labels = strats.map(s => {json.dumps(STRATEGY_LABELS)}[s] || s);
+  const labels = strats.map(s => ({json.dumps(STRATEGY_LABELS)})[s] || s);
   const agg = DATA.strategy_aggregate;
   const roiVals = strats.map(s => agg[s] ? agg[s].roi : 0);
   const wrVals = strats.map(s => agg[s] ? (agg[s].bets > 0 ? Math.round(agg[s].profit > 0 ? 25 : 15) : 0) : 0);
@@ -444,7 +456,7 @@ const DATA = {data_json};
 // ── Heatmap ──
 (function() {{
   const strats = {json.dumps(STRATEGIES)};
-  const stratLabels = strats.map(s => {json.dumps(STRATEGY_LABELS)}[s] || s);
+  const stratLabels = strats.map(s => ({json.dumps(STRATEGY_LABELS)})[s] || s);
   const leagues = DATA.leagues.map(l => l.league_name);
   const zData = [];
   const textData = [];
@@ -547,7 +559,7 @@ const DATA = {data_json};
 // ── Equity Curves (aggregated, normalized) ──
 (function() {{
   const strats = {json.dumps(STRATEGIES)};
-  const stratLabels = strats.map(s => {json.dumps(STRATEGY_LABELS)}[s] || s);
+  const stratLabels = strats.map(s => ({json.dumps(STRATEGY_LABELS)})[s] || s);
   const colors = ['#38bdf8','#34d399','#fbbf24','#f87171','#a78bfa','#fb923c','#f472b6'];
 
   // Build cumulative equity by date across leagues
