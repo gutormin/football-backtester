@@ -113,8 +113,9 @@ def _start_schedulers():
 
     asyncio.create_task(_delayed_task("scheduler", run_scheduler_loop, 0.5))
     asyncio.create_task(_delayed_task("arbitrage", run_arbitrage_scheduler_loop, 0.5))
-    asyncio.create_task(_delayed_task("live_odds", run_live_odds_tracker_loop, 0.5))
-    asyncio.create_task(_delayed_task("cluster_ai", run_cluster_ai_alerts_loop, 2.0))
+    # Smart Money (live_odds + cluster_ai) — DESLIGADO manualmente
+    # asyncio.create_task(_delayed_task("live_odds", run_live_odds_tracker_loop, 0.5))
+    # asyncio.create_task(_delayed_task("cluster_ai", run_cluster_ai_alerts_loop, 2.0))
     asyncio.create_task(_delayed_task("dutching", run_dutching_scheduler_loop, 0.5))
     asyncio.create_task(_delayed_task("datafootball_sync", run_datafootball_sync_loop, 60))  # start after 60s
 
